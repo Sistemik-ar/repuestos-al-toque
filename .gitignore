@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Editor / local tooling
+.claude/
+.vscode/
+
+# Vercel
+.vercel
+
+# Node (por si más adelante sumamos backend)
+node_modules/
+npm-debug.log*
