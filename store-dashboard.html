@@ -46,8 +46,8 @@
 
       <!-- Today stats -->
       <div class="grid-3 mb-16">
-        <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">7</div><div class="stat-label">Leads hoy</div></div>
-        <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green">4</div><div class="stat-label">Ganados</div></div>
+        <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">7</div><div class="stat-label">Solicitudes hoy</div></div>
+        <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green">4</div><div class="stat-label">Concretados</div></div>
         <div class="card stat-card" style="padding:14px;"><div class="stat-value">$182k</div><div class="stat-label">Vendido</div></div>
       </div>
 
@@ -239,7 +239,7 @@
       document.querySelectorAll('.tab-pane').forEach(p => p.style.display = (p.dataset.pane===b.dataset.tab)?'block':'none');
     });
 
-    document.getElementById('bellBtn').onclick = () => RAT.toast({title:'Nuevo lead cercano', sub:'Filtro de aire · Chevrolet S10 · Zona Centro', icon:'fa-bolt', type:'yellow'});
+    document.getElementById('bellBtn').onclick = () => RAT.toast({title:'Nueva solicitud cercana', sub:'Filtro de aire · Chevrolet S10 · Zona Centro', icon:'fa-bolt', type:'yellow'});
 
     renderLeads();
 
