@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>RepuestosAlToque — Mecánico</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top bar -->
+    <div class="topbar">
+      <a href="index.html" class="brand">
+        <span class="logo-mark"><i class="fa-solid fa-gear"></i></span>
+        <span>RepuestosAlToque</span>
+      </a>
+      <div class="topbar-actions">
+        <button class="icon-btn" onclick="RAT.toast({title:'2 nuevas cotizaciones',sub:'Pedido #1042 · Pastillas de freno',icon:'fa-tag',type:'yellow'})"><i class="fa-regular fa-bell"></i><span class="dot"></span></button>
+        <div class="avatar">TP</div>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Greeting -->
+      <div class="mb-16">
+        <div class="eyebrow">Taller Patagonia</div>
+        <h1 class="h-lg">Buenas, Martín 👋</h1>
+        <p class="text-sm muted">¿Qué repuesto necesitás hoy?</p>
+      </div>
+
+      <!-- Reputation / badge -->
+      <div class="card glow mb-16" style="background:linear-gradient(135deg,rgba(109,40,217,0.28),rgba(31,41,55,0.6));">
+        <div class="flex-between mb-12">
+          <div class="flex-center gap-12">
+            <div class="avatar" style="width:46px;height:46px;font-size:16px;">TP</div>
+            <div>
+              <div style="font-weight:800;">Taller Patagonia</div>
+              <div id="repBadge" class="mt-4"></div>
+            </div>
+          </div>
+          <div style="text-align:right;"><div class="text-xs muted">Puntos</div><div class="h-md text-yellow">2.540</div></div>
+        </div>
+        <div class="rep-stats card" style="background:var(--bg-1);padding:12px;">
+          <div><div class="v">127</div><div class="l">Operaciones</div></div>
+          <div><div class="v">⭐ 4.9</div><div class="l">Calificación</div></div>
+          <div><div class="v">96</div><div class="l">Reseñas</div></div>
+        </div>
+        <div class="mt-12">
+          <div class="flex-between text-xs muted mb-4"><span><i class="fa-solid fa-bolt text-yellow"></i> Nivel Elite · Top 5% de Bariloche</span><span>Máximo</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:100%;"></div></div>
+        </div>
+      </div>
+
+      <!-- Primary CTA -->
+      <a href="request-flow.html" class="card glow hoverable mb-16" style="display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,rgba(109,40,217,0.35),rgba(31,41,55,0.7));">
+        <div class="store-avatar" style="background:var(--yellow);color:#0B0B0F;"><i class="fa-solid fa-bolt"></i></div>
+        <div style="flex:1">
+          <div class="h-md">Solicitar Repuesto</div>
+          <div class="text-sm subtle">Recibí cotizaciones en minutos</div>
+        </div>
+        <i class="fa-solid fa-arrow-right"></i>
+      </a>
+
+      <!-- Floating live notification -->
+      <div class="float-notif mb-24 animate-in">
+        <div class="store-avatar" style="width:38px;height:38px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-tower-broadcast"></i></div>
+        <div style="flex:1">
+          <div class="text-sm" style="font-weight:700;">Pedido #1042 activo</div>
+          <div class="text-xs muted">3 comercios notificados · llegando cotizaciones</div>
+        </div>
+        <a href="quotes.html" class="btn btn-yellow btn-sm">Ver</a>
+      </div>
+
+      <!-- Active requests -->
+      <div class="section">
+        <div class="section-title"><h2>Pedidos activos</h2><a href="quotes.html">Ver todos</a></div>
+
+        <a href="quotes.html" class="card hoverable mb-12" style="display:block;">
+          <div class="flex-between mb-8">
+            <div class="flex-center">
+              <div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-record-vinyl"></i></div>
+              <div>
+                <div class="text-sm" style="font-weight:700;">Pastillas de freno delanteras</div>
+                <div class="text-xs muted">Toyota Hilux 2019 · Frenos</div>
+              </div>
+            </div>
+            <span class="timer-pill" id="dashTimer"><i class="fa-solid fa-clock"></i> 07:12</span>
+          </div>
+          <div class="flex-between">
+            <div class="flex-center gap-8">
+              <span class="badge badge-green"><i class="fa-solid fa-bolt"></i> Necesito ahora</span>
+              <span class="text-xs muted">3 cotizaciones</span>
+            </div>
+            <span class="text-xs text-purple" style="font-weight:700;">Ver ofertas →</span>
+          </div>
+        </a>
+
+        <div class="card mb-12" style="opacity:.85;">
+          <div class="flex-between mb-8">
+            <div class="flex-center">
+              <div class="store-avatar" style="width:38px;height:38px;background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-snowflake"></i></div>
+              <div>
+                <div class="text-sm" style="font-weight:700;">Bomba de agua</div>
+                <div class="text-xs muted">VW Amarok 2021 · Refrigeración</div>
+              </div>
+            </div>
+            <span class="badge badge-green"><i class="fa-solid fa-check"></i> Entregado</span>
+          </div>
+          <div class="flex-between">
+            <span class="text-xs muted">Repuestos Centro</span>
+            <button class="btn btn-yellow btn-sm" onclick="RAT.openRating({role:'store', who:'Repuestos Centro', subjectName:'Bomba de agua · VW Amarok'})"><i class="fa-solid fa-star"></i> Calificar vendedor</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent quotes preview -->
+      <div class="section">
+        <div class="section-title"><h2>Últimas cotizaciones</h2></div>
+        <div class="card-flush card">
+          <div class="container" style="padding:14px 16px;">
+            <div class="list-row">
+              <div class="store-avatar" style="width:36px;height:36px;"><i class="fa-solid fa-user-secret"></i></div>
+              <div style="flex:1">
+                <div class="text-sm" style="font-weight:700;">Proveedor #12 <span class="badge badge-purple" style="margin-left:4px;">Bosch</span></div>
+                <div class="text-xs muted">ETA 25 min · ⭐ 4.9</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:800;">$48.500</div>
+                <div class="text-xs muted">garantía 6m</div>
+              </div>
+            </div>
+            <div class="list-row">
+              <div class="store-avatar" style="width:36px;height:36px;"><i class="fa-solid fa-user-secret"></i></div>
+              <div style="flex:1">
+                <div class="text-sm" style="font-weight:700;">Zona Oeste Parts <span class="badge badge-purple" style="margin-left:4px;">Ferodo</span></div>
+                <div class="text-xs muted">ETA 45 min · ⭐ 4.8</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:800;">$39.900</div>
+                <div class="text-xs muted">garantía 12m</div>
+              </div>
+            </div>
+          </div>
+          <a href="quotes.html" class="btn btn-ghost btn-block" style="border-radius:0;border-left:none;border-right:none;border-bottom:none;">Comparar cotizaciones</a>
+        </div>
+      </div>
+
+      <!-- Delivery status -->
+      <div class="section">
+        <div class="section-title"><h2>Estado de entregas</h2></div>
+        <div class="card">
+          <div class="flex-between mb-12">
+            <div class="text-sm" style="font-weight:700;">Bomba de agua · #1038</div>
+            <span class="badge badge-yellow"><i class="fa-solid fa-motorcycle"></i> En camino</span>
+          </div>
+          <div class="progress-track mb-8"><div class="progress-fill" style="width:66%;"></div></div>
+          <div class="flex-between text-xs muted">
+            <span>Retirado del comercio</span>
+            <span class="text-yellow" style="font-weight:700;">Llega en ~12 min</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom nav -->
+    <nav class="bottom-nav">
+      <a href="mechanic-dashboard.html" data-nav="mechanic-dashboard.html"><i class="fa-solid fa-house"></i>Inicio</a>
+      <a href="quotes.html" data-nav="quotes.html"><i class="fa-solid fa-tags"></i>Cotizaciones</a>
+      <a href="request-flow.html" class="fab"><i class="fa-solid fa-plus"></i></a>
+      <a href="delivery-dashboard.html" data-nav="delivery-dashboard.html"><i class="fa-solid fa-map-location-dot"></i>Envíos</a>
+      <a href="index.html"><i class="fa-solid fa-user"></i>Perfil</a>
+    </nav>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    // Reputation badge (derived from completed operations)
+    document.getElementById('repBadge').innerHTML = RAT.badgeHTML('mechanic', 127);
+    // Dashboard countdown
+    RAT.countdown(document.getElementById('dashTimer'), 7 * 60 + 12, { pillEl: document.getElementById('dashTimer') });
+    // Simulated incoming quote after a moment
+    setTimeout(() => { RAT.ping(); RAT.toast({ title: 'Nueva cotización · Pedido #1042', sub: 'Distribuidor Centro · $44.900 · ETA 35 min', icon: 'fa-tag', type: 'yellow' }); }, 4500);
+  </script>
+</body>
+</html>

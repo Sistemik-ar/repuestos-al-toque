@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>RepuestosAlToque — Nuevo pedido</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="flex-center">
+        <a href="mechanic-dashboard.html" class="icon-btn" id="backBtn"><i class="fa-solid fa-arrow-left"></i></a>
+        <div>
+          <div style="font-weight:800;">Nuevo pedido</div>
+          <div class="text-xs muted" id="stepLabel">Paso 1 de 5 · Vehículo</div>
+        </div>
+      </div>
+      <a href="mechanic-dashboard.html" class="icon-btn"><i class="fa-solid fa-xmark"></i></a>
+    </div>
+
+    <div class="container">
+      <div class="steps" id="steps">
+        <div class="step current"></div><div class="step"></div><div class="step"></div><div class="step"></div><div class="step"></div>
+      </div>
+
+      <!-- STEP 1: Vehicle -->
+      <div class="step-pane" data-step="1">
+        <div class="eyebrow mb-8">Paso 1</div>
+        <h2 class="h-lg mb-16">¿Para qué vehículo?</h2>
+        <div class="field">
+          <label>Marca</label>
+          <select class="select" id="brand"></select>
+        </div>
+        <div class="field">
+          <label>Modelo</label>
+          <select class="select" id="model" disabled><option value="">Elegí primero la marca</option></select>
+        </div>
+        <div class="field">
+          <label>Año</label>
+          <select class="select" id="year"></select>
+        </div>
+        <div class="field">
+          <label>VIN <span class="muted">(opcional)</span></label>
+          <input class="input" id="vin" placeholder="Ej: 8AJHA8CD9J1234567">
+        </div>
+        <div class="chip-row mb-8">
+          <span class="text-xs muted" style="align-self:center;">Frecuentes:</span>
+          <button class="chip" onclick="quickVehicle('Toyota','Hilux','2019')">Toyota Hilux</button>
+          <button class="chip" onclick="quickVehicle('Volkswagen','Amarok','2021')">VW Amarok</button>
+          <button class="chip" onclick="quickVehicle('Ford','Ranger','2020')">Ford Ranger</button>
+          <button class="chip" onclick="quickVehicle('Renault','Kangoo','2018')">Renault Kangoo</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: Category -->
+      <div class="step-pane" data-step="2" style="display:none;">
+        <div class="eyebrow mb-8">Paso 2</div>
+        <h2 class="h-lg mb-16">¿Qué tipo de repuesto?</h2>
+        <div class="grid-3" id="catGrid"></div>
+      </div>
+
+      <!-- STEP 3: Describe -->
+      <div class="step-pane" data-step="3" style="display:none;">
+        <div class="eyebrow mb-8">Paso 3</div>
+        <h2 class="h-lg mb-16">Describí el repuesto</h2>
+        <div class="field">
+          <label>Detalle</label>
+          <textarea class="textarea" id="desc" placeholder="Ej: Juego de pastillas de freno delanteras, originales o equivalentes. Auto con freno de disco ventilado."></textarea>
+        </div>
+        <div class="field">
+          <label>Foto <span class="muted">(opcional)</span></label>
+          <div class="upload-area" id="uploadArea">
+            <i class="fa-solid fa-camera" style="font-size:24px;"></i>
+            <div class="text-sm mt-8" style="font-weight:600;">Agregar foto</div>
+            <div class="text-xs">Sacá foto de la pieza o el número de parte</div>
+          </div>
+          <div id="photoChip" style="display:none;" class="float-notif mt-12">
+            <div class="store-avatar" style="width:38px;height:38px;background:rgba(34,197,94,0.18);color:#4ADE80;"><i class="fa-solid fa-image"></i></div>
+            <div style="flex:1"><div class="text-sm" style="font-weight:700;">foto_pieza.jpg</div><div class="text-xs muted">Cargada · 1.2 MB</div></div>
+            <i class="fa-solid fa-check text-green"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Urgency -->
+      <div class="step-pane" data-step="4" style="display:none;">
+        <div class="eyebrow mb-8">Paso 4</div>
+        <h2 class="h-lg mb-8">¿Para cuándo lo necesitás?</h2>
+        <p class="text-sm muted mb-16">Esto define a cuántos comercios y con qué prioridad notificamos.</p>
+        <div class="flex-col gap-12" id="urgencyList">
+          <label class="card hoverable urgency-opt" style="display:flex;align-items:center;gap:14px;cursor:pointer;" data-urg="ahora">
+            <input type="radio" name="urgency" value="Necesito ahora" hidden checked>
+            <div class="store-avatar" style="background:rgba(239,68,68,0.16);color:#FCA5A5;"><i class="fa-solid fa-bolt"></i></div>
+            <div style="flex:1"><div class="h-md">Necesito ahora</div><div class="text-sm muted">Auto parado · máxima prioridad</div></div>
+            <i class="fa-solid fa-circle-check text-yellow check"></i>
+          </label>
+          <label class="card hoverable urgency-opt" style="display:flex;align-items:center;gap:14px;cursor:pointer;" data-urg="hoy">
+            <input type="radio" name="urgency" value="Hoy" hidden>
+            <div class="store-avatar" style="background:rgba(250,204,21,0.16);color:var(--yellow);"><i class="fa-solid fa-sun"></i></div>
+            <div style="flex:1"><div class="h-md">Hoy</div><div class="text-sm muted">En el día</div></div>
+            <i class="fa-solid fa-circle-check text-yellow check" style="display:none;"></i>
+          </label>
+          <label class="card hoverable urgency-opt" style="display:flex;align-items:center;gap:14px;cursor:pointer;" data-urg="manana">
+            <input type="radio" name="urgency" value="Mañana" hidden>
+            <div class="store-avatar" style="background:rgba(109,40,217,0.18);color:var(--purple-light);"><i class="fa-solid fa-calendar-day"></i></div>
+            <div style="flex:1"><div class="h-md">Mañana</div><div class="text-sm muted">Sin apuro</div></div>
+            <i class="fa-solid fa-circle-check text-yellow check" style="display:none;"></i>
+          </label>
+        </div>
+      </div>
+
+      <!-- STEP 5: Review -->
+      <div class="step-pane" data-step="5" style="display:none;">
+        <div class="eyebrow mb-8">Paso 5</div>
+        <h2 class="h-lg mb-16">Revisá y enviá</h2>
+        <div class="card mb-12">
+          <div class="list-row" style="padding-top:0;"><i class="fa-solid fa-car text-purple" style="width:20px;"></i><div style="flex:1"><div class="text-xs muted">Vehículo</div><div class="text-sm" style="font-weight:700;" id="rvVehicle">—</div></div></div>
+          <div class="list-row"><i class="fa-solid fa-layer-group text-purple" style="width:20px;"></i><div style="flex:1"><div class="text-xs muted">Categoría</div><div class="text-sm" style="font-weight:700;" id="rvCat">—</div></div></div>
+          <div class="list-row"><i class="fa-solid fa-align-left text-purple" style="width:20px;"></i><div style="flex:1"><div class="text-xs muted">Detalle</div><div class="text-sm" style="font-weight:700;" id="rvDesc">—</div></div></div>
+          <div class="list-row" style="padding-bottom:0;"><i class="fa-solid fa-bolt text-purple" style="width:20px;"></i><div style="flex:1"><div class="text-xs muted">Urgencia</div><div class="text-sm" style="font-weight:700;" id="rvUrg">—</div></div></div>
+        </div>
+        <div class="float-notif">
+          <i class="fa-solid fa-circle-info text-purple"></i>
+          <div class="text-sm subtle">Vamos a notificar a las casas de repuestos de <b>Frenos y Suspensión</b> en Bariloche. Recibís cotizaciones por <b class="text-yellow">10 minutos</b>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky footer nav -->
+    <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:14px 16px;background:linear-gradient(0deg,var(--bg-0),transparent);">
+      <div class="flex gap-12">
+        <button class="btn btn-ghost" id="prevBtn" style="display:none;flex:0 0 auto;"><i class="fa-solid fa-arrow-left"></i></button>
+        <button class="btn btn-primary btn-block" id="nextBtn">Continuar <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Searching overlay -->
+  <div id="searchOverlay" style="position:fixed;inset:0;background:var(--bg-0);z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;">
+    <div class="radar-wrap mb-24">
+      <div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div>
+      <div class="radar-core"><i class="fa-solid fa-satellite-dish"></i></div>
+    </div>
+    <h2 class="h-lg mb-8">Buscando casas de repuestos cercanas…</h2>
+    <p class="subtle mb-16" id="searchSub">Notificando comercios de Frenos en Bariloche</p>
+    <div style="width:220px;" class="progress-track"><div class="progress-fill" id="searchProg" style="width:5%;"></div></div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const d = RAT.data;
+    let step = 1;
+    const state = { brand:'', model:'', year:'', vin:'', cat:'', catLabel:'', desc:'', urgency:'Necesito ahora' };
+
+    // Fill selects
+    RAT.fillSelect(document.getElementById('brand'), d.brands, 'Elegí una marca');
+    const years = []; for (let y=2024; y>=2005; y--) years.push(String(y));
+    RAT.fillSelect(document.getElementById('year'), years, 'Año');
+
+    const brandSel = document.getElementById('brand'), modelSel = document.getElementById('model');
+    brandSel.addEventListener('change', () => {
+      state.brand = brandSel.value;
+      if (state.brand && d.models[state.brand]) {
+        RAT.fillSelect(modelSel, d.models[state.brand], 'Elegí un modelo'); modelSel.disabled = false;
+      } else { modelSel.innerHTML = '<option value="">Elegí primero la marca</option>'; modelSel.disabled = true; }
+    });
+
+    // Categories
+    const catGrid = document.getElementById('catGrid');
+    d.categories.forEach(c => {
+      const el = document.createElement('button');
+      el.className = 'card hoverable text-center'; el.style.cssText='padding:18px 8px;cursor:pointer;';
+      el.innerHTML = `<i class="fa-solid ${c.icon}" style="font-size:22px;" class="text-purple"></i><div class="text-sm mt-8" style="font-weight:700;">${c.label}</div>`;
+      el.onclick = () => {
+        state.cat = c.id; state.catLabel = c.label;
+        document.querySelectorAll('#catGrid .card').forEach(x=>x.classList.remove('glow'));
+        el.classList.add('glow');
+        setTimeout(()=>go(3), 220);
+      };
+      catGrid.appendChild(el);
+    });
+
+    // Photo upload sim
+    document.getElementById('uploadArea').onclick = () => {
+      document.getElementById('photoChip').style.display = 'flex';
+      RAT.toast({title:'Foto agregada', icon:'fa-image', type:'green'});
+    };
+
+    // Urgency selection
+    document.querySelectorAll('.urgency-opt').forEach(opt => {
+      opt.onclick = () => {
+        document.querySelectorAll('.urgency-opt').forEach(o => { o.classList.remove('glow'); o.querySelector('.check').style.display='none'; });
+        opt.classList.add('glow'); opt.querySelector('.check').style.display='block';
+        state.urgency = opt.querySelector('input').value;
+      };
+    });
+    document.querySelector('.urgency-opt').classList.add('glow');
+
+    // Quick vehicle
+    window.quickVehicle = (b,m,y) => {
+      brandSel.value = b; brandSel.dispatchEvent(new Event('change'));
+      setTimeout(()=>{ modelSel.value = m; document.getElementById('year').value = y; state.model=m; state.year=y; }, 30);
+      RAT.toast({title:`${b} ${m}`, sub:'Vehículo cargado', icon:'fa-car', type:'purple', duration:1800});
+    };
+
+    const panes = [...document.querySelectorAll('.step-pane')];
+    const stepsEl = [...document.querySelectorAll('#steps .step')];
+    const labels = ['Vehículo','Categoría','Descripción','Urgencia','Confirmar'];
+
+    function go(n) {
+      step = n;
+      panes.forEach(p => p.style.display = (+p.dataset.step === n) ? 'block' : 'none');
+      stepsEl.forEach((s,i) => { s.className = 'step' + (i < n-1 ? ' done' : (i===n-1 ? ' current' : '')); });
+      document.getElementById('stepLabel').textContent = `Paso ${n} de 5 · ${labels[n-1]}`;
+      document.getElementById('prevBtn').style.display = n>1 ? 'flex' : 'none';
+      const next = document.getElementById('nextBtn');
+      next.innerHTML = n===5 ? '<i class="fa-solid fa-paper-plane"></i> Enviar pedido' : 'Continuar <i class="fa-solid fa-arrow-right"></i>';
+      next.className = 'btn btn-block ' + (n===5 ? 'btn-yellow' : 'btn-primary');
+      if (n===5) renderReview();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function renderReview() {
+      state.model = modelSel.value || state.model; state.year = document.getElementById('year').value || state.year;
+      state.desc = document.getElementById('desc').value;
+      document.getElementById('rvVehicle').textContent = `${state.brand||'Toyota'} ${state.model||'Hilux'} ${state.year||'2019'}`;
+      document.getElementById('rvCat').textContent = state.catLabel || 'Frenos';
+      document.getElementById('rvDesc').textContent = state.desc || 'Pastillas de freno delanteras';
+      document.getElementById('rvUrg').textContent = state.urgency;
+    }
+
+    document.getElementById('nextBtn').onclick = () => {
+      if (step === 1) { state.model = modelSel.value; state.year = document.getElementById('year').value; }
+      if (step < 5) { go(step+1); }
+      else { submit(); }
+    };
+    document.getElementById('prevBtn').onclick = () => { if (step>1) go(step-1); };
+
+    function submit() {
+      RAT.store.set('request', state);
+      const ov = document.getElementById('searchOverlay'); ov.style.display='flex';
+      const msgs = ['Notificando comercios de '+(state.catLabel||'Frenos')+' en Bariloche','3 comercios recibieron tu pedido','Esperando primeras cotizaciones…'];
+      let p=5, i=0;
+      const prog = document.getElementById('searchProg'), sub = document.getElementById('searchSub');
+      const id = setInterval(()=>{ p+=Math.random()*22; if(p>100)p=100; prog.style.width=p+'%'; if(p>40&&i<1){i=1;sub.textContent=msgs[1];} if(p>75&&i<2){i=2;sub.textContent=msgs[2];} if(p>=100){clearInterval(id); setTimeout(()=>location.href='quotes.html', 600);} }, 320);
+    }
+
+    go(1);
+  </script>
+</body>
+</html>

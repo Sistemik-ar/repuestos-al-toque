@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>RepuestosAlToque — Cotizaciones en vivo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="flex-center">
+        <a href="mechanic-dashboard.html" class="icon-btn"><i class="fa-solid fa-arrow-left"></i></a>
+        <div>
+          <div style="font-weight:800;">Cotizaciones en vivo</div>
+          <div class="text-xs muted">Pedido #1042 · Pastillas de freno</div>
+        </div>
+      </div>
+      <div class="icon-btn"><i class="fa-solid fa-tower-broadcast text-purple"></i></div>
+    </div>
+
+    <div class="container">
+      <!-- Live header -->
+      <div class="card glow mb-16" style="text-align:center;background:linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4));">
+        <div class="text-xs muted mb-8" style="text-transform:uppercase;letter-spacing:0.08em;">Tiempo restante para recibir ofertas</div>
+        <div class="countdown-big text-yellow" id="bigTimer">10:00</div>
+        <div class="flex-center" style="justify-content:center;gap:18px;margin-top:14px;">
+          <div class="flex-center gap-8"><span class="badge badge-purple"><i class="fa-solid fa-store"></i> <span id="notifCount">3</span> comercios notificados</span></div>
+          <div class="flex-center gap-8"><span class="badge badge-yellow"><i class="fa-solid fa-bolt"></i> Necesito ahora</span></div>
+        </div>
+      </div>
+
+      <!-- Vehicle summary -->
+      <div class="card mb-16" style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
+        <div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-car"></i></div>
+        <div style="flex:1"><div class="text-sm" style="font-weight:700;" id="vehSummary">Toyota Hilux 2019</div><div class="text-xs muted" id="catSummary">Frenos · Pastillas delanteras</div></div>
+        <span class="badge badge-gray">#1042</span>
+      </div>
+
+      <!-- Sponsored promo (non-invasive): only brand + discount while waiting -->
+      <div class="mb-16">
+        <div class="promo-card promo-fade" id="promoCard">
+          <div class="promo-img" id="promoImg"><i class="fa-solid fa-record-vinyl"></i></div>
+          <div style="flex:1;min-width:0;">
+            <div class="text-sm" style="font-weight:700;" id="promoStore">Repuestos Centro</div>
+            <span class="badge badge-yellow" id="promoDiscount" style="margin-top:5px;">20% OFF</span>
+          </div>
+          <span class="promo-tag">Promocionado</span>
+        </div>
+        <div class="promo-dots" id="promoDots"></div>
+      </div>
+
+      <div class="section-title"><h2>Ofertas recibidas (<span id="qCount">0</span>)</h2><span class="text-xs muted" id="liveDot"><i class="fa-solid fa-circle text-green" style="font-size:7px;animation:pulse-soft 1s infinite;"></i> en vivo</span></div>
+
+      <!-- Quotes container -->
+      <div id="quotesList" class="flex-col gap-12"></div>
+
+      <!-- Skeleton while waiting -->
+      <div id="skeleton" class="card mt-12">
+        <div class="flex-center gap-12 mb-12">
+          <div class="skeleton" style="width:44px;height:44px;"></div>
+          <div style="flex:1"><div class="skeleton" style="width:60%;height:14px;margin-bottom:8px;"></div><div class="skeleton" style="width:40%;height:11px;"></div></div>
+        </div>
+        <div class="skeleton" style="width:100%;height:11px;margin-bottom:6px;"></div>
+        <div class="skeleton" style="width:80%;height:11px;"></div>
+        <div class="text-center text-xs muted mt-12"><span class="spinner" style="display:inline-block;width:14px;height:14px;vertical-align:middle;"></span> Esperando más cotizaciones…</div>
+      </div>
+
+      <!-- Anonymity note -->
+      <div class="float-notif mt-16">
+        <i class="fa-solid fa-user-secret text-yellow"></i>
+        <div class="text-sm subtle">Los datos del comercio (nombre, teléfono, dirección) se revelan <b class="text-yellow">después del pago</b>. Así protegemos el marketplace.</div>
+      </div>
+    </div>
+
+    <!-- Sticky select footer -->
+    <div id="selectFooter" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:14px 16px;background:linear-gradient(0deg,var(--bg-0),transparent);display:none;">
+      <button class="btn btn-yellow btn-block btn-lg" id="continueBtn"><i class="fa-solid fa-lock"></i> Continuar al pago</button>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const req = RAT.store.get('request', null);
+    if (req) {
+      document.getElementById('vehSummary').textContent = `${req.brand||'Toyota'} ${req.model||'Hilux'} ${req.year||'2019'}`;
+      document.getElementById('catSummary').textContent = `${req.catLabel||'Frenos'} · ${(req.desc||'Pastillas delanteras').slice(0,40)}`;
+    }
+
+    const pool = RAT.data.quotePool;
+    const list = document.getElementById('quotesList');
+    let arrived = 0, selectedIdx = null;
+
+    RAT.countdown(document.getElementById('bigTimer'), 10*60, {
+      pillEl: null,
+      onTick: (r) => { if (r === 600-2) {/* noop */} },
+      onEnd: () => { document.getElementById('liveDot').innerHTML = '<span class="muted">cerrado</span>'; document.getElementById('skeleton').style.display='none'; }
+    });
+
+    function addQuote(q, idx) {
+      const card = document.createElement('div');
+      card.className = 'quote-card animate-in';
+      card.dataset.idx = idx;
+      card.innerHTML = `
+        <div class="flex-between mb-12">
+          <div class="flex-center gap-12">
+            <div class="store-avatar"><i class="fa-solid fa-user-secret"></i></div>
+            <div>
+              <div style="font-weight:700;font-size:15px;">${q.alias}</div>
+              <div class="text-xs muted">${RAT.stars(q.rating)} ${q.rating} · Zona ${q.zone}</div>
+            </div>
+          </div>
+          <span class="badge badge-green"><i class="fa-solid fa-shield-halved"></i> ${q.warranty}</span>
+        </div>
+        <div class="flex-between mb-12">
+          <div>
+            <div class="text-xs muted">Marca de la pieza</div>
+            <div class="text-sm" style="font-weight:700;">${q.partBrand}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="text-xs muted">Entrega estimada</div>
+            <div class="text-sm" style="font-weight:700;"><i class="fa-solid fa-motorcycle text-yellow"></i> ${q.eta}</div>
+          </div>
+        </div>
+        <div class="divider" style="margin:12px 0;"></div>
+        <div class="flex-between">
+          <div>
+            <div class="text-xs muted">Precio final</div>
+            <div class="price">${RAT.money(q.price)}</div>
+          </div>
+          <button class="btn btn-primary btn-sm select-btn" data-idx="${idx}">Elegir oferta</button>
+        </div>
+        <div class="locked-info mt-12"><i class="fa-solid fa-lock"></i> Nombre y contacto: <span class="badge badge-gray" style="margin-left:4px;">Visible luego del pago</span></div>
+      `;
+      list.appendChild(card);
+
+      card.querySelector('.select-btn').onclick = () => selectQuote(idx, q);
+      arrived++;
+      document.getElementById('qCount').textContent = arrived;
+      RAT.ping();
+      RAT.toast({ title: 'Nueva cotización · '+q.alias, sub: `${q.partBrand} · ${RAT.money(q.price)} · ETA ${q.eta}`, icon:'fa-tag', type:'yellow' });
+    }
+
+    function selectQuote(idx, q) {
+      selectedIdx = idx;
+      document.querySelectorAll('.quote-card').forEach(c => {
+        c.classList.toggle('selected', +c.dataset.idx === idx);
+        const btn = c.querySelector('.select-btn');
+        if (+c.dataset.idx === idx) { btn.innerHTML = '<i class="fa-solid fa-check"></i> Elegida'; btn.className='btn btn-success btn-sm select-btn'; }
+        else { btn.innerHTML = 'Elegir oferta'; btn.className='btn btn-ghost btn-sm select-btn'; }
+      });
+      RAT.store.set('selectedQuote', q);
+      document.getElementById('selectFooter').style.display = 'block';
+      document.getElementById('continueBtn').scrollIntoView({behavior:'smooth', block:'center'});
+    }
+
+    document.getElementById('continueBtn').onclick = () => location.href = 'payment.html';
+
+    // Sponsored promos — rotate every few seconds while waiting (non-invasive)
+    const ads = RAT.data.ads;
+    const pImg=document.getElementById('promoImg'), pStore=document.getElementById('promoStore'),
+          pDiscount=document.getElementById('promoDiscount'),
+          pCard=document.getElementById('promoCard'), pDots=document.getElementById('promoDots');
+    ads.forEach((_,i)=>{ const d=document.createElement('span'); if(i===0)d.className='on'; pDots.appendChild(d); });
+    function showAd(i){
+      const a=ads[i];
+      pImg.style.background=a.color; pImg.innerHTML=`<i class="fa-solid ${a.icon}"></i>`;
+      pStore.textContent=a.store; pDiscount.textContent=a.discount;
+      pCard.classList.remove('promo-fade'); void pCard.offsetWidth; pCard.classList.add('promo-fade');
+      [...pDots.children].forEach((d,j)=>d.className = j===i ? 'on' : '');
+    }
+    showAd(0);
+    let adIdx=0; setInterval(()=>{ adIdx=(adIdx+1)%ads.length; showAd(adIdx); }, 4500);
+
+    // Simulate live arrivals
+    const delays = [1200, 4200, 8000, 13500];
+    pool.forEach((q, i) => {
+      setTimeout(() => {
+        if (i === pool.length-1) document.getElementById('skeleton').style.display = 'none';
+        addQuote(q, i);
+      }, delays[i] || (i*4000+1500));
+    });
+  </script>
+</body>
+</html>

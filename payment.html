@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>RepuestosAlToque — Pago</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="flex-center">
+        <a href="quotes.html" class="icon-btn"><i class="fa-solid fa-arrow-left"></i></a>
+        <div><div style="font-weight:800;">Confirmar y pagar</div><div class="text-xs muted">Pedido #1042</div></div>
+      </div>
+      <div class="flex-center gap-8"><i class="fa-solid fa-lock text-green"></i><span class="text-xs muted">Pago seguro</span></div>
+    </div>
+
+    <!-- ===== PRE-PAYMENT ===== -->
+    <div id="prePay" class="container">
+      <!-- Selected offer (still anonymous) -->
+      <div class="section-title"><h2>Oferta elegida</h2></div>
+      <div class="card mb-16">
+        <div class="flex-between mb-12">
+          <div class="flex-center gap-12">
+            <div class="store-avatar"><i class="fa-solid fa-user-secret"></i></div>
+            <div><div style="font-weight:700;" id="qAlias">Zona Oeste Parts</div><div class="text-xs muted"><span id="qBrand">Ferodo</span> · ETA <span id="qEta">45 min</span></div></div>
+          </div>
+          <span class="badge badge-green"><i class="fa-solid fa-shield-halved"></i> <span id="qWarranty">12 meses</span></span>
+        </div>
+        <div class="locked-info"><i class="fa-solid fa-lock"></i> <span class="blurred">Patagonia Frenos · Bustillo</span> <span class="badge badge-gray">Visible luego del pago</span></div>
+      </div>
+
+      <!-- Pay for / link toggle -->
+      <div class="section-title"><h2>¿Quién paga?</h2></div>
+      <div class="grid-2 mb-16">
+        <button class="card hoverable text-center payopt glow" data-pay="self" style="cursor:pointer;padding:16px 8px;">
+          <i class="fa-solid fa-wallet text-purple" style="font-size:20px;"></i>
+          <div class="text-sm mt-8" style="font-weight:700;">Pago yo</div>
+          <div class="text-xs muted">Como mecánico</div>
+        </button>
+        <button class="card hoverable text-center payopt" data-pay="link" style="cursor:pointer;padding:16px 8px;">
+          <i class="fa-solid fa-link text-yellow" style="font-size:20px;"></i>
+          <div class="text-sm mt-8" style="font-weight:700;">Link al cliente</div>
+          <div class="text-xs muted">Lo paga el dueño</div>
+        </button>
+      </div>
+
+      <!-- Breakdown -->
+      <div class="section-title"><h2>Detalle</h2></div>
+      <div class="card mb-16">
+        <div class="flex-between mb-12"><span class="subtle">Repuesto (Ferodo)</span><span style="font-weight:700;" id="bPart">$39.900</span></div>
+        <div class="flex-between mb-12"><span class="subtle">Envío express <span class="text-xs muted">(Bariloche)</span></span><span style="font-weight:700;" id="bShip">$3.500</span></div>
+        <div class="flex-between mb-12"><span class="subtle">Comisión RepuestosAlToque <span class="badge badge-purple" style="margin-left:4px;">10%</span></span><span style="font-weight:700;" id="bFee">$4.340</span></div>
+        <div class="divider"></div>
+        <div class="flex-between"><span class="h-md">Total</span><span class="h-md text-yellow" id="bTotal">$47.740</span></div>
+      </div>
+
+      <!-- MP method -->
+      <div class="card mb-16" style="display:flex;align-items:center;gap:12px;border-color:rgba(0,158,227,0.4);">
+        <div class="store-avatar" style="background:#009EE3;color:white;"><i class="fa-solid fa-credit-card"></i></div>
+        <div style="flex:1"><div class="text-sm" style="font-weight:700;">MercadoPago</div><div class="text-xs muted">Tarjeta, dinero en cuenta o transferencia</div></div>
+        <i class="fa-solid fa-circle-check text-green"></i>
+      </div>
+    </div>
+
+    <!-- ===== PROCESSING ===== -->
+    <div id="processing" class="container" style="display:none;text-align:center;padding-top:80px;">
+      <div class="radar-wrap mb-24"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-core" style="background:#009EE3;"><i class="fa-solid fa-credit-card"></i></div></div>
+      <h2 class="h-lg mb-8">Procesando pago…</h2>
+      <p class="subtle">Conectando con MercadoPago</p>
+    </div>
+
+    <!-- ===== SUCCESS + REVEAL ===== -->
+    <div id="success" class="container" style="display:none;">
+      <div class="text-center" style="padding:24px 0 16px;">
+        <div class="success-check mb-16"><i class="fa-solid fa-check"></i></div>
+        <h2 class="h-lg">¡Pago aprobado!</h2>
+        <p class="subtle">Comprobante #MP-90432187 · <span id="sTotal">$47.740</span></p>
+      </div>
+
+      <div class="float-notif mb-16" style="border-color:rgba(34,197,94,0.35);background:linear-gradient(135deg,rgba(34,197,94,0.14),rgba(31,41,55,0.5));">
+        <i class="fa-solid fa-lock-open text-green"></i>
+        <div class="text-sm subtle">Datos del vendedor <b class="text-green">desbloqueados</b>. Ya podés coordinar.</div>
+      </div>
+
+      <!-- Revealed seller -->
+      <div class="section-title"><h2>Tu vendedor</h2></div>
+      <div class="card reveal-card glow mb-16">
+        <div class="flex-center gap-12 mb-12">
+          <div class="store-avatar" style="background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div>
+          <div><div class="h-md" id="rName">Patagonia Frenos</div><div class="text-xs muted">⭐ 4.8 · Zona Oeste</div></div>
+        </div>
+        <div class="list-row" style="padding:10px 0;"><i class="fa-solid fa-location-dot text-purple" style="width:20px;"></i><div class="text-sm" id="rAddr">Km 5 Av. Bustillo, Bariloche</div></div>
+        <div class="list-row" style="padding:10px 0;border:none;"><i class="fa-solid fa-phone text-purple" style="width:20px;"></i><div class="text-sm" id="rPhone">+54 9 294 4789-012</div></div>
+        <div class="flex gap-12 mt-12">
+          <a class="btn btn-ghost btn-block btn-sm"><i class="fa-solid fa-phone"></i> Llamar</a>
+          <a class="btn btn-ghost btn-block btn-sm"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
+        </div>
+      </div>
+
+      <!-- Driver assignment -->
+      <div class="section-title"><h2>Envío</h2></div>
+      <div class="card mb-16">
+        <div class="flex-between mb-12">
+          <div class="flex-center gap-12">
+            <div class="store-avatar" style="background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-motorcycle"></i></div>
+            <div><div class="text-sm" style="font-weight:700;">Repartidor asignado</div><div class="text-xs muted">Diego R. · ⭐ 4.9</div></div>
+          </div>
+          <span class="badge badge-yellow">En camino al comercio</span>
+        </div>
+        <div class="progress-track mb-8"><div class="progress-fill" style="width:20%;"></div></div>
+        <div class="text-xs muted">Llega a tu taller en ~45 min</div>
+      </div>
+
+      <!-- Sponsored promos — WhatsApp contact unlocked only AFTER payment -->
+      <div class="section-title"><h2>Promos de la zona</h2><span class="promo-tag" style="position:static;">Promocionado</span></div>
+      <div id="adList" class="flex-col gap-12 mb-16"></div>
+
+      <a href="delivery-dashboard.html" class="btn btn-primary btn-block btn-lg mb-12"><i class="fa-solid fa-map-location-dot"></i> Seguir el envío</a>
+      <a href="mechanic-dashboard.html" class="btn btn-ghost btn-block">Volver al inicio</a>
+    </div>
+
+    <!-- Sticky pay footer -->
+    <div id="payFooter" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:14px 16px;background:linear-gradient(0deg,var(--bg-0),transparent);">
+      <button class="btn btn-block btn-lg" id="payBtn" style="background:#009EE3;color:white;"><i class="fa-solid fa-credit-card"></i> Pagar con MercadoPago</button>
+    </div>
+  </div>
+
+  <!-- Link generated modal -->
+  <div class="modal-backdrop" id="linkModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="text-center mb-16">
+        <div class="store-avatar" style="width:54px;height:54px;margin:0 auto 12px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-link"></i></div>
+        <h2 class="h-md">Link de pago generado</h2>
+        <p class="text-sm muted">Enviáselo al dueño del auto para que pague</p>
+      </div>
+      <div class="card flex-between mb-16" style="padding:12px 14px;">
+        <span class="text-sm" style="font-family:monospace;color:var(--purple-light);">mpago.la/RAToque/1042</span>
+        <button class="btn btn-ghost btn-sm" onclick="RAT.toast({title:'Link copiado',icon:'fa-copy',type:'green'})"><i class="fa-solid fa-copy"></i></button>
+      </div>
+      <div class="flex gap-12">
+        <a class="btn btn-success btn-block"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</a>
+      </div>
+      <button class="btn btn-ghost btn-block mt-12" onclick="document.getElementById('linkModal').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const q = RAT.store.get('selectedQuote', RAT.data.quotePool[2]);
+    // Fill selected offer + breakdown
+    document.getElementById('qAlias').textContent = q.alias;
+    document.getElementById('qBrand').textContent = q.partBrand;
+    document.getElementById('qEta').textContent = q.eta;
+    document.getElementById('qWarranty').textContent = q.warranty;
+    const part = q.price, ship = 3500, fee = Math.round(part*0.10), total = part+ship+fee;
+    document.getElementById('bPart').textContent = RAT.money(part);
+    document.getElementById('bShip').textContent = RAT.money(ship);
+    document.getElementById('bFee').textContent = RAT.money(fee);
+    document.getElementById('bTotal').textContent = RAT.money(total);
+    document.getElementById('sTotal').textContent = RAT.money(total);
+    // Reveal data
+    document.getElementById('rName').textContent = q.real.name;
+    document.getElementById('rAddr').textContent = q.real.address;
+    document.getElementById('rPhone').textContent = q.real.phone;
+
+    let payMode = 'self';
+    document.querySelectorAll('.payopt').forEach(o => o.onclick = () => {
+      document.querySelectorAll('.payopt').forEach(x=>x.classList.remove('glow'));
+      o.classList.add('glow'); payMode = o.dataset.pay;
+      document.getElementById('payBtn').innerHTML = payMode==='link'
+        ? '<i class="fa-solid fa-link"></i> Generar link de pago'
+        : '<i class="fa-solid fa-credit-card"></i> Pagar con MercadoPago';
+    });
+
+    document.getElementById('payBtn').onclick = () => {
+      if (payMode === 'link') { document.getElementById('linkModal').classList.add('open'); return; }
+      // Processing -> success
+      document.getElementById('prePay').style.display = 'none';
+      document.getElementById('payFooter').style.display = 'none';
+      document.getElementById('processing').style.display = 'block';
+      setTimeout(() => {
+        document.getElementById('processing').style.display = 'none';
+        document.getElementById('success').style.display = 'block';
+        RAT.ping();
+        RAT.toast({ title:'Pago aprobado', sub:'Datos del vendedor desbloqueados', icon:'fa-circle-check', type:'green' });
+        RAT.store.set('paid', true);
+      }, 2300);
+    };
+
+    // Sponsored promos with WhatsApp — rendered into the (post-payment) success screen
+    const adList = document.getElementById('adList');
+    RAT.data.ads.forEach(a => {
+      const msg = encodeURIComponent(`Hola ${a.store}! Vi su promo (${a.discount}) en RepuestosAlToque y quiero consultar.`);
+      const el = document.createElement('div');
+      el.className = 'promo-card';
+      el.innerHTML = `
+        <div class="promo-img" style="background:${a.color}"><i class="fa-solid ${a.icon}"></i></div>
+        <div style="flex:1;min-width:0;">
+          <div class="text-sm" style="font-weight:700;">${a.store}</div>
+          <span class="badge badge-yellow" style="margin-top:5px;">${a.discount}</span>
+        </div>
+        <a class="btn btn-success btn-sm" style="flex-shrink:0;" href="https://wa.me/${a.phone}?text=${msg}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>`;
+      adList.appendChild(el);
+    });
+  </script>
+</body>
+</html>

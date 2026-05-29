@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>RepuestosAlToque — Repartidor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <a href="index.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Repartidor</span></a>
+      <div class="topbar-actions">
+        <span class="badge badge-green"><i class="fa-solid fa-circle" style="font-size:7px;"></i> En línea</span>
+        <div class="avatar" style="background:linear-gradient(135deg,#22C55E,var(--purple));">DR</div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="mb-16">
+        <div class="eyebrow">Diego R. · ⭐ 4.9</div>
+        <h1 class="h-lg">Tus entregas</h1>
+      </div>
+
+      <!-- Earnings -->
+      <div class="grid-3 mb-16">
+        <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green">$8.4k</div><div class="stat-label">Hoy</div></div>
+        <div class="card stat-card" style="padding:14px;"><div class="stat-value">6</div><div class="stat-label">Entregas</div></div>
+        <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">31'</div><div class="stat-label">Prom.</div></div>
+      </div>
+
+      <!-- Active delivery -->
+      <div class="section-title"><h2>Entrega activa</h2><span class="badge badge-yellow" id="statusBadge">En camino al comercio</span></div>
+      <div class="card mb-16">
+        <div class="map-mock mb-16">
+          <div class="map-route"></div>
+          <div class="map-pin start"></div>
+          <div class="map-pin end"></div>
+          <div class="map-pin driver"><i class="fa-solid fa-motorcycle" style="font-size:9px;color:#0B0B0F;display:grid;place-items:center;height:100%;"></i></div>
+        </div>
+
+        <div class="flex-between mb-16">
+          <div class="flex-center gap-8"><div class="store-avatar" style="width:34px;height:34px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div><div><div class="text-xs muted">Retiro</div><div class="text-sm" style="font-weight:700;">Repuestos Centro</div></div></div>
+          <i class="fa-solid fa-arrow-right muted"></i>
+          <div class="flex-center gap-8"><div><div class="text-xs muted" style="text-align:right;">Entrega</div><div class="text-sm" style="font-weight:700;">Taller Patagonia</div></div><div class="store-avatar" style="width:34px;height:34px;background:rgba(109,40,217,0.18);color:var(--purple-light);"><i class="fa-solid fa-screwdriver-wrench"></i></div></div>
+        </div>
+
+        <div class="card" style="background:var(--bg-1);padding:12px 14px;margin-bottom:16px;">
+          <div class="flex-between"><span class="text-sm muted">Pedido</span><span class="text-sm" style="font-weight:700;">Pastillas de freno · #1042</span></div>
+          <div class="flex-between mt-8"><span class="text-sm muted">Tu pago</span><span class="text-sm" style="font-weight:700;" class="text-green">$3.500</span></div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="timeline" id="timeline">
+          <div class="timeline-item done" data-st="0"><div class="dot"><i class="fa-solid fa-check"></i></div><div class="t-title">Pedido asignado</div><div class="t-time">12:04</div></div>
+          <div class="timeline-item current" data-st="1"><div class="dot"></div><div class="t-title">En camino al comercio</div><div class="t-time">Ahora</div></div>
+          <div class="timeline-item" data-st="2"><div class="dot"></div><div class="t-title">Retirado</div><div class="t-time muted">Pendiente</div></div>
+          <div class="timeline-item" data-st="3"><div class="dot"></div><div class="t-title">Entregando</div><div class="t-time muted">Pendiente</div></div>
+          <div class="timeline-item" data-st="4"><div class="dot"></div><div class="t-title">Entregado</div><div class="t-time muted">Pendiente</div></div>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg mt-16" id="advanceBtn"><i class="fa-solid fa-arrow-right"></i> Marcar: Retirado</button>
+      </div>
+
+      <!-- Available deliveries -->
+      <div class="section-title"><h2>Disponibles cerca</h2></div>
+      <div class="card mb-12">
+        <div class="flex-between mb-8">
+          <div><div class="text-sm" style="font-weight:700;">Bomba de agua</div><div class="text-xs muted">Andina Parts → Bariloche Diesel</div></div>
+          <span class="text-sm text-green" style="font-weight:700;">$4.200</span>
+        </div>
+        <div class="flex-between">
+          <span class="badge badge-gray"><i class="fa-solid fa-route"></i> 3,2 km</span>
+          <button class="btn btn-yellow btn-sm" onclick="RAT.toast({title:'Entrega aceptada',sub:'Andina Parts',icon:'fa-check',type:'green'})">Aceptar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="flex-between mb-8">
+          <div><div class="text-sm" style="font-weight:700;">Kit de embrague</div><div class="text-xs muted">Patagonia Frenos → MotorSur</div></div>
+          <span class="text-sm text-green" style="font-weight:700;">$5.800</span>
+        </div>
+        <div class="flex-between">
+          <span class="badge badge-gray"><i class="fa-solid fa-route"></i> 6,7 km</span>
+          <button class="btn btn-ghost btn-sm" onclick="RAT.toast({title:'Entrega aceptada',icon:'fa-check',type:'green'})">Aceptar</button>
+        </div>
+      </div>
+    </div>
+
+    <nav class="bottom-nav">
+      <a href="delivery-dashboard.html" data-nav="delivery-dashboard.html" class="active"><i class="fa-solid fa-motorcycle"></i>Entregas</a>
+      <a href="#" onclick="RAT.toast({title:'Mapa',sub:'Vista de zona',icon:'fa-map'});return false;"><i class="fa-solid fa-map"></i>Mapa</a>
+      <a href="#" onclick="RAT.toast({title:'Ganancias',sub:'$8.400 hoy',icon:'fa-coins',type:'yellow'});return false;"><i class="fa-solid fa-coins"></i>Ganancias</a>
+      <a href="index.html"><i class="fa-solid fa-user"></i>Perfil</a>
+    </nav>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const statuses = ['Pedido asignado','En camino al comercio','Retirado','Entregando','Entregado'];
+    const nextLabels = ['En camino al comercio','Retirado','Entregando','Entregado',null];
+    let st = 1;
+    const items = [...document.querySelectorAll('#timeline .timeline-item')];
+
+    function render() {
+      items.forEach((it,i) => {
+        it.className = 'timeline-item' + (i < st ? ' done' : (i===st ? ' current' : ''));
+        const dot = it.querySelector('.dot'); dot.innerHTML = i < st ? '<i class="fa-solid fa-check"></i>' : '';
+        const tm = it.querySelector('.t-time');
+        if (i < st) { if(tm.classList.contains('muted')){ tm.classList.remove('muted'); tm.textContent = nowTime(); } }
+        else if (i===st) { tm.textContent = 'Ahora'; tm.classList.remove('muted'); }
+      });
+      document.getElementById('statusBadge').textContent = statuses[st];
+      const btn = document.getElementById('advanceBtn');
+      if (nextLabels[st]) { btn.style.display='flex'; btn.innerHTML = `<i class="fa-solid fa-arrow-right"></i> Marcar: ${nextLabels[st]}`; }
+      else {
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Entrega completada';
+        btn.className = 'btn btn-success btn-block btn-lg mt-16'; btn.disabled = true;
+        document.getElementById('statusBadge').className = 'badge badge-green';
+      }
+    }
+    function nowTime(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+    document.getElementById('advanceBtn').onclick = () => {
+      if (st < 4) {
+        st++; render(); RAT.ping();
+        RAT.toast({title:'Estado actualizado', sub:statuses[st], icon:'fa-motorcycle', type:'green'});
+      }
+    };
+    render();
+  </script>
+</body>
+</html>

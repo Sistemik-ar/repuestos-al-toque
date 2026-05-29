@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>RepuestosAlToque — Repuestos urgentes, al toque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Hero -->
+    <div class="container" style="padding-top:32px;">
+      <div class="flex-center mb-24">
+        <div class="logo-mark" style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--purple),var(--purple-light));display:grid;place-items:center;box-shadow:var(--shadow-glow);">
+          <i class="fa-solid fa-gear" style="color:white;font-size:20px;"></i>
+        </div>
+        <div>
+          <div style="font-weight:800;font-size:18px;letter-spacing:-0.02em;">RepuestosAlToque</div>
+          <div class="text-xs muted">Bariloche · Patagonia</div>
+        </div>
+      </div>
+
+      <div class="badge badge-yellow mb-12"><i class="fa-solid fa-bolt"></i> Repuestos en minutos, no en días</div>
+      <h1 class="h-xl mb-12">El repuesto que necesitás,<br><span class="text-purple">al toque.</span></h1>
+      <p class="subtle mb-24" style="line-height:1.5;">Pedí un repuesto y recibí cotizaciones de casas cercanas <b class="text-yellow">en tiempo real</b>. Vos elegís. Nosotros lo llevamos. Sin perder horas al teléfono.</p>
+
+      <!-- Value props -->
+      <div class="grid-3 mb-24">
+        <div class="card text-center" style="padding:14px 8px;">
+          <i class="fa-solid fa-bolt text-yellow" style="font-size:20px;"></i>
+          <div class="text-sm mt-8" style="font-weight:700;">Velocidad</div>
+          <div class="text-xs muted">No el precio más bajo</div>
+        </div>
+        <div class="card text-center" style="padding:14px 8px;">
+          <i class="fa-solid fa-tower-broadcast text-purple" style="font-size:20px;"></i>
+          <div class="text-sm mt-8" style="font-weight:700;">En vivo</div>
+          <div class="text-xs muted">Cotizaciones reales</div>
+        </div>
+        <div class="card text-center" style="padding:14px 8px;">
+          <i class="fa-solid fa-user-secret text-yellow" style="font-size:20px;"></i>
+          <div class="text-sm mt-8" style="font-weight:700;">Anónimo</div>
+          <div class="text-xs muted">Hasta pagar</div>
+        </div>
+      </div>
+
+      <!-- Role selector -->
+      <div class="section-title"><h2>Ingresá como…</h2><span class="text-xs muted">demo</span></div>
+      <div class="flex-col gap-12">
+        <a href="mechanic-dashboard.html" class="card hoverable" style="display:flex;align-items:center;gap:14px;">
+          <div class="store-avatar" style="background:rgba(109,40,217,0.2);"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+          <div style="flex:1">
+            <div class="h-md">Mecánico</div>
+            <div class="text-sm muted">Pedí repuestos y recibí cotizaciones</div>
+          </div>
+          <i class="fa-solid fa-chevron-right muted"></i>
+        </a>
+        <a href="store-dashboard.html" class="card hoverable" style="display:flex;align-items:center;gap:14px;">
+          <div class="store-avatar" style="background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div>
+          <div style="flex:1">
+            <div class="h-md">Casa de Repuestos</div>
+            <div class="text-sm muted">Recibí pedidos y cotizá rápido</div>
+          </div>
+          <i class="fa-solid fa-chevron-right muted"></i>
+        </a>
+        <a href="delivery-dashboard.html" class="card hoverable" style="display:flex;align-items:center;gap:14px;">
+          <div class="store-avatar" style="background:rgba(34,197,94,0.18);color:#4ADE80;"><i class="fa-solid fa-motorcycle"></i></div>
+          <div style="flex:1">
+            <div class="h-md">Repartidor</div>
+            <div class="text-sm muted">Gestioná entregas en la ciudad</div>
+          </div>
+          <i class="fa-solid fa-chevron-right muted"></i>
+        </a>
+        <a href="admin-dashboard.html" class="card hoverable" style="display:flex;align-items:center;gap:14px;">
+          <div class="store-avatar" style="background:rgba(255,255,255,0.08);color:white;"><i class="fa-solid fa-chart-line"></i></div>
+          <div style="flex:1">
+            <div class="h-md">Admin</div>
+            <div class="text-sm muted">Métricas y gestión de la plataforma</div>
+          </div>
+          <i class="fa-solid fa-chevron-right muted"></i>
+        </a>
+      </div>
+
+      <p class="text-center text-xs muted mt-24">Prototipo navegable · Datos simulados · v0.1</p>
+    </div>
+  </div>
+  <script src="assets/app.js"></script>
+</body>
+</html>
