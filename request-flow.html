@@ -37,6 +37,7 @@
         <div class="field">
           <label>Modelo</label>
           <select class="select" id="model" disabled><option value="">Elegí primero la marca</option></select>
+          <input class="input mt-8" id="modelOther" placeholder="Escribí el modelo" style="display:none;">
         </div>
         <div class="field">
           <label>Año</label>
@@ -157,15 +158,31 @@
 
     // Fill selects
     RAT.fillSelect(document.getElementById('brand'), d.brands, 'Elegí una marca');
-    const years = []; for (let y=2024; y>=2005; y--) years.push(String(y));
+    const years = []; for (let y=2026; y>=1990; y--) years.push(String(y));
     RAT.fillSelect(document.getElementById('year'), years, 'Año');
 
-    const brandSel = document.getElementById('brand'), modelSel = document.getElementById('model');
-    brandSel.addEventListener('change', () => {
-      state.brand = brandSel.value;
-      if (state.brand && d.models[state.brand]) {
-        RAT.fillSelect(modelSel, d.models[state.brand], 'Elegí un modelo'); modelSel.disabled = false;
-      } else { modelSel.innerHTML = '<option value="">Elegí primero la marca</option>'; modelSel.disabled = true; }
+    const brandSel = document.getElementById('brand'), modelSel = document.getElementById('model'), modelOther = document.getElementById('modelOther');
+    const currentModel = () => (modelOther.style.display !== 'none' ? modelOther.value : modelSel.value);
+
+    function setModelMode(brand) {
+      const models = d.models[brand] || [];
+      if (brand && models.length) {
+        RAT.fillSelect(modelSel, [...models, 'Otro'], 'Elegí un modelo');
+        modelSel.disabled = false; modelSel.style.display = '';
+        modelOther.style.display = 'none'; modelOther.value = '';
+      } else if (brand) { // marca sin modelos precargados (ej: "Otro")
+        modelSel.style.display = 'none'; modelSel.disabled = true;
+        modelOther.style.display = ''; modelOther.value = '';
+      } else {
+        modelSel.innerHTML = '<option value="">Elegí primero la marca</option>';
+        modelSel.disabled = true; modelSel.style.display = '';
+        modelOther.style.display = 'none';
+      }
+    }
+    brandSel.addEventListener('change', () => { state.brand = brandSel.value; setModelMode(state.brand); });
+    modelSel.addEventListener('change', () => {
+      if (modelSel.value === 'Otro') { modelOther.style.display = ''; modelOther.focus(); }
+      else modelOther.style.display = 'none';
     });
 
     // Categories
@@ -224,7 +241,7 @@
     }
 
     function renderReview() {
-      state.model = modelSel.value || state.model; state.year = document.getElementById('year').value || state.year;
+      state.model = currentModel() || state.model; state.year = document.getElementById('year').value || state.year;
       state.desc = document.getElementById('desc').value;
       document.getElementById('rvVehicle').textContent = `${state.brand||'Toyota'} ${state.model||'Hilux'} ${state.year||'2019'}`;
       document.getElementById('rvCat').textContent = state.catLabel || 'Frenos';
@@ -233,7 +250,7 @@
     }
 
     document.getElementById('nextBtn').onclick = () => {
-      if (step === 1) { state.model = modelSel.value; state.year = document.getElementById('year').value; }
+      if (step === 1) { state.model = currentModel(); state.year = document.getElementById('year').value; }
       if (step < 5) { go(step+1); }
       else { submit(); }
     };

@@ -120,8 +120,8 @@
             <div class="text-sm" style="font-weight:700;">${q.partBrand}</div>
           </div>
           <div style="text-align:right;">
-            <div class="text-xs muted">Entrega estimada</div>
-            <div class="text-sm" style="font-weight:700;"><i class="fa-solid fa-motorcycle text-yellow"></i> ${q.eta}</div>
+            <div class="text-xs muted">Disponibilidad</div>
+            <div class="text-sm" style="font-weight:700;"><i class="fa-solid fa-circle-check text-green"></i> En stock</div>
           </div>
         </div>
         <div class="divider" style="margin:12px 0;"></div>
@@ -140,7 +140,7 @@
       arrived++;
       document.getElementById('qCount').textContent = arrived;
       RAT.ping();
-      RAT.toast({ title: 'Nueva cotización · '+q.alias, sub: `${q.partBrand} · ${RAT.money(q.price)} · ETA ${q.eta}`, icon:'fa-tag', type:'yellow' });
+      RAT.toast({ title: 'Nueva cotización · '+q.alias, sub: `${q.partBrand} · ${RAT.money(q.price)} · En stock`, icon:'fa-tag', type:'yellow' });
     }
 
     function selectQuote(idx, q) {

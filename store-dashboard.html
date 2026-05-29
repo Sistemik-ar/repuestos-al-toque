@@ -76,11 +76,25 @@
       <div class="tab-pane" data-pane="delivered" style="display:none;">
         <div class="card mb-12">
           <div class="flex-between mb-8"><div><div class="text-sm" style="font-weight:700;">Bomba de agua</div><div class="text-xs muted">VW Amarok 2021 · Taller Patagonia</div></div><span class="badge badge-green"><i class="fa-solid fa-check"></i> Entregado</span></div>
-          <div class="flex-between"><span class="text-sm muted">Venta <b class="text-green">$54.200</b></span><button class="btn btn-yellow btn-sm" onclick="RAT.openRating({role:'mechanic', who:'Taller Patagonia', subjectName:'Bomba de agua · VW Amarok'})"><i class="fa-solid fa-star"></i> Calificar mecánico</button></div>
+          <div class="flex-between mb-12"><span class="text-sm muted">Venta <b class="text-green">$54.200</b></span><button class="btn btn-yellow btn-sm" onclick="RAT.openRating({role:'mechanic', who:'Taller Patagonia', subjectName:'Bomba de agua · VW Amarok'})"><i class="fa-solid fa-star"></i> Calificar mecánico</button></div>
+          <div class="divider"></div>
+          <div id="proof-1">
+            <div class="flex-between">
+              <div class="text-xs muted"><i class="fa-solid fa-camera"></i> Comprobante de entrega</div>
+              <button class="btn btn-ghost btn-sm" onclick="uploadProof(1,'Bomba de agua · VW Amarok')"><i class="fa-solid fa-upload"></i> Subir foto</button>
+            </div>
+            <div class="text-xs muted mt-8">Sumá la foto del repuesto que entregaste para cerrar la venta.</div>
+          </div>
         </div>
-        <div class="card" style="opacity:.85;">
+        <div class="card">
           <div class="flex-between mb-8"><div><div class="text-sm" style="font-weight:700;">Disco de embrague</div><div class="text-xs muted">Renault Kangoo 2018 · MotorSur</div></div><span class="badge badge-purple"><i class="fa-solid fa-star"></i> Calificado</span></div>
-          <div class="flex-between text-sm"><span class="muted">Venta <b class="text-green">$71.000</b></span><span class="text-xs muted">Calificaste ⭐ 5</span></div>
+          <div class="flex-between mb-12"><span class="text-sm muted">Venta <b class="text-green">$71.000</b></span><span class="text-xs muted">Calificaste ⭐ 5</span></div>
+          <div class="divider"></div>
+          <div class="flex-center gap-12">
+            <div style="width:54px;height:54px;border-radius:10px;background:repeating-linear-gradient(45deg,#1F2937 0 8px,#283548 8px 16px);display:grid;place-items:center;color:var(--text-2);flex-shrink:0;"><i class="fa-solid fa-image"></i></div>
+            <div style="flex:1"><div class="text-sm" style="font-weight:700;">entrega_disco.jpg</div><div class="text-xs text-green"><i class="fa-solid fa-circle-check"></i> Entrega documentada · venta cerrada</div></div>
+            <button class="btn btn-ghost btn-sm" onclick="RAT.toast({title:'Comprobante de entrega',sub:'Disco de embrague · Renault Kangoo',icon:'fa-image',type:'purple'})"><i class="fa-solid fa-eye"></i></button>
+          </div>
         </div>
       </div>
     </div>
@@ -102,15 +116,6 @@
       <div class="field">
         <label>Precio final (con envío incluido)</label>
         <input class="input" id="qPrice" inputmode="numeric" placeholder="$ 0">
-      </div>
-      <div class="field">
-        <label>Tiempo de entrega estimado</label>
-        <div class="chip-row" id="etaChips">
-          <button class="chip active" data-eta="25 min">25 min</button>
-          <button class="chip" data-eta="45 min">45 min</button>
-          <button class="chip" data-eta="1 h">1 h</button>
-          <button class="chip" data-eta="2 h">2 h</button>
-        </div>
       </div>
       <div class="field">
         <label>Marca de la pieza</label>
@@ -207,10 +212,18 @@
     };
     window.closeModal = () => document.getElementById('quoteModal').classList.remove('open');
 
-    // ETA chips
-    document.querySelectorAll('#etaChips .chip').forEach(c => c.onclick = () => {
-      document.querySelectorAll('#etaChips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active');
-    });
+    // Foto de entrega: el vendedor documenta el repuesto entregado como cierre de la venta
+    window.uploadProof = (id, name) => {
+      const box = document.getElementById('proof-' + id);
+      box.innerHTML = `
+        <div class="flex-center gap-12 animate-in">
+          <div style="width:54px;height:54px;border-radius:10px;background:repeating-linear-gradient(45deg,#1F2937 0 8px,#283548 8px 16px);display:grid;place-items:center;color:var(--text-2);flex-shrink:0;"><i class="fa-solid fa-image"></i></div>
+          <div style="flex:1"><div class="text-sm" style="font-weight:700;">entrega_${id}.jpg</div><div class="text-xs text-green"><i class="fa-solid fa-circle-check"></i> Entrega documentada · venta cerrada</div></div>
+          <button class="btn btn-ghost btn-sm" onclick="RAT.toast({title:'Comprobante de entrega',sub:'${name}',icon:'fa-image',type:'purple'})"><i class="fa-solid fa-eye"></i></button>
+        </div>`;
+      RAT.ping();
+      RAT.toast({ title: 'Venta finalizada', sub: 'Comprobante de entrega cargado', icon: 'fa-circle-check', type: 'green' });
+    };
 
     document.getElementById('sendQuoteBtn').onclick = () => {
       const price = document.getElementById('qPrice').value || '$44.900';

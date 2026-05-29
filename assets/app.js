@@ -8,16 +8,50 @@ const RAT = (() => {
   const data = {
     mechanics: ['Taller Patagonia', 'MotorSur', 'Bariloche Diesel'],
     stores: ['Repuestos Centro', 'Andina Parts', 'Patagonia Frenos'],
-    brands: ['Toyota', 'Ford', 'Volkswagen', 'Chevrolet', 'Renault', 'Fiat', 'Peugeot', 'Nissan'],
+    // Listado completo orientado al mercado argentino (marca -> modelos). "Otro" al final permite texto libre.
+    brands: [
+      'Alfa Romeo', 'Audi', 'BAIC', 'BMW', 'Chery', 'Chevrolet', 'Citroën', 'DS', 'Dodge', 'Fiat',
+      'Ford', 'Geely', 'Haval', 'Honda', 'Hyundai', 'Isuzu', 'Iveco', 'JAC', 'Jeep', 'Kia',
+      'Land Rover', 'Lexus', 'Mercedes-Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche',
+      'RAM', 'Renault', 'Subaru', 'Suzuki', 'Toyota', 'Volkswagen', 'Volvo', 'Otro'
+    ],
     models: {
-      Toyota: ['Hilux', 'Corolla', 'Etios', 'SW4', 'Yaris'],
-      Ford: ['Ranger', 'Focus', 'Fiesta', 'EcoSport', 'Ka'],
-      Volkswagen: ['Amarok', 'Gol', 'Vento', 'Polo', 'Saveiro'],
-      Chevrolet: ['S10', 'Onix', 'Cruze', 'Tracker', 'Spin'],
-      Renault: ['Kangoo', 'Duster', 'Sandero', 'Logan', 'Oroch'],
-      Fiat: ['Toro', 'Cronos', 'Argo', 'Strada', 'Mobi'],
-      Peugeot: ['208', '2008', 'Partner', '308'],
-      Nissan: ['Frontier', 'Versa', 'Kicks', 'March']
+      'Alfa Romeo': ['Giulia', 'Giulietta', 'Stelvio', 'Mito', '147'],
+      Audi: ['A1', 'A3', 'A4', 'A5', 'A6', 'Q2', 'Q3', 'Q5', 'Q7', 'TT'],
+      BAIC: ['X25', 'X35', 'X55', 'BJ40'],
+      BMW: ['Serie 1', 'Serie 2', 'Serie 3', 'Serie 4', 'Serie 5', 'X1', 'X2', 'X3', 'X4', 'X5', 'X6'],
+      Chery: ['QQ', 'Tiggo 2', 'Tiggo 4', 'Tiggo 5', 'Tiggo 7', 'Tiggo 8', 'Arrizo 5'],
+      Chevrolet: ['Corsa', 'Classic', 'Celta', 'Agile', 'Aveo', 'Onix', 'Onix Plus', 'Prisma', 'Cruze', 'Sonic', 'Spin', 'Tracker', 'Captiva', 'Equinox', 'Trailblazer', 'S10', 'Montana', 'Blazer'],
+      'Citroën': ['C3', 'C3 Aircross', 'C4', 'C4 Cactus', 'C4 Lounge', 'C5 Aircross', 'Berlingo', 'Jumpy', 'Jumper', 'Xsara', 'C-Elysée'],
+      DS: ['DS3', 'DS4', 'DS7'],
+      Dodge: ['Journey', 'Caliber', 'RAM 1500', 'Durango'],
+      Fiat: ['Uno', 'Palio', 'Siena', 'Punto', 'Idea', 'Cronos', 'Argo', 'Mobi', '500', 'Toro', 'Strada', 'Fiorino', 'Ducato', 'Pulse', 'Fastback'],
+      Ford: ['Ka', 'Fiesta', 'Focus', 'Mondeo', 'EcoSport', 'Kuga', 'Territory', 'Escape', 'Ranger', 'Maverick', 'Bronco', 'F-100', 'F-150', 'Transit'],
+      Geely: ['Emgrand', 'Coolray', 'GS'],
+      Haval: ['H6', 'Jolion', 'H2'],
+      Honda: ['Fit', 'City', 'Civic', 'Accord', 'HR-V', 'CR-V', 'WR-V'],
+      Hyundai: ['i10', 'Grand i10', 'HB20', 'Accent', 'Elantra', 'Creta', 'Tucson', 'Santa Fe', 'Kona', 'ix35'],
+      Isuzu: ['D-Max', 'MU-X'],
+      Iveco: ['Daily'],
+      JAC: ['S2', 'S3', 'T6', 'T8'],
+      Jeep: ['Renegade', 'Compass', 'Commander', 'Cherokee', 'Grand Cherokee', 'Wrangler'],
+      Kia: ['Picanto', 'Rio', 'Cerato', 'Soul', 'Stonic', 'Seltos', 'Sportage', 'Sorento', 'Carnival'],
+      'Land Rover': ['Defender', 'Discovery', 'Discovery Sport', 'Range Rover', 'Range Rover Evoque', 'Freelander'],
+      Lexus: ['UX', 'NX', 'RX', 'ES'],
+      'Mercedes-Benz': ['Clase A', 'Clase B', 'Clase C', 'Clase E', 'CLA', 'GLA', 'GLB', 'GLC', 'GLE', 'Sprinter', 'Vito', 'Citan'],
+      Mini: ['Cooper', 'Countryman', 'Clubman'],
+      Mitsubishi: ['L200', 'Montero', 'Outlander', 'ASX', 'Eclipse Cross'],
+      Nissan: ['March', 'Versa', 'Sentra', 'Tiida', 'Note', 'Kicks', 'X-Trail', 'Murano', 'Frontier', 'NP300'],
+      Peugeot: ['206', '207', '208', '2008', '301', '307', '308', '408', '3008', '5008', 'Partner', 'Expert', 'Boxer', '504'],
+      Porsche: ['Macan', 'Cayenne', '911', 'Panamera'],
+      RAM: ['700', '1000', '1500', '2500', 'Rampage'],
+      Renault: ['Twingo', 'Clio', 'Kwid', 'Sandero', 'Stepway', 'Logan', 'Symbol', 'Fluence', 'Megane', 'Captur', 'Duster', 'Oroch', 'Koleos', 'Kangoo', 'Alaskan', 'Master'],
+      Subaru: ['Impreza', 'XV', 'Forester', 'Outback', 'WRX'],
+      Suzuki: ['Fun', 'Swift', 'Baleno', 'Vitara', 'S-Cross', 'Jimny'],
+      Toyota: ['Etios', 'Yaris', 'Corolla', 'Corolla Cross', 'Camry', 'RAV4', 'SW4', 'Hilux', 'Hiace', 'Land Cruiser', '4Runner', 'Prius'],
+      Volkswagen: ['Up', 'Gol', 'Gol Trend', 'Voyage', 'Polo', 'Virtus', 'Vento', 'Golf', 'Passat', 'Suran', 'Fox', 'Nivus', 'T-Cross', 'Taos', 'Tiguan', 'Saveiro', 'Amarok'],
+      Volvo: ['XC40', 'XC60', 'XC90', 'S60', 'S90'],
+      Otro: []
     },
     categories: [
       { id: 'frenos', label: 'Frenos', icon: 'fa-record-vinyl' },
@@ -32,10 +66,10 @@ const RAT = (() => {
     ],
     // Anonymous quote pool used on the live quotes screen
     quotePool: [
-      { alias: 'Proveedor #12', zone: 'Centro', rating: 4.9, partBrand: 'Bosch', eta: '25 min', price: 48500, warranty: '6 meses', real: { name: 'Repuestos Centro', phone: '+54 9 294 4123-456', address: 'Av. Bustillo 1240, Bariloche' } },
-      { alias: 'Distribuidor Centro', zone: 'Centro', rating: 4.7, partBrand: 'TRW', eta: '35 min', price: 44900, warranty: '3 meses', real: { name: 'Andina Parts', phone: '+54 9 294 4567-890', address: 'Onelli 530, Bariloche' } },
-      { alias: 'Zona Oeste Parts', zone: 'Oeste', rating: 4.8, partBrand: 'Ferodo', eta: '45 min', price: 39900, warranty: '12 meses', real: { name: 'Patagonia Frenos', phone: '+54 9 294 4789-012', address: 'Km 5 Av. Bustillo, Bariloche' } },
-      { alias: 'AutoPartes Sur', zone: 'Sur', rating: 4.6, partBrand: 'Fras-le', eta: '50 min', price: 37500, warranty: '6 meses', real: { name: 'Sur Repuestos', phone: '+54 9 294 4222-333', address: 'Elordi 870, Bariloche' } }
+      { alias: 'Proveedor #12', zone: 'Centro', rating: 4.9, partBrand: 'Bosch', price: 48500, warranty: '6 meses', real: { name: 'Repuestos Centro', phone: '+54 9 294 4123-456', address: 'Av. Bustillo 1240, Bariloche' } },
+      { alias: 'Distribuidor Centro', zone: 'Centro', rating: 4.7, partBrand: 'TRW', price: 44900, warranty: '3 meses', real: { name: 'Andina Parts', phone: '+54 9 294 4567-890', address: 'Onelli 530, Bariloche' } },
+      { alias: 'Zona Oeste Parts', zone: 'Oeste', rating: 4.8, partBrand: 'Ferodo', price: 39900, warranty: '12 meses', real: { name: 'Patagonia Frenos', phone: '+54 9 294 4789-012', address: 'Km 5 Av. Bustillo, Bariloche' } },
+      { alias: 'AutoPartes Sur', zone: 'Sur', rating: 4.6, partBrand: 'Fras-le', price: 37500, warranty: '6 meses', real: { name: 'Sur Repuestos', phone: '+54 9 294 4222-333', address: 'Elordi 870, Bariloche' } }
     ],
     // Sponsored promos. While the mechanic WAITS we show only brand + discount (no contact,
     // so they don't leave before buying). WhatsApp contact is unlocked only AFTER payment.

@@ -75,14 +75,7 @@
       <div class="modal-handle"></div>
       <h2 class="h-md mb-4">Enviar cotización</h2>
       <p class="text-sm muted mb-16">Pastillas de freno · Toyota Hilux 2019</p>
-      <div class="field"><label>Precio final (envío incluido)</label><input class="input" id="qPrice" inputmode="numeric" placeholder="$ 0"></div>
-      <div class="field"><label>Tiempo de entrega</label>
-        <div class="chip-row" id="etaChips">
-          <button class="chip active" data-eta="25 min">25 min</button>
-          <button class="chip" data-eta="45 min">45 min</button>
-          <button class="chip" data-eta="1 h">1 h</button>
-        </div>
-      </div>
+      <div class="field"><label>Precio final</label><input class="input" id="qPrice" inputmode="numeric" placeholder="$ 0"></div>
       <div class="field"><label>Marca de la pieza</label>
         <select class="select"><option>Bosch</option><option>TRW</option><option>Ferodo</option><option>Original / OEM</option></select>
       </div>
@@ -98,7 +91,6 @@
   <script>
     const t = document.getElementById('detTimer');
     RAT.countdown(t, 7*60+12, { pillEl: t, urgentAt: 120 });
-    document.querySelectorAll('#etaChips .chip').forEach(c => c.onclick = () => { document.querySelectorAll('#etaChips .chip').forEach(x=>x.classList.remove('active')); c.classList.add('active'); });
     window.sendQuote = () => {
       document.getElementById('quoteModal').classList.remove('open');
       RAT.toast({title:'Cotización enviada', sub:'Esperando decisión del mecánico…', icon:'fa-paper-plane', type:'green'});

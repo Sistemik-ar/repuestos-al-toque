@@ -26,7 +26,7 @@
         <div class="flex-between mb-12">
           <div class="flex-center gap-12">
             <div class="store-avatar"><i class="fa-solid fa-user-secret"></i></div>
-            <div><div style="font-weight:700;" id="qAlias">Zona Oeste Parts</div><div class="text-xs muted"><span id="qBrand">Ferodo</span> · ETA <span id="qEta">45 min</span></div></div>
+            <div><div style="font-weight:700;" id="qAlias">Zona Oeste Parts</div><div class="text-xs muted"><span id="qBrand">Ferodo</span> · <i class="fa-solid fa-circle-check text-green"></i> En stock</div></div>
           </div>
           <span class="badge badge-green"><i class="fa-solid fa-shield-halved"></i> <span id="qWarranty">12 meses</span></span>
         </div>
@@ -52,7 +52,6 @@
       <div class="section-title"><h2>Detalle</h2></div>
       <div class="card mb-16">
         <div class="flex-between mb-12"><span class="subtle">Repuesto (Ferodo)</span><span style="font-weight:700;" id="bPart">$39.900</span></div>
-        <div class="flex-between mb-12"><span class="subtle">Envío express <span class="text-xs muted">(Bariloche)</span></span><span style="font-weight:700;" id="bShip">$3.500</span></div>
         <div class="flex-between mb-12"><span class="subtle">Comisión RepuestosAlToque <span class="badge badge-purple" style="margin-left:4px;">10%</span></span><span style="font-weight:700;" id="bFee">$4.340</span></div>
         <div class="divider"></div>
         <div class="flex-between"><span class="h-md">Total</span><span class="h-md text-yellow" id="bTotal">$47.740</span></div>
@@ -101,26 +100,17 @@
         </div>
       </div>
 
-      <!-- Driver assignment -->
-      <div class="section-title"><h2>Envío</h2></div>
-      <div class="card mb-16">
-        <div class="flex-between mb-12">
-          <div class="flex-center gap-12">
-            <div class="store-avatar" style="background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-motorcycle"></i></div>
-            <div><div class="text-sm" style="font-weight:700;">Repartidor asignado</div><div class="text-xs muted">Diego R. · ⭐ 4.9</div></div>
-          </div>
-          <span class="badge badge-yellow">En camino al comercio</span>
-        </div>
-        <div class="progress-track mb-8"><div class="progress-fill" style="width:20%;"></div></div>
-        <div class="text-xs muted">Llega a tu taller en ~45 min</div>
+      <!-- Coordinación (envío en pausa por ahora) -->
+      <div class="float-notif mb-16">
+        <i class="fa-solid fa-handshake text-purple"></i>
+        <div class="text-sm subtle">Coordiná el <b>retiro o la entrega</b> directamente con el vendedor usando los datos de arriba.</div>
       </div>
 
       <!-- Sponsored promos — WhatsApp contact unlocked only AFTER payment -->
       <div class="section-title"><h2>Promos de la zona</h2><span class="promo-tag" style="position:static;">Promocionado</span></div>
       <div id="adList" class="flex-col gap-12 mb-16"></div>
 
-      <a href="delivery-dashboard.html" class="btn btn-primary btn-block btn-lg mb-12"><i class="fa-solid fa-map-location-dot"></i> Seguir el envío</a>
-      <a href="mechanic-dashboard.html" class="btn btn-ghost btn-block">Volver al inicio</a>
+      <a href="mechanic-dashboard.html" class="btn btn-primary btn-block btn-lg mb-12"><i class="fa-solid fa-house"></i> Volver al inicio</a>
     </div>
 
     <!-- Sticky pay footer -->
@@ -155,11 +145,9 @@
     // Fill selected offer + breakdown
     document.getElementById('qAlias').textContent = q.alias;
     document.getElementById('qBrand').textContent = q.partBrand;
-    document.getElementById('qEta').textContent = q.eta;
     document.getElementById('qWarranty').textContent = q.warranty;
-    const part = q.price, ship = 3500, fee = Math.round(part*0.10), total = part+ship+fee;
+    const part = q.price, fee = Math.round(part*0.10), total = part+fee;
     document.getElementById('bPart').textContent = RAT.money(part);
-    document.getElementById('bShip').textContent = RAT.money(ship);
     document.getElementById('bFee').textContent = RAT.money(fee);
     document.getElementById('bTotal').textContent = RAT.money(total);
     document.getElementById('sTotal').textContent = RAT.money(total);
