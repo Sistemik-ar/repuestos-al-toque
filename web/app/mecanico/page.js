@@ -1,14 +1,18 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import BottomNav from '@/components/BottomNav';
 import { toast, tierFor } from '@/lib/ui';
-import { useRequests } from '@/lib/store';
+import { useRequests, getClientId } from '@/lib/store';
 
 export default function MecanicoDashboard() {
   const badge = tierFor('mechanic', 127);
   const requests = useRequests();
-  const activos = requests.filter((r) => r.status === 'open' || r.status === 'closed');
-  const coordinar = requests.filter((r) => r.status === 'paid');
+  const [myId, setMyId] = useState(null);
+  useEffect(() => { setMyId(getClientId()); }, []);
+  const mine = myId ? requests.filter((r) => r.clientId === myId) : [];
+  const activos = mine.filter((r) => r.status === 'open' || r.status === 'closed');
+  const coordinar = mine.filter((r) => r.status === 'paid');
 
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim() || 'Vehículo';

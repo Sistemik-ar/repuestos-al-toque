@@ -1,82 +1,84 @@
 'use client';
-// Almacén compartido en el navegador (localStorage). Sin mocks: los pedidos y
-// cotizaciones los genera el usuario. Se comparte entre pestañas del mismo equipo
-// (mecánico/comercio). El backend real será Supabase más adelante.
+// Cliente del almacén compartido. Lee/escribe contra la API del servidor (la PC
+// de Felipe) y hace polling para refrescar en vivo. Todos los celus comparten datos.
 import { useEffect, useState } from 'react';
 
-const KEY = 'rat_db_v1';
-const empty = { requests: [], quotes: [] };
+let cache = { requests: [], quotes: [] };
+let started = false;
 
-function read() {
-  if (typeof window === 'undefined') return empty;
-  try { return JSON.parse(localStorage.getItem(KEY)) || empty; } catch { return empty; }
+function notify() { if (typeof window !== 'undefined') window.dispatchEvent(new Event('rat-db')); }
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/db', { cache: 'no-store' });
+    cache = await r.json();
+    notify();
+  } catch (e) {}
 }
-function write(db) {
-  localStorage.setItem(KEY, JSON.stringify(db));
-  window.dispatchEvent(new Event('rat-db'));
+function startPolling() {
+  if (started || typeof window === 'undefined') return;
+  started = true;
+  refresh();
+  setInterval(refresh, 1500);
 }
 
+// ---- Lectura sincrónica desde el cache (arranca polling al primer uso) ----
+export function getRequests() { startPolling(); return cache.requests; }
+export function getRequest(id) { startPolling(); return cache.requests.find((r) => r.id === id); }
+export function getOpenRequests() { startPolling(); return cache.requests.filter((r) => r.status === 'open'); }
+export function getQuotes(requestId) { startPolling(); return cache.quotes.filter((q) => q.requestId === requestId); }
+export function storeQuotedRequestIds(storeName) {
+  startPolling();
+  return new Set(cache.quotes.filter((q) => q.storeName === storeName).map((q) => q.requestId));
+}
+
+// ---- Escritura (POST + refresh inmediato) ----
 const ALIASES = { 'Repuestos Centro': 'Proveedor #12', 'Andina Parts': 'Distribuidor Centro', 'Patagonia Frenos': 'Zona Oeste Parts' };
+function aliasFor(store) {
+  if (ALIASES[store]) return ALIASES[store];
+  let h = 0; for (const c of String(store)) h = (h * 31 + c.charCodeAt(0)) % 97;
+  return 'Proveedor #' + (10 + (h % 80));
+}
 
-export function getRequests() { return read().requests; }
-export function getRequest(id) { return read().requests.find((r) => r.id === id); }
-export function getOpenRequests() { return read().requests.filter((r) => r.status === 'open'); }
-
-export function addRequest(r) {
-  const db = read();
-  const n = 1042 + db.requests.length;
-  const id = String(n);
-  db.requests.unshift({ id, status: 'open', createdAt: Date.now(), ...r });
-  write(db);
+export async function addRequest(r) {
+  const res = await fetch('/api/requests', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(r) });
+  const { id } = await res.json();
+  await refresh();
   return id;
 }
-export function setRequestStatus(id, status) {
-  const db = read();
-  const r = db.requests.find((x) => x.id === id);
-  if (r) r.status = status;
-  write(db);
+export async function addQuote(q) {
+  const store = q.storeName || 'Vendedor';
+  const quote = { rating: 4.8, zone: 'Centro', warranty: '6 meses', ...q, alias: aliasFor(store) };
+  await fetch('/api/quotes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(quote) });
+  await refresh();
+}
+export async function setRequestStatus(id, status) {
+  await fetch('/api/status', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, status }) });
+  await refresh();
 }
 
-export function getQuotes(requestId) { return read().quotes.filter((q) => q.requestId === requestId); }
-export function addQuote(q) {
-  const db = read();
-  const store = q.storeName || 'Repuestos Centro';
-  db.quotes.push({
-    id: 'Q' + Date.now() + Math.floor(Math.random() * 99),
-    createdAt: Date.now(),
-    alias: ALIASES[store] || 'Proveedor #' + (10 + Math.floor(Math.random() * 80)),
-    storeName: store,
-    rating: q.rating ?? 4.8,
-    zone: q.zone || 'Centro',
-    warranty: q.warranty || '6 meses',
-    ...q,
-  });
-  write(db);
+// ---- Identidad local (por dispositivo) ----
+export function getClientId() {
+  if (typeof window === 'undefined') return null;
+  let id = localStorage.getItem('rat_client');
+  if (!id) { id = 'c' + Math.random().toString(36).slice(2, 9); localStorage.setItem('rat_client', id); }
+  return id;
 }
-export function quotesByStore(storeName) {
-  const db = read();
-  const ids = new Set(db.quotes.filter((q) => q.storeName === storeName).map((q) => q.requestId));
-  return db.requests.filter((r) => ids.has(r.id));
-}
-export function storeQuotedRequestIds(storeName) {
-  return new Set(read().quotes.filter((q) => q.storeName === storeName).map((q) => q.requestId));
-}
-
-export function resetAll() { write({ requests: [], quotes: [] }); }
+export function getSellerName() { return typeof window === 'undefined' ? null : localStorage.getItem('rat_seller'); }
+export function setSellerName(n) { localStorage.setItem('rat_seller', n); }
 
 // ---- Hooks reactivos ----
-function useDb(selector) {
-  const [val, setVal] = useState(undefined);
+function useSub(getter) {
+  const [val, setVal] = useState(getter);
   useEffect(() => {
-    const load = () => setVal(selector());
-    load();
-    window.addEventListener('rat-db', load);
-    window.addEventListener('storage', load);
-    return () => { window.removeEventListener('rat-db', load); window.removeEventListener('storage', load); };
+    startPolling();
+    const h = () => setVal(getter());
+    h();
+    window.addEventListener('rat-db', h);
+    return () => window.removeEventListener('rat-db', h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return val;
 }
-export function useRequests() { return useDb(getRequests) || []; }
-export function useRequest(id) { return useDb(() => getRequest(id)); }
-export function useQuotes(requestId) { return useDb(() => getQuotes(requestId)) || []; }
+export function useRequests() { return useSub(getRequests); }
+export function useQuotes(requestId) { return useSub(() => getQuotes(requestId)); }

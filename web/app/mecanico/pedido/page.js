@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
-import { addRequest } from '@/lib/store';
+import { addRequest, getClientId } from '@/lib/store';
 
 const years = [];
 for (let y = 2026; y >= 1990; y--) years.push(String(y));
@@ -31,15 +31,15 @@ export default function Pedido() {
     else submit();
   }
 
-  function submit() {
-    const payload = { ...st, model: needsOther ? st.modelOther : st.model };
-    const reqId = addRequest(payload); // queda guardado: lo verás vos y el comercio
+  async function submit() {
+    const payload = { ...st, model: needsOther ? st.modelOther : st.model, clientId: getClientId(), mechanic: 'Taller Patagonia' };
     setSearching(true);
+    const reqId = await addRequest(payload); // compartido: lo ven los vendedores
     let p = 5;
     const id = setInterval(() => {
       p += Math.random() * 22; if (p > 100) p = 100; setProg(p);
-      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones?id=' + reqId), 500); }
-    }, 320);
+      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones?id=' + reqId), 400); }
+    }, 280);
   }
 
   return (
