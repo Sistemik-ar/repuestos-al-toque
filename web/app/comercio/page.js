@@ -92,8 +92,8 @@ function Panel({ store, onChange }) {
 
         <div className="grid-3 mb-16">
           <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-yellow">{pend.length}</div><div className="stat-label">Solicitudes</div></div>
-          <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-green">{ent.length}</div><div className="stat-label">Concretadas</div></div>
           <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value">{cot.length}</div><div className="stat-label">Cotizadas</div></div>
+          <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-green">{ent.length}</div><div className="stat-label">Concretadas</div></div>
         </div>
 
         <div className="pill-tabs mb-16">
