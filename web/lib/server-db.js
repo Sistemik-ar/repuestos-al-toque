@@ -37,4 +37,10 @@ export function setStatus(id, status) {
   if (r) r.status = status;
   save();
 }
+export function updateRequest(id, patch) {
+  const d = load();
+  const r = d.requests.find((x) => x.id === id);
+  if (r) Object.assign(r, patch);
+  save();
+}
 export function resetAll() { db = { requests: [], quotes: [] }; save(); }

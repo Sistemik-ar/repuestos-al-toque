@@ -1,13 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast, ping, tierFor } from '@/lib/ui';
-import { useRequests, addQuote, getQuotes, storeQuotedRequestIds, getSellerName, setSellerName } from '@/lib/store';
+import { useRequests, addQuote, getQuotes, storeQuotedRequestIds, getSellerName, setSellerName, getRequest, updateRequest } from '@/lib/store';
+import { fileToThumb } from '@/lib/img';
 
 export default function Comercio() {
   const [store, setStore] = useState(null);
   useEffect(() => { setStore(getSellerName()); }, []);
-
   if (store === null) return <Setup onReady={setStore} />;
   return <Panel store={store} onChange={() => setStore(getSellerName())} />;
 }
@@ -25,9 +25,7 @@ function Setup({ onReady }) {
           <p className="text-sm muted">Así aparecés ante la plataforma (el mecánico te ve anónimo).</p>
         </div>
         <div className="field"><input className="input" placeholder="Nombre del comercio" value={name} onChange={(e) => setName(e.target.value)} /></div>
-        <div className="chip-row mb-16">
-          {sug.map((s) => <button key={s} className="chip" onClick={() => enter(s)}>{s}</button>)}
-        </div>
+        <div className="chip-row mb-16">{sug.map((s) => <button key={s} className="chip" onClick={() => enter(s)}>{s}</button>)}</div>
         <button className="btn btn-yellow btn-block btn-lg" disabled={!name.trim()} onClick={() => enter()}>Entrar</button>
       </div>
     </div>
@@ -37,6 +35,8 @@ function Setup({ onReady }) {
 function Panel({ store, onChange }) {
   const [tab, setTab] = useState('pend');
   const [modal, setModal] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [help, setHelp] = useState(false);
   const [dismissed, setDismissed] = useState([]);
   const requests = useRequests();
   const badge = tierFor('store', 312);
@@ -51,11 +51,18 @@ function Panel({ store, onChange }) {
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
 
-  async function sendQuote(price, partBrand, note) {
-    await addQuote({ requestId: modal.id, storeName: store, partBrand, price: Number(String(price).replace(/\D/g, '')) || 0, note });
+  async function sendQuote(price, partBrand, note, photos) {
+    await addQuote({ requestId: modal.id, storeName: store, partBrand, price: Number(String(price).replace(/\D/g, '')) || 0, note, photos });
     setModal(null);
     ping();
     toast({ title: 'Cotización enviada', sub: 'Se revela al mecánico al cerrarse la ventana', icon: 'fa-paper-plane', type: 'green' });
+  }
+
+  async function askInfo(r, items, text) {
+    const prev = getRequest(r.id)?.infoRequests || [];
+    await updateRequest(r.id, { infoRequests: [...prev, { store, items, text, at: Date.now() }] });
+    setInfo(null);
+    toast({ title: 'Le pedimos más info al mecánico', sub: 'Te avisamos cuando responda', icon: 'fa-circle-question', type: 'purple' });
   }
 
   return (
@@ -63,6 +70,7 @@ function Panel({ store, onChange }) {
       <div className="topbar">
         <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Panel Comercio</span></Link>
         <div className="topbar-actions">
+          <button className="icon-btn" onClick={() => setHelp(true)} title="Ayuda"><i className="fa-regular fa-circle-question"></i></button>
           <button className="icon-btn" onClick={() => { setSellerName(''); onChange(); }} title="Cambiar comercio"><i className="fa-solid fa-right-left"></i></button>
           <div className="avatar" style={{ background: 'linear-gradient(135deg,var(--yellow),var(--purple))' }}>{initials}</div>
         </div>
@@ -122,9 +130,23 @@ function Panel({ store, onChange }) {
                   </div>
                   {r.photo && <span className="badge badge-purple"><i className="fa-solid fa-image"></i> con foto</span>}
                 </div>
+
+                {r.extraInfo && (
+                  <div className="float-notif mb-12" style={{ padding: '10px 12px' }}>
+                    <i className="fa-solid fa-circle-info text-green"></i>
+                    <div className="text-xs subtle"><b>Info extra del mecánico:</b> {r.extraInfo}</div>
+                  </div>
+                )}
+
                 <div className="locked-info mb-12"><i className="fa-solid fa-user-secret"></i> Mecánico anónimo hasta concretar</div>
+
+                <div className="flex-between mb-12">
+                  <button className="btn btn-ghost btn-sm" onClick={() => setInfo(r)}><i className="fa-regular fa-circle-question"></i> ¿Dudas? Pedir info</button>
+                  {r.infoRequests?.length ? <span className="badge badge-purple"><i className="fa-solid fa-clock"></i> info pedida</span> : null}
+                </div>
+
                 <div className="flex gap-12">
-                  <button className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} onClick={() => { setDismissed((d) => [...d, r.id]); toast({ title: 'Marcado sin disponibilidad', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' }); }}><i className="fa-solid fa-ban"></i> Sin disponibilidad</button>
+                  <button className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} onClick={() => { setDismissed((d) => [...d, r.id]); toast({ title: 'Marcado sin disponibilidad', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' }); }}><i className="fa-solid fa-ban"></i> Sin stock</button>
                   <button className="btn btn-yellow btn-block" onClick={() => setModal(r)}><i className="fa-solid fa-tag"></i> Cotizar</button>
                 </div>
               </div>
@@ -158,6 +180,8 @@ function Panel({ store, onChange }) {
       </div>
 
       {modal && <CotizarModal lead={modal} label={label(modal)} veh={veh(modal)} onClose={() => setModal(null)} onSend={sendQuote} />}
+      {info && <PedirInfoModal lead={info} label={label(info)} onClose={() => setInfo(null)} onSend={(items, text) => askInfo(info, items, text)} />}
+      {help && <HelpSheet onClose={() => setHelp(false)} />}
     </div>
   );
 }
@@ -180,6 +204,17 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
   const [price, setPrice] = useState('');
   const [brand, setBrand] = useState('Bosch');
   const [note, setNote] = useState('');
+  const [photos, setPhotos] = useState([]);
+  const fileRef = useRef(null);
+
+  async function onPick(e) {
+    const files = [...e.target.files].slice(0, 3 - photos.length);
+    for (const f of files) {
+      try { const t = await fileToThumb(f); setPhotos((p) => (p.length < 3 ? [...p, t] : p)); } catch (err) {}
+    }
+    e.target.value = '';
+  }
+
   return (
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
@@ -190,12 +225,93 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         <div className="field"><label>Marca de la pieza</label>
           <select className="select" value={brand} onChange={(e) => setBrand(e.target.value)}><option>Bosch</option><option>TRW</option><option>Ferodo</option><option>Original / OEM</option><option>Alternativa</option></select>
         </div>
+        <div className="field">
+          <label>Fotos de la pieza <span className="muted">(hasta 3, opcional)</span></label>
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
+          <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+            {photos.map((src, i) => (
+              <div key={i} style={{ position: 'relative' }}>
+                <img src={src} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />
+                <button onClick={() => setPhotos((p) => p.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--red)', color: '#fff', cursor: 'pointer', fontSize: 11 }}>✕</button>
+              </div>
+            ))}
+            {photos.length < 3 && (
+              <button className="upload-area" style={{ width: 64, height: 64, padding: 0, display: 'grid', placeItems: 'center' }} onClick={() => fileRef.current?.click()}>
+                <i className="fa-solid fa-camera"></i>
+              </button>
+            )}
+          </div>
+        </div>
         <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" placeholder="Stock disponible, garantía, etc." value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">
           <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={onClose}>Cancelar</button>
-          <button className="btn btn-yellow btn-block" disabled={!price} onClick={() => onSend(price, brand, note)}><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</button>
+          <button className="btn btn-yellow btn-block" disabled={!price} onClick={() => onSend(price, brand, note, photos)}><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const CANNED = [
+  'Mandá una foto de la pieza',
+  'Indicá el lado/posición (izq/der, del/tras)',
+  'Pasá el número de parte (si lo tenés)',
+  '¿Original o alternativo?',
+  'Confirmá el motor / versión',
+];
+
+function PedirInfoModal({ lead, label, onClose, onSend }) {
+  const [sel, setSel] = useState([]);
+  const [text, setText] = useState('');
+  const toggle = (q) => setSel((s) => (s.includes(q) ? s.filter((x) => x !== q) : [...s, q]));
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <div className="modal-handle"></div>
+        <h2 className="h-md mb-4">Pedir más info</h2>
+        <p className="text-sm muted mb-16">{label} · #{lead.id} — elegí qué necesitás saber</p>
+        <div className="flex-col gap-8 mb-16">
+          {CANNED.map((q) => (
+            <button key={q} className={`card hoverable ${sel.includes(q) ? 'glow' : ''}`} style={{ padding: '12px 14px', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => toggle(q)}>
+              <i className={`fa-${sel.includes(q) ? 'solid fa-circle-check text-yellow' : 'regular fa-circle'}`}></i>
+              <span className="text-sm">{q}</span>
+            </button>
+          ))}
+        </div>
+        <div className="field"><label>Otra consulta <span className="muted">(opcional)</span></label><textarea className="textarea" placeholder="Escribí tu pregunta…" value={text} onChange={(e) => setText(e.target.value)}></textarea></div>
+        <div className="flex gap-12">
+          <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary btn-block" disabled={!sel.length && !text.trim()} onClick={() => onSend(sel, text.trim())}><i className="fa-solid fa-paper-plane"></i> Pedir al mecánico</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HelpSheet({ onClose }) {
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <div className="modal-handle"></div>
+        <h2 className="h-md mb-4">Ayuda para cotizar</h2>
+        <p className="text-sm muted mb-16">Tips rápidos para responder bien y ganar la venta.</p>
+        <div className="flex-col gap-12 mb-16">
+          <HelpRow icon="fa-bolt" t="Respondé rápido" d="La cotización más rápida y mejor calificada se muestra primero." />
+          <HelpRow icon="fa-circle-question" t="¿No entendés el pedido?" d="Tocá “¿Dudas? Pedir info” en la solicitud y mandale preguntas al mecánico." />
+          <HelpRow icon="fa-camera" t="Sumá fotos" d="Podés adjuntar hasta 3 fotos de la pieza para dar confianza." />
+          <HelpRow icon="fa-ban" t="Sin stock" d="Si no la tenés, marcá “Sin stock”: no te penaliza." />
+          <HelpRow icon="fa-user-secret" t="Anonimato" d="El mecánico no ve tu nombre hasta que se concreta la venta." />
+        </div>
+        <button className="btn btn-yellow btn-block" onClick={onClose}>Entendido</button>
+      </div>
+    </div>
+  );
+}
+function HelpRow({ icon, t, d }) {
+  return (
+    <div className="flex-center gap-12">
+      <div className="store-avatar" style={{ width: 38, height: 38 }}><i className={`fa-solid ${icon}`}></i></div>
+      <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 700 }}>{t}</div><div className="text-xs muted">{d}</div></div>
     </div>
   );
 }

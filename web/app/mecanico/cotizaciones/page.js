@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { money, ping, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
-import { getRequest, getQuotes, getOpenRequests, getRequests } from '@/lib/store';
+import { getRequest, getQuotes, getOpenRequests, getRequests, updateRequest } from '@/lib/store';
 
 // En producción la ventana es de 10 minutos. Botón "ver ahora" para no esperar en la demo.
 const WINDOW = 600;
@@ -17,7 +17,16 @@ export default function Cotizaciones() {
   const [secs, setSecs] = useState(WINDOW);
   const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [zoom, setZoom] = useState(null);
+  const [infoText, setInfoText] = useState('');
   const revealedRef = useRef(false);
+
+  async function addInfo() {
+    if (!infoText.trim() || !id) return;
+    await updateRequest(id, { extraInfo: infoText.trim(), infoRequests: [] });
+    setInfoText('');
+    toast({ title: 'Info enviada al vendedor', icon: 'fa-paper-plane', type: 'green' });
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -101,6 +110,22 @@ export default function Cotizaciones() {
               <span className="badge badge-gray">#{id}</span>
             </div>
 
+            {request.infoRequests?.length > 0 && (
+              <div className="card glow mb-16" style={{ borderColor: 'rgba(250,204,21,0.4)' }}>
+                <div className="flex-center gap-8 mb-8"><i className="fa-solid fa-circle-question text-yellow"></i><b className="text-sm">Un vendedor te pide más info</b></div>
+                <ul className="text-sm subtle" style={{ margin: '0 0 10px', paddingLeft: 18 }}>
+                  {[...new Set(request.infoRequests.flatMap((x) => [...(x.items || []), ...(x.text ? [x.text] : [])]))].map((q, i) => <li key={i}>{q}</li>)}
+                </ul>
+                <div className="flex gap-8">
+                  <input className="input" placeholder="Respondé o agregá info…" value={infoText} onChange={(e) => setInfoText(e.target.value)} />
+                  <button className="btn btn-yellow btn-sm" style={{ flex: '0 0 auto' }} onClick={addInfo}><i className="fa-solid fa-paper-plane"></i></button>
+                </div>
+              </div>
+            )}
+            {request.extraInfo && (
+              <div className="float-notif mb-16"><i className="fa-solid fa-circle-check text-green"></i><div className="text-xs subtle">Agregaste: <b>{request.extraInfo}</b></div></div>
+            )}
+
             {!revealed ? (
               <div className="card text-center" style={{ padding: 28 }}>
                 <div className="spinner" style={{ margin: '0 auto 14px' }}></div>
@@ -134,6 +159,11 @@ export default function Cotizaciones() {
                         <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}</div></div>
                         <div style={{ textAlign: 'right' }}><div className="text-xs muted">Disponibilidad</div><div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-circle-check text-green"></i> En stock</div></div>
                       </div>
+                      {q.photos?.length > 0 && (
+                        <div className="flex gap-8 mb-12">
+                          {q.photos.map((src, j) => <img key={j} src={src} alt="" onClick={() => setZoom(src)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }} />)}
+                        </div>
+                      )}
                       {q.note && <div className="text-xs muted mb-12"><i className="fa-solid fa-note-sticky"></i> {q.note}</div>}
                       <div className="divider" style={{ margin: '12px 0' }}></div>
                       <div className="flex-between">
@@ -157,6 +187,12 @@ export default function Cotizaciones() {
           <button className="btn btn-yellow btn-block btn-lg" onClick={() => router.push('/mecanico/pago')}>
             <i className="fa-solid fa-lock"></i> Continuar al pago
           </button>
+        </div>
+      )}
+
+      {zoom && (
+        <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20 }}>
+          <img src={zoom} alt="" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} />
         </div>
       )}
     </div>

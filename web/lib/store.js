@@ -56,6 +56,10 @@ export async function setRequestStatus(id, status) {
   await fetch('/api/status', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, status }) });
   await refresh();
 }
+export async function updateRequest(id, patch) {
+  await fetch('/api/update', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, patch }) });
+  await refresh();
+}
 
 // ---- Identidad local (por dispositivo) ----
 export function getClientId() {
