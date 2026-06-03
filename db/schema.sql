@@ -6,7 +6,7 @@
 -- ============================================================
 
 -- ---------- Tipos ----------
-create type user_role       as enum ('admin','mechanic','seller','freight');
+create type user_role       as enum ('admin','mechanic','seller','courier');
 create type user_status     as enum ('pending','active','suspended');
 create type iva_condition   as enum ('responsable_inscripto','monotributo','exento','consumidor_final');
 create type urgency         as enum ('ahora','hoy','manana');
@@ -122,6 +122,16 @@ create table freight_tariffs (
   zone       text,
   size       package_size,
   price      numeric(12,2)
+);
+
+-- ---------- Repartidores (cargados a mano; pueden pertenecer a una empresa de fletes) ----------
+create table couriers (
+  profile_id         uuid primary key references profiles(id) on delete cascade,
+  freight_company_id uuid references freight_companies(id),
+  vehicle_type       package_size,               -- moto / auto / utilitario
+  plate              text,                        -- patente
+  zones              jsonb,                       -- zonas que cubre
+  cuit               text
 );
 
 -- ---------- Pedidos ----------

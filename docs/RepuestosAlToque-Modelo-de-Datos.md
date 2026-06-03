@@ -6,7 +6,7 @@ Postgres / Supabase. El SQL concreto está en [`db/schema.sql`](../db/schema.sql
 > Reglas que atraviesan todo el modelo:
 > - **Anonimato bilateral:** el mecánico no ve la identidad real del vendedor hasta concretar; el vendedor no ve la del mecánico. Antes del pago solo se expone el **alias** del vendedor y el **barrio/zona** del taller.
 > - **Cobro:** split de Mercado Pago. Comisión **5%**, la paga el **cliente** (se suma). El **flete** es una pata aparte (empresa tercerizada).
-> - **Onboarding manual:** los usuarios se dan de alta desde el backoffice; la contraseña la define cada uno por invitación (no la cargan los admins).
+> - **Onboarding 100% manual (MVP):** los admins cargan **a todos** —vendedores, mecánicos y repartidores— desde el backoffice. No hay registro público todavía. La contraseña la define cada uno por **invitación** (no la cargan los admins), y como vienen verificados el estado puede arrancar en **activo**. Más adelante se puede abrir el auto‑registro de mecánicos.
 
 ---
 
@@ -28,6 +28,9 @@ Nombre del local, **razón social**, **CUIT (único)**, **condición de IVA**, t
 
 ### 4. freight_companies + freight_tariffs (fletes tercerizados)
 Empresa de envíos (razón social, CUIT, contacto, **tipos de vehículo** moto/auto/utilitario, zonas de cobertura, cómo se le paga) y su **tarifa** (por zona y tamaño de paquete). La tarifa es la "tercera pata" del pago.
+
+### 4b. couriers (repartidores)
+Repartidores individuales, **cargados a mano** por los admins (1‑a‑1 con profile, rol `courier`). Pueden pertenecer a una empresa de fletes: tipo de vehículo (moto/auto/utilitario), patente, zonas que cubre, CUIT.
 
 ### 5. categories / vehicle_brands / vehicle_models (catálogos)
 Categorías de repuesto (Frenos, Motor…) y catálogo de marcas/modelos (las 24 marcas AR).
@@ -62,7 +65,8 @@ Quién (de los 4 admins) hizo qué cambio y cuándo. Útil siendo varios adminis
 ---
 
 ## Relaciones (resumen)
-- `profiles` 1—1 `mechanics` / `stores` (según rol).
+- `profiles` 1—1 `mechanics` / `stores` / `couriers` (según rol).
+- `couriers` N—1 `freight_companies`.
 - `stores` N—N `categories` (vía `store_categories`).
 - `requests` N—1 `mechanics`; `requests` 1—N `quotes`; `quotes` N—1 `stores`.
 - `requests` 1—N `info_requests`.
