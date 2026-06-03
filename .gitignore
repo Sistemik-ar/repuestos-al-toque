@@ -11,3 +11,10 @@
 # Node (por si más adelante sumamos backend)
 node_modules/
 npm-debug.log*
+
+# Next.js (app real en web/)
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.env*.local
