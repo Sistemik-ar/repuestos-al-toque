@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { data } from '@/lib/data';
 import { money, ping, toast } from '@/lib/ui';
+import { setRequestStatus } from '@/lib/store';
 
 export default function Pago() {
-  const [q, setQ] = useState(data.quotePool[2]);
+  const [q, setQ] = useState(null);
   const [phase, setPhase] = useState('pre'); // pre | processing | done
   const [payMode, setPayMode] = useState('self');
 
@@ -16,18 +16,37 @@ export default function Pago() {
     } catch {}
   }, []);
 
+  if (!q) {
+    return (
+      <div className="app-shell">
+        <div className="topbar">
+          <div className="flex-center"><Link href="/mecanico" className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link><div style={{ fontWeight: 800 }}>Pago</div></div>
+        </div>
+        <div className="container">
+          <div className="empty-state">
+            <div className="empty-icon"><i className="fa-solid fa-receipt"></i></div>
+            <div className="text-sm">No hay una oferta elegida</div>
+            <div className="text-xs mb-16">Elegí una cotización para pagar</div>
+            <Link href="/mecanico" className="btn btn-primary btn-sm">Volver al inicio</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const part = q.price;
   const fee = Math.round(part * 0.05); // comisión 5% (la paga el cliente)
   const total = part + fee;
 
   function pay() {
     if (payMode === 'link') {
-      toast({ title: 'Link de pago generado', sub: 'mpago.la/RAToque/1042 · enviado al cliente', icon: 'fa-link', type: 'yellow' });
+      toast({ title: 'Link de pago generado', sub: 'mpago.la/RAToque/' + (q.requestId || '') + ' · enviado al cliente', icon: 'fa-link', type: 'yellow' });
       return;
     }
     setPhase('processing');
     setTimeout(() => {
       setPhase('done');
+      if (q.requestId) setRequestStatus(q.requestId, 'paid');
       ping();
       toast({ title: 'Pago aprobado', sub: 'Mercado Pago reparte automáticamente', icon: 'fa-circle-check', type: 'green' });
     }, 2200);
@@ -38,7 +57,7 @@ export default function Pago() {
       <div className="topbar">
         <div className="flex-center">
           <Link href="/mecanico/cotizaciones" className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link>
-          <div><div style={{ fontWeight: 800 }}>Confirmar y pagar</div><div className="text-xs muted">Pedido #1042</div></div>
+          <div><div style={{ fontWeight: 800 }}>Confirmar y pagar</div><div className="text-xs muted">Pedido #{q.requestId || '—'}</div></div>
         </div>
         <div className="flex-center gap-8"><i className="fa-solid fa-lock text-green"></i><span className="text-xs muted">Pago seguro</span></div>
       </div>
@@ -106,14 +125,6 @@ export default function Pago() {
           <div className="float-notif mb-16" style={{ borderColor: 'rgba(34,197,94,0.35)', background: 'linear-gradient(135deg,rgba(34,197,94,0.14),rgba(31,41,55,0.5))' }}>
             <i className="fa-solid fa-truck-fast text-green"></i>
             <div className="text-sm subtle">Tu repuesto sale en camino. <b>Te llega con la factura/remito</b> a través de la empresa de envíos.</div>
-          </div>
-          <div className="card mb-16">
-            <div className="flex-between mb-12">
-              <div className="text-sm" style={{ fontWeight: 700 }}>Estado del envío</div>
-              <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Preparando</span>
-            </div>
-            <div className="progress-track mb-8"><div className="progress-fill" style={{ width: '25%' }}></div></div>
-            <div className="text-xs muted">El comercio confirma "salió el pedido" y la empresa de envíos lo retira.</div>
           </div>
           <Link href="/mecanico" className="btn btn-primary btn-block btn-lg"><i className="fa-solid fa-house"></i> Volver al inicio</Link>
         </div>

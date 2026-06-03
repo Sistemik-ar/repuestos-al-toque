@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
+import { addRequest } from '@/lib/store';
 
 const years = [];
 for (let y = 2026; y >= 1990; y--) years.push(String(y));
@@ -32,12 +33,12 @@ export default function Pedido() {
 
   function submit() {
     const payload = { ...st, model: needsOther ? st.modelOther : st.model };
-    sessionStorage.setItem('rat_request', JSON.stringify(payload));
+    const reqId = addRequest(payload); // queda guardado: lo verás vos y el comercio
     setSearching(true);
     let p = 5;
     const id = setInterval(() => {
       p += Math.random() * 22; if (p > 100) p = 100; setProg(p);
-      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones'), 500); }
+      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones?id=' + reqId), 500); }
     }, 320);
   }
 

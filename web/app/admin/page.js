@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast, tierFor } from '@/lib/ui';
+import { useRequests, getQuotes } from '@/lib/store';
 
 const users = [
   { name: 'Repuestos Centro', role: 'Comercio', icon: 'fa-store', completed: 312, rating: 4.8, points: 6180 },
@@ -12,6 +13,11 @@ const bars = [30, 55, 80, 65, 90, 72, 48];
 
 export default function Admin() {
   const [reset, setReset] = useState(null);
+  const requests = useRequests();
+  const paid = requests.filter((r) => r.status === 'paid');
+  const label = (r) => r.desc || r.catLabel || 'Repuesto';
+  const veh = (r) => `${r.brand || ''} ${r.model || ''}`.trim();
+  const priceOf = (r) => { const q = getQuotes(r.id)[0]; return q ? q.price : null; };
 
   return (
     <div className="app-shell wide">
@@ -27,8 +33,8 @@ export default function Admin() {
         <div className="mb-16"><div className="eyebrow">Panel de control</div><h1 className="h-lg">Resumen del día</h1></div>
 
         <div className="dash-grid grid-2 mb-16">
-          <Kpi label="Pedidos hoy" value="38" icon="fa-receipt" trend="+12% vs ayer" />
-          <Kpi label="Ingresos (comisión 5%)" value="$92.100" icon="fa-coins" trend="+8% vs ayer" yellow />
+          <Kpi label="Pedidos generados" value={String(requests.length)} icon="fa-receipt" trend={`${paid.length} pagados`} />
+          <Kpi label="Ingresos (comisión 5%)" value={'$' + paid.reduce((a, r) => a + Math.round((priceOf(r) || 0) * 0.05), 0).toLocaleString('es-AR')} icon="fa-coins" trend="acumulado" yellow />
           <Kpi label="Tiempo prom. entrega" value="38 min" icon="fa-stopwatch" trend="-4 min" down />
           <Kpi label="Conversión" value="61%" icon="fa-bullseye" trend="+3 pts" />
         </div>
@@ -77,9 +83,17 @@ export default function Admin() {
             <table className="table">
               <thead><tr><th>#</th><th>Repuesto</th><th>Vehículo</th><th>Total</th><th>Estado</th></tr></thead>
               <tbody>
-                <tr><td>1042</td><td>Pastillas de freno</td><td>Toyota Hilux</td><td>$47.145</td><td><span className="badge badge-yellow">En envío</span></td></tr>
-                <tr><td>1041</td><td>Bomba de agua</td><td>VW Amarok</td><td>$56.910</td><td><span className="badge badge-green">Entregado</span></td></tr>
-                <tr><td>1040</td><td>Disco de embrague</td><td>Renault Kangoo</td><td>$74.550</td><td><span className="badge badge-green">Entregado</span></td></tr>
+                {requests.length === 0 && (
+                  <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin pedidos todavía — generá uno desde el panel del Mecánico</td></tr>
+                )}
+                {requests.map((r) => {
+                  const p = priceOf(r);
+                  const total = p ? p + Math.round(p * 0.05) : null;
+                  const estado = r.status === 'paid' ? <span className="badge badge-green">Pagado</span> : r.status === 'closed' ? <span className="badge badge-purple">Cerrado</span> : <span className="badge badge-yellow">Abierto</span>;
+                  return (
+                    <tr key={r.id}><td>{r.id}</td><td>{label(r)}</td><td>{veh(r)}</td><td>{total ? '$' + total.toLocaleString('es-AR') : '—'}</td><td>{estado}</td></tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

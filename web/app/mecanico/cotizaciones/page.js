@@ -2,51 +2,65 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { data } from '@/lib/data';
 import { money, ping, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
+import { getRequest, getQuotes, getOpenRequests, getRequests } from '@/lib/store';
 
-// En producción la ventana es de 10 minutos. Acelerada para poder probar la demo.
-const DEMO_SECONDS = 10;
+// En producción la ventana es de 10 minutos. Botón "ver ahora" para no esperar en la demo.
+const WINDOW = 600;
 
 export default function Cotizaciones() {
   const router = useRouter();
-  const [secs, setSecs] = useState(DEMO_SECONDS);
+  const [id, setId] = useState(null);
+  const [request, setRequest] = useState(null);
+  const [quotes, setQuotes] = useState([]);
+  const [secs, setSecs] = useState(WINDOW);
   const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [adIdx, setAdIdx] = useState(0);
-  const [req, setReq] = useState(null);
-  const done = useRef(false);
-
-  // Ordenadas por calificación del vendedor (decisión de producto)
-  const quotes = [...data.quotePool].sort((a, b) => b.rating - a.rating);
+  const revealedRef = useRef(false);
 
   useEffect(() => {
-    try { setReq(JSON.parse(sessionStorage.getItem('rat_request'))); } catch {}
-    const id = setInterval(() => {
+    const params = new URLSearchParams(window.location.search);
+    let rid = params.get('id');
+    if (!rid) { rid = getOpenRequests()[0]?.id || getRequests()[0]?.id || null; }
+    setId(rid);
+    const load = () => {
+      setRequest(getRequest(rid));
+      setQuotes(getQuotes(rid).sort((a, b) => b.rating - a.rating));
+    };
+    load();
+    window.addEventListener('rat-db', load);
+    window.addEventListener('storage', load);
+    return () => { window.removeEventListener('rat-db', load); window.removeEventListener('storage', load); };
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => {
       setSecs((s) => {
-        if (s <= 1 && !done.current) {
-          done.current = true;
-          setRevealed(true);
-          ping();
-          toast({ title: 'Llegaron las cotizaciones', sub: `${quotes.length} comercios respondieron`, icon: 'fa-tags', type: 'yellow' });
-          return 0;
-        }
+        if (s <= 1 && !revealedRef.current) { reveal(); return 0; }
         return s > 0 ? s - 1 : 0;
       });
     }, 1000);
-    const ad = setInterval(() => setAdIdx((i) => (i + 1) % data.ads.length), 2500);
-    return () => { clearInterval(id); clearInterval(ad); };
+    return () => clearInterval(t);
   }, []);
+
+  function reveal() {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    setRevealed(true);
+    ping();
+    const n = getQuotes(id || '').length;
+    toast({ title: n ? 'Ventana cerrada' : 'Ventana cerrada · sin ofertas', sub: n ? `${n} oferta(s) recibidas` : 'Podés reintentar', icon: 'fa-flag-checkered', type: n ? 'yellow' : 'purple' });
+  }
+  function retry() { revealedRef.current = false; setRevealed(false); setSecs(WINDOW); }
 
   function choose(i) {
     setSelected(i);
-    sessionStorage.setItem('rat_selectedQuote', JSON.stringify(quotes[i]));
+    sessionStorage.setItem('rat_selectedQuote', JSON.stringify({ ...quotes[i], requestId: id }));
   }
 
-  const ad = data.ads[adIdx];
-  const veh = req ? `${req.brand || 'Toyota'} ${req.model || 'Hilux'} ${req.year || '2019'}` : 'Toyota Hilux 2019';
-  const cat = req ? `${req.catLabel || 'Frenos'} · ${(req.desc || 'Pastillas delanteras').slice(0, 40)}` : 'Frenos · Pastillas delanteras';
+  const veh = request ? `${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() : '—';
+  const part = request ? (request.desc || request.catLabel) : '—';
 
   return (
     <div className="app-shell">
@@ -55,82 +69,85 @@ export default function Cotizaciones() {
           <Link href="/mecanico" className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link>
           <div>
             <div style={{ fontWeight: 800 }}>Cotizaciones</div>
-            <div className="text-xs muted">Pedido #1042 · Pastillas de freno</div>
+            <div className="text-xs muted">{id ? `Pedido #${id}` : 'Sin pedido'}</div>
           </div>
         </div>
         <div className="icon-btn"><i className="fa-solid fa-tower-broadcast text-purple"></i></div>
       </div>
 
       <div className="container">
-        {/* Header ventana */}
-        <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
-          <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {revealed ? 'Ventana cerrada · ofertas recibidas' : 'Ventana de ofertas — se revelan al cerrarse'}
+        {!request ? (
+          <div className="empty-state">
+            <div className="empty-icon"><i className="fa-solid fa-clipboard-question"></i></div>
+            <div className="text-sm">No hay un pedido para mostrar</div>
+            <div className="text-xs mb-16">Creá un pedido para empezar a recibir ofertas</div>
+            <Link href="/mecanico/pedido" className="btn btn-primary btn-sm"><i className="fa-solid fa-plus"></i> Nuevo pedido</Link>
           </div>
-          <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
-          <div className="flex-center" style={{ justifyContent: 'center', gap: 18, marginTop: 14 }}>
-            <span className="badge badge-purple"><i className="fa-solid fa-store"></i> 3 comercios notificados</span>
-            <span className="badge badge-yellow"><i className="fa-solid fa-bolt"></i> Necesito ahora</span>
-          </div>
-        </div>
-
-        {/* Vehículo */}
-        <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
-          <div className="store-avatar" style={{ width: 38, height: 38 }}><i className="fa-solid fa-car"></i></div>
-          <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 700 }}>{veh}</div><div className="text-xs muted">{cat}</div></div>
-          <span className="badge badge-gray">#1042</span>
-        </div>
-
-        {!revealed ? (
-          <>
-            {/* Promo durante la espera (marca + descuento) */}
-            <div className="mb-16">
-              <div className="promo-card promo-fade">
-                <div className="promo-img" style={{ background: ad.color }}><i className={`fa-solid ${ad.icon}`}></i></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="text-sm" style={{ fontWeight: 700 }}>{ad.store}</div>
-                  <span className="badge badge-yellow" style={{ marginTop: 5 }}>{ad.discount}</span>
-                </div>
-                <span className="promo-tag">Promocionado</span>
-              </div>
-            </div>
-            <div className="card text-center" style={{ padding: 28 }}>
-              <div className="spinner" style={{ margin: '0 auto 14px' }}></div>
-              <div className="text-sm" style={{ fontWeight: 700 }}>Los comercios están cotizando…</div>
-              <div className="text-xs muted mt-4">Para que sea parejo, las ofertas se muestran todas juntas al cerrarse la ventana.</div>
-            </div>
-          </>
         ) : (
           <>
-            <div className="section-title"><h2>Ofertas recibidas ({quotes.length})</h2><span className="text-xs muted">orden por calificación</span></div>
-            <div className="flex-col gap-12">
-              {quotes.map((q, i) => (
-                <div key={i} className={`quote-card animate-in ${selected === i ? 'selected' : ''}`}>
-                  <div className="flex-between mb-12">
-                    <div className="flex-center gap-12">
-                      <div className="store-avatar"><i className="fa-solid fa-user-secret"></i></div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>{q.alias}</div>
-                        <div className="text-xs muted"><Stars rating={q.rating} /> {q.rating} · Zona {q.zone}</div>
-                      </div>
-                    </div>
-                    <span className="badge badge-green"><i className="fa-solid fa-shield-halved"></i> {q.warranty}</span>
-                  </div>
-                  <div className="flex-between mb-12">
-                    <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}</div></div>
-                    <div style={{ textAlign: 'right' }}><div className="text-xs muted">Disponibilidad</div><div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-circle-check text-green"></i> En stock</div></div>
-                  </div>
-                  <div className="divider" style={{ margin: '12px 0' }}></div>
-                  <div className="flex-between">
-                    <div><div className="text-xs muted">Precio final</div><div className="price">{money(q.price)}</div></div>
-                    <button className={`btn btn-sm ${selected === i ? 'btn-success' : 'btn-primary'}`} onClick={() => choose(i)}>
-                      {selected === i ? <><i className="fa-solid fa-check"></i> Elegida</> : 'Elegir oferta'}
-                    </button>
-                  </div>
-                  <div className="locked-info mt-12"><i className="fa-solid fa-lock"></i> Vendedor: <span className="badge badge-gray" style={{ marginLeft: 4 }}>Anónimo hasta concretar</span></div>
-                </div>
-              ))}
+            <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
+              <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                {revealed ? 'Ventana cerrada · ofertas' : 'Ventana de ofertas — se revelan al cerrarse'}
+              </div>
+              <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
+              {!revealed && (
+                <button className="btn btn-ghost btn-sm mt-12" onClick={reveal}><i className="fa-solid fa-eye"></i> Ver ofertas ahora (demo)</button>
+              )}
             </div>
+
+            <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+              <div className="store-avatar" style={{ width: 38, height: 38 }}><i className="fa-solid fa-car"></i></div>
+              <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 700 }}>{veh}</div><div className="text-xs muted">{request.catLabel} · {part}</div></div>
+              <span className="badge badge-gray">#{id}</span>
+            </div>
+
+            {!revealed ? (
+              <div className="card text-center" style={{ padding: 28 }}>
+                <div className="spinner" style={{ margin: '0 auto 14px' }}></div>
+                <div className="text-sm" style={{ fontWeight: 700 }}>Esperando que los comercios coticen…</div>
+                <div className="text-xs muted mt-4">Las ofertas se muestran todas juntas al cerrarse la ventana.</div>
+              </div>
+            ) : quotes.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon"><i className="fa-solid fa-inbox"></i></div>
+                <div className="text-sm">No llegaron ofertas en esta ventana</div>
+                <div className="text-xs mb-16">Podés reintentar por otra ventana</div>
+                <button className="btn btn-primary btn-sm" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</button>
+              </div>
+            ) : (
+              <>
+                <div className="section-title"><h2>Ofertas recibidas ({quotes.length})</h2><span className="text-xs muted">orden por calificación</span></div>
+                <div className="flex-col gap-12">
+                  {quotes.map((q, i) => (
+                    <div key={q.id} className={`quote-card animate-in ${selected === i ? 'selected' : ''}`}>
+                      <div className="flex-between mb-12">
+                        <div className="flex-center gap-12">
+                          <div className="store-avatar"><i className="fa-solid fa-user-secret"></i></div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 15 }}>{q.alias}</div>
+                            <div className="text-xs muted"><Stars rating={q.rating} /> {q.rating} · Zona {q.zone}</div>
+                          </div>
+                        </div>
+                        <span className="badge badge-green"><i className="fa-solid fa-shield-halved"></i> {q.warranty}</span>
+                      </div>
+                      <div className="flex-between mb-12">
+                        <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}</div></div>
+                        <div style={{ textAlign: 'right' }}><div className="text-xs muted">Disponibilidad</div><div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-circle-check text-green"></i> En stock</div></div>
+                      </div>
+                      {q.note && <div className="text-xs muted mb-12"><i className="fa-solid fa-note-sticky"></i> {q.note}</div>}
+                      <div className="divider" style={{ margin: '12px 0' }}></div>
+                      <div className="flex-between">
+                        <div><div className="text-xs muted">Precio final</div><div className="price">{money(q.price)}</div></div>
+                        <button className={`btn btn-sm ${selected === i ? 'btn-success' : 'btn-primary'}`} onClick={() => choose(i)}>
+                          {selected === i ? <><i className="fa-solid fa-check"></i> Elegida</> : 'Elegir oferta'}
+                        </button>
+                      </div>
+                      <div className="locked-info mt-12"><i className="fa-solid fa-lock"></i> Vendedor: <span className="badge badge-gray" style={{ marginLeft: 4 }}>Anónimo hasta concretar</span></div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
