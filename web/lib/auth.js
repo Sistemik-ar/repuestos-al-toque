@@ -8,10 +8,10 @@ export const ROLE_HOME = { admin: '/admin', seller: '/comercio', mechanic: '/mec
 
 // Cuentas de prueba (onboarding manual). La contraseña no se valida todavía.
 export const DEMO_ACCOUNTS = {
-  'admin@rat.com': { role: 'admin', name: 'Administración' },
-  'mecanico@rat.com': { role: 'mechanic', name: 'Taller Patagonia' },
-  'vendedor@rat.com': { role: 'seller', name: 'Repuestos Centro' },
-  'repartidor@rat.com': { role: 'courier', name: 'Diego R.' },
+  'admin@repuestosaltoque.com.ar': { role: 'admin', name: 'Administración' },
+  'mecanico@repuestosaltoque.com.ar': { role: 'mechanic', name: 'Taller Patagonia' },
+  'vendedor@repuestosaltoque.com.ar': { role: 'seller', name: 'Repuestos Centro' },
+  'repartidor@repuestosaltoque.com.ar': { role: 'courier', name: 'Diego R.' },
 };
 
 export function login(email) {

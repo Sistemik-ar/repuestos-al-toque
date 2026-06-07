@@ -1,0 +1,413 @@
+// RepuestosAlToque — Prisma schema (Postgres / Supabase)
+// Ver docs/ARQUITECTURA.md y docs/RepuestosAlToque-Modelo-de-Datos.md
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MECHANIC
+  STORE
+  DELIVERY
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum IvaCondition {
+  RESPONSABLE_INSCRIPTO
+  MONOTRIBUTO
+  EXENTO
+  CONSUMIDOR_FINAL
+}
+
+enum Urgency {
+  AHORA
+  HOY
+  MANANA
+}
+
+enum InvoiceType {
+  CONSUMIDOR_FINAL
+  FACTURA_A
+}
+
+enum RequestStatus {
+  OPEN
+  CLOSED
+  QUOTED
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  EXPIRED
+}
+
+enum QuoteStatus {
+  SENT
+  SELECTED
+  REJECTED
+}
+
+enum OrderStatus {
+  PAID
+  READY
+  SHIPPED
+  DELIVERED
+  REFUNDED
+}
+
+enum ShipmentStatus {
+  PENDING
+  PICKED_UP
+  ON_ROUTE
+  DELIVERED
+}
+
+enum PackageSize {
+  MOTO
+  AUTO
+  UTILITARIO
+}
+
+enum PartCondition {
+  NUEVO
+  USADO
+  REACONDICIONADO
+}
+
+enum NotificationType {
+  NEW_QUOTE
+  QUOTE_WINDOW_CLOSED
+  ORDER_PAID
+  INFO_REQUEST
+  SHIPMENT_UPDATE
+  SYSTEM
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String?    @map("password_hash")
+  role            Role
+  status          UserStatus @default(ACTIVE)
+  name            String?
+  phone           String?
+  whatsapp        String?
+  createdAt       DateTime   @default(now()) @map("created_at")
+  createdById     String?    @map("created_by_id")
+  termsAcceptedAt DateTime?  @map("terms_accepted_at")
+
+  mechanic      MechanicProfile?
+  store         StoreProfile?
+  delivery      DeliveryProfile?
+  requests      Request[]        @relation("mechanicRequests")
+  quotes        RequestQuote[]   @relation("storeQuotes")
+  notifications Notification[]
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model MechanicProfile {
+  userId       String  @id @map("user_id")
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workshopName String? @map("workshop_name")
+  kind         String  @default("taller")
+  barrio       String?
+  address      String?
+  lat          Float?
+  lng          Float?
+  cuit         String?
+  ratingAvg    Decimal @default(0) @map("rating_avg") @db.Decimal(2, 1)
+  ratingsCount Int     @default(0) @map("ratings_count")
+  points       Int     @default(0)
+  completedOps Int     @default(0) @map("completed_ops")
+
+  @@map("mechanic_profiles")
+}
+
+model StoreProfile {
+  userId        String        @id @map("user_id")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradeName     String        @map("trade_name")
+  legalName     String?       @map("legal_name")
+  cuit          String?       @unique
+  ivaCondition  IvaCondition? @map("iva_condition")
+  ownerName     String?       @map("owner_name")
+  address       String?
+  barrio        String?
+  lat           Float?
+  lng           Float?
+  hours         Json?
+  contactPerson String?       @map("contact_person")
+  partCondition PartCondition @default(NUEVO) @map("part_condition")
+  mpUserId      String?       @map("mp_user_id")
+  mpLinked      Boolean       @default(false) @map("mp_linked")
+  cbu           String?
+  mpAlias       String?       @map("mp_alias")
+  invoiceType   String?       @map("invoice_type")
+  afipPos       String?       @map("afip_pos")
+  logoUrl       String?       @map("logo_url")
+  ratingAvg     Decimal       @default(0) @map("rating_avg") @db.Decimal(2, 1)
+  ratingsCount  Int           @default(0) @map("ratings_count")
+  points        Int           @default(0)
+
+  categories StoreCategory[]
+  ads        Ad[]
+
+  @@map("store_profiles")
+}
+
+model DeliveryProfile {
+  userId           String          @id @map("user_id")
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  freightCompanyId String?         @map("freight_company_id")
+  freightCompany   FreightCompany? @relation(fields: [freightCompanyId], references: [id])
+  vehicleType      PackageSize?    @map("vehicle_type")
+  plate            String?
+  zones            Json?
+
+  @@map("delivery_profiles")
+}
+
+model Category {
+  id       Int             @id @default(autoincrement())
+  slug     String          @unique
+  name     String
+  icon     String?
+  requests Request[]
+  stores   StoreCategory[]
+
+  @@map("categories")
+}
+
+model StoreCategory {
+  storeId    String       @map("store_id")
+  categoryId Int          @map("category_id")
+  store      StoreProfile @relation(fields: [storeId], references: [userId], onDelete: Cascade)
+  category   Category     @relation(fields: [categoryId], references: [id])
+
+  @@id([storeId, categoryId])
+  @@map("store_categories")
+}
+
+model Vehicle {
+  id    Int    @id @default(autoincrement())
+  brand String
+  model String
+
+  @@unique([brand, model])
+  @@index([brand])
+  @@map("vehicles")
+}
+
+model Request {
+  id            String        @id @default(cuid())
+  code          String        @unique
+  mechanicId    String        @map("mechanic_id")
+  mechanic      User          @relation("mechanicRequests", fields: [mechanicId], references: [id])
+  brand         String?
+  model         String?
+  year          Int?
+  vin           String?
+  categoryId    Int?          @map("category_id")
+  category      Category?     @relation(fields: [categoryId], references: [id])
+  description   String?
+  urgency       Urgency       @default(AHORA)
+  photoUrls     String[]      @map("photo_urls")
+  invoiceType   InvoiceType   @default(CONSUMIDOR_FINAL) @map("invoice_type")
+  invEmisorName String?       @map("inv_emisor_name")
+  invEmisorCuit String?       @map("inv_emisor_cuit")
+  invBuyerName  String?       @map("inv_buyer_name")
+  invBuyerCuit  String?       @map("inv_buyer_cuit")
+  status        RequestStatus @default(OPEN)
+  windowEndsAt  DateTime?     @map("window_ends_at")
+  extraInfo     String?       @map("extra_info")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  quotes RequestQuote[]
+  order  Order?
+
+  @@index([mechanicId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("requests")
+}
+
+model RequestQuote {
+  id             String      @id @default(cuid())
+  requestId      String      @map("request_id")
+  request        Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  storeId        String      @map("store_id")
+  store          User        @relation("storeQuotes", fields: [storeId], references: [id])
+  alias          String
+  optionLabel    String?     @map("option_label")
+  partBrand      String?     @map("part_brand")
+  price          Decimal     @db.Decimal(12, 2)
+  warranty       String?
+  note           String?
+  photoUrls      String[]    @map("photo_urls")
+  ratingSnapshot Decimal?    @map("rating_snapshot") @db.Decimal(2, 1)
+  status         QuoteStatus @default(SENT)
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  order Order?
+
+  @@index([requestId])
+  @@index([storeId])
+  @@map("request_quotes")
+}
+
+model Shipment {
+  id               String          @id @default(cuid())
+  mechanicId       String          @map("mechanic_id")
+  freightCompanyId String?         @map("freight_company_id")
+  freightCompany   FreightCompany? @relation(fields: [freightCompanyId], references: [id])
+  packageSize      PackageSize?    @map("package_size")
+  status           ShipmentStatus  @default(PENDING)
+  pickedUpAt       DateTime?       @map("picked_up_at")
+  deliveredAt      DateTime?       @map("delivered_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  orders Order[]
+
+  @@index([mechanicId])
+  @@map("shipments")
+}
+
+model Order {
+  id               String       @id @default(cuid())
+  requestId        String       @unique @map("request_id")
+  request          Request      @relation(fields: [requestId], references: [id])
+  quoteId          String       @unique @map("quote_id")
+  quote            RequestQuote @relation(fields: [quoteId], references: [id])
+  mechanicId       String       @map("mechanic_id")
+  storeId          String       @map("store_id")
+  partAmount       Decimal      @map("part_amount") @db.Decimal(12, 2)
+  commissionPct    Decimal      @default(5) @map("commission_pct") @db.Decimal(4, 2)
+  commissionAmount Decimal      @map("commission_amount") @db.Decimal(12, 2)
+  freightAmount    Decimal?     @map("freight_amount") @db.Decimal(12, 2)
+  total            Decimal      @db.Decimal(12, 2)
+  payer            String       @default("client")
+  status           OrderStatus  @default(PAID)
+  shipmentId       String?      @map("shipment_id")
+  shipment         Shipment?    @relation(fields: [shipmentId], references: [id])
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  payment Payment?
+  ratings Rating[]
+
+  @@index([mechanicId])
+  @@index([storeId])
+  @@index([shipmentId])
+  @@map("orders")
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String   @unique @map("order_id")
+  order       Order    @relation(fields: [orderId], references: [id])
+  provider    String   @default("mercadopago")
+  mpPaymentId String?  @unique @map("mp_payment_id")
+  status      String
+  amount      Decimal  @db.Decimal(12, 2)
+  split       Json?
+  raw         Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("payments")
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  orderId   String   @map("order_id")
+  order     Order    @relation(fields: [orderId], references: [id])
+  fromId    String   @map("from_id")
+  toId      String   @map("to_id")
+  stars     Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([toId])
+  @@map("ratings")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  data      Json?
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model FreightCompany {
+  id           String        @id @default(cuid())
+  name         String
+  cuit         String?
+  contactName  String?       @map("contact_name")
+  phone        String?
+  vehicleTypes PackageSize[] @map("vehicle_types")
+  coverage     Json?
+  status       UserStatus    @default(ACTIVE)
+
+  tariffs   FreightTariff[]
+  drivers   DeliveryProfile[]
+  shipments Shipment[]
+
+  @@map("freight_companies")
+}
+
+model FreightTariff {
+  id        Int            @id @default(autoincrement())
+  companyId String         @map("company_id")
+  company   FreightCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  zone      String?
+  size      PackageSize?
+  price     Decimal        @db.Decimal(12, 2)
+
+  @@map("freight_tariffs")
+}
+
+model Ad {
+  id        String       @id @default(cuid())
+  storeId   String       @map("store_id")
+  store     StoreProfile @relation(fields: [storeId], references: [userId], onDelete: Cascade)
+  brand     String?
+  discount  String?
+  imageUrl  String?      @map("image_url")
+  active    Boolean      @default(true)
+  paidUntil DateTime?    @map("paid_until")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@map("ads")
+}
+
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  actorId   String?  @map("actor_id")
+  action    String
+  entity    String?
+  entityId  String?  @map("entity_id")
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([entity])
+  @@map("audit_logs")
+}
