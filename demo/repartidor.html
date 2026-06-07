@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Envíos — Repartidor · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="index.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Repartidor</span></a>
+          <div class="topbar-actions">
+            <label class="switch"><input type="checkbox" id="online" checked /><span class="track"></span><span class="thumb"></span></label>
+            <div class="avatar" style="background:linear-gradient(135deg,#22C55E,var(--purple));">DF</div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="mb-16">
+            <div class="eyebrow">Diego · Fletes del Sur</div>
+            <h1 class="h-lg">Tus envíos de hoy</h1>
+            <p class="text-sm muted"><span class="dot-status dot-active" id="statusDot"></span> <span id="statusText">En línea · recibiendo asignaciones</span></p>
+          </div>
+
+          <!-- Banner pendiente de definir -->
+          <div class="float-notif mb-16" style="border-color:rgba(250,204,21,0.35);background:linear-gradient(135deg,rgba(250,204,21,0.12),rgba(31,41,55,0.5));">
+            <i class="fa-solid fa-compass-drafting text-yellow"></i>
+            <div class="text-sm subtle"><b>Flujo en definición.</b> Esta es una vista preliminar del rol repartidor para mantener el sistema completo. La definimos en detalle más adelante.</div>
+          </div>
+
+          <div class="grid-3 mb-16">
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value">2</div><div class="stat-label">Asignados</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">1</div><div class="stat-label">En camino</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green">7</div><div class="stat-label">Hoy</div></div>
+          </div>
+
+          <div class="dash-grid" style="align-items:start;">
+            <div class="col-span-2">
+              <!-- Envío activo con consolidación -->
+              <div class="section-title"><h2>Envío activo</h2><span class="badge badge-yellow"><i class="fa-solid fa-layer-group"></i> consolidado</span></div>
+              <div class="card glow mb-16">
+                <div class="map-mock mb-12"><div class="map-route"></div><div class="map-pin start"></div><div class="map-pin driver"></div><div class="map-pin end"></div></div>
+                <div class="text-xs muted mb-8" style="text-transform:uppercase;letter-spacing:0.06em;">Retiros (2 puntos) → 1 entrega</div>
+                <div class="timeline">
+                  <div class="timeline-item done"><div class="dot"><i class="fa-solid fa-check"></i></div><div class="t-title">Retiro 1 · Repuestos Centro</div><div class="t-time">Av. Bustillo 1240 · 14:21</div></div>
+                  <div class="timeline-item current"><div class="dot"><i class="fa-solid fa-box"></i></div><div class="t-title">Retiro 2 · Andina Parts</div><div class="t-time">Onelli 530 · en curso</div></div>
+                  <div class="timeline-item"><div class="dot"></div><div class="t-title">Entrega · Taller Patagonia</div><div class="t-time">Bariloche Centro · pendiente</div></div>
+                </div>
+                <button class="btn btn-yellow btn-block mt-12" id="advanceBtn"><i class="fa-solid fa-arrow-right"></i> Marcar retiro 2 completado</button>
+              </div>
+            </div>
+
+            <div class="col-span-2">
+              <div class="section-title"><h2>Próximo</h2></div>
+              <div class="card mb-16">
+                <div class="flex-between mb-8"><div class="flex-center gap-12"><div class="store-avatar"><i class="fa-solid fa-box"></i></div><div><div class="text-sm" style="font-weight:700;">Filtro de aceite</div><div class="text-xs muted">Andina Parts → MotorSur</div></div></div><span class="badge badge-purple">Moto</span></div>
+                <div class="flex-between"><span class="text-xs muted">Asignado 14:40</span><button class="btn btn-ghost btn-sm" id="acceptNext"><i class="fa-solid fa-check"></i> Aceptar</button></div>
+              </div>
+
+              <div class="section-title" id="historial"><h2>Historial</h2></div>
+              <div class="card">
+                <div class="list-row" style="padding-top:0;"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-check"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Bomba de agua</div><div class="text-xs muted">Entregado 13:58</div></div><span class="text-sm text-green" style="font-weight:700;">✓</span></div>
+                <div class="list-row" style="border-bottom:none;"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-check"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Pastillas de freno</div><div class="text-xs muted">Entregado 12:30</div></div><span class="text-sm text-green" style="font-weight:700;">✓</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('repartidor', 'envios');
+    document.getElementById('online').addEventListener('change', e => {
+      const on = e.target.checked;
+      document.getElementById('statusDot').className = 'dot-status ' + (on ? 'dot-active' : 'dot-susp');
+      document.getElementById('statusText').textContent = on ? 'En línea · recibiendo asignaciones' : 'Desconectado';
+    });
+    document.getElementById('advanceBtn').addEventListener('click', () => RAT.toast({ title: 'Retiro 2 completado', sub: 'Vas en camino al taller', icon: 'fa-truck-fast', type: 'green' }));
+    document.getElementById('acceptNext').addEventListener('click', () => RAT.toast({ title: 'Envío aceptado', icon: 'fa-check', type: 'green' }));
+  </script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reputación — Backoffice · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="admin.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Backoffice</span></a>
+          <div class="topbar-actions"><div class="avatar" style="background:linear-gradient(135deg,#fff,var(--purple));color:#0B0B0F;">JN</div></div>
+        </div>
+
+        <div class="container admin-wide">
+          <div class="mb-16"><div class="eyebrow">Calidad</div><h1 class="h-lg">Reputación y reseñas</h1><p class="text-sm muted">Moderá reseñas y gestioná cuentas con baja calificación</p></div>
+
+          <div class="grid-4 mb-16">
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value">4.8</div><div class="stat-label">Calif. promedio</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value">1.204</div><div class="stat-label">Reseñas totales</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">4</div><div class="stat-label">Reportadas</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-red">2</div><div class="stat-label">En riesgo</div></div>
+          </div>
+
+          <div class="store-layout">
+            <!-- Reseñas a moderar -->
+            <div>
+              <div class="section-title"><h2>Reseñas reportadas</h2><span class="badge badge-yellow">4 pendientes</span></div>
+              <div id="reviews"></div>
+
+              <div class="section-title mt-24"><h2>Reseñas recientes</h2><span class="text-xs muted">bidireccional</span></div>
+              <div class="card">
+                <div class="list-row" style="padding-top:0;"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;"><i class="fa-solid fa-screwdriver-wrench"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Taller Patagonia → Patagonia Frenos</div><div class="text-xs muted">"Rápido y la pieza justa."</div></div><span class="stars">★★★★★</span></div>
+                <div class="list-row"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Andina Parts → MotorSur</div><div class="text-xs muted">"Pago al toque, todo claro."</div></div><span class="stars">★★★★★</span></div>
+                <div class="list-row" style="border-bottom:none;"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;"><i class="fa-solid fa-screwdriver-wrench"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">MotorSur → Andina Parts</div><div class="text-xs muted">"Tardó un poco la entrega."</div></div><span class="stars">★★★☆☆</span></div>
+              </div>
+            </div>
+
+            <!-- Cuentas en riesgo -->
+            <div>
+              <div class="section-title"><h2>Cuentas en riesgo</h2></div>
+              <div class="card mb-12" style="border-color:rgba(239,68,68,0.3);">
+                <div class="flex-between mb-12">
+                  <div class="flex-center gap-12"><div class="store-avatar" style="background:rgba(239,68,68,0.16);color:#FCA5A5;"><i class="fa-solid fa-store"></i></div><div><div class="text-sm" style="font-weight:700;">Bariloche Diesel</div><div class="text-xs muted">⭐ 2.9 · 6 reclamos</div></div></div>
+                  <span class="badge badge-red">En riesgo</span>
+                </div>
+                <div class="text-xs muted mb-12">3 entregas tardías y 2 productos incorrectos en 30 días.</div>
+                <div class="flex gap-8">
+                  <button class="btn btn-ghost btn-sm risk" data-a="aviso" data-n="Bariloche Diesel"><i class="fa-solid fa-triangle-exclamation"></i> Enviar aviso</button>
+                  <button class="btn btn-danger btn-sm btn-block risk" data-a="suspender" data-n="Bariloche Diesel"><i class="fa-solid fa-ban"></i> Suspender</button>
+                </div>
+              </div>
+              <div class="card" style="border-color:rgba(249,115,22,0.3);">
+                <div class="flex-between mb-12">
+                  <div class="flex-center gap-12"><div class="store-avatar" style="background:rgba(249,115,22,0.16);color:#FB923C;"><i class="fa-solid fa-store"></i></div><div><div class="text-sm" style="font-weight:700;">Repuestos Express</div><div class="text-xs muted">⭐ 3.4 · 3 reclamos</div></div></div>
+                  <span class="badge badge-orange">Observado</span>
+                </div>
+                <div class="text-xs muted mb-12">Calificación en descenso esta semana.</div>
+                <div class="flex gap-8"><button class="btn btn-ghost btn-sm btn-block risk" data-a="aviso" data-n="Repuestos Express"><i class="fa-solid fa-triangle-exclamation"></i> Enviar aviso</button></div>
+              </div>
+
+              <div class="float-notif mt-16">
+                <i class="fa-solid fa-circle-info text-purple"></i>
+                <div class="text-xs subtle">Las malas calificaciones reiteradas escalan: <b>aviso → suspensión → cancelación</b>.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('admin', 'moderacion');
+
+    let reported = [
+      { id: 1, from: 'Anónimo (mecánico)', to: 'Repuestos Express', text: 'Lenguaje ofensivo en el comentario. Reportada por el comercio.', stars: 1 },
+      { id: 2, from: 'Andina Parts', to: 'Taller del Sur', text: 'Reseña presuntamente falsa (sin operación asociada).', stars: 1 },
+      { id: 3, from: 'Anónimo (mecánico)', to: 'Bariloche Diesel', text: 'Producto llegó roto, reclamo de garantía.', stars: 2 },
+      { id: 4, from: 'MotorSur', to: 'Repuestos Centro', text: 'Comentario fuera de contexto.', stars: 3 }
+    ];
+    function renderReviews() {
+      document.getElementById('reviews').innerHTML = reported.map(r => `
+        <div class="card mb-12">
+          <div class="flex-between mb-8"><div class="text-sm" style="font-weight:700;">${r.from} → ${r.to}</div><span class="stars">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span></div>
+          <div class="text-sm subtle mb-12">"${r.text}"</div>
+          <div class="flex gap-8">
+            <button class="btn btn-ghost btn-sm rev" data-a="mantener" data-i="${r.id}"><i class="fa-solid fa-check"></i> Mantener</button>
+            <button class="btn btn-danger btn-sm rev" data-a="ocultar" data-i="${r.id}"><i class="fa-solid fa-eye-slash"></i> Ocultar reseña</button>
+          </div>
+        </div>`).join('') || '<div class="empty-state"><div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div><div class="text-sm">No hay reseñas reportadas</div></div>';
+      document.querySelectorAll('.rev').forEach(b => b.addEventListener('click', () => {
+        reported = reported.filter(r => r.id !== +b.dataset.i);
+        RAT.toast({ title: b.dataset.a === 'ocultar' ? 'Reseña ocultada' : 'Reseña mantenida', icon: b.dataset.a === 'ocultar' ? 'fa-eye-slash' : 'fa-check', type: b.dataset.a === 'ocultar' ? 'yellow' : 'green' });
+        renderReviews();
+      }));
+    }
+    renderReviews();
+
+    document.querySelectorAll('.risk').forEach(b => b.addEventListener('click', () => {
+      const a = b.dataset.a, n = b.dataset.n;
+      RAT.toast({ title: a === 'suspender' ? `${n} suspendido` : `Aviso enviado a ${n}`, sub: a === 'suspender' ? 'Queda registrado en auditoría' : 'Se registra la advertencia', icon: a === 'suspender' ? 'fa-ban' : 'fa-triangle-exclamation', type: a === 'suspender' ? 'yellow' : 'purple' });
+    }));
+  </script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cotizaciones — Mecánico · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .flow { max-width: 760px; margin: 0 auto; min-height: 100vh; padding-bottom: 100px; }
+    .flow-foot { position: fixed; bottom: 0; left: 0; right: 0; padding: 14px 16px; background: linear-gradient(0deg, var(--bg-0) 60%, transparent); display: none; }
+    .flow-foot.on { display: block; }
+    .flow-foot .inner { max-width: 760px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="flow">
+    <div class="topbar">
+      <div class="flex-center">
+        <a href="mecanico-dashboard.html" class="icon-btn"><i class="fa-solid fa-arrow-left"></i></a>
+        <div><div style="font-weight:800;">Cotizaciones</div><div class="text-xs muted">Pedido #1044 · Pastillas de freno</div></div>
+      </div>
+      <div class="icon-btn"><i class="fa-solid fa-tower-broadcast text-purple"></i></div>
+    </div>
+
+    <div class="container">
+      <!-- Countdown -->
+      <div class="card glow mb-16 text-center" style="background:linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4));">
+        <div class="text-xs muted mb-8" style="text-transform:uppercase;letter-spacing:0.08em;" id="windowLabel">Ventana de ofertas — se revelan al cerrarse</div>
+        <div class="countdown-big text-yellow" id="countdown">07:42</div>
+        <button class="btn btn-ghost btn-sm mt-12" id="revealBtn"><i class="fa-solid fa-eye"></i> Ver ofertas ahora (demo)</button>
+      </div>
+
+      <!-- Vehicle -->
+      <div class="card mb-16" style="display:flex;align-items:center;gap:12px;padding:12px 16px;">
+        <div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-car"></i></div>
+        <div style="flex:1;"><div class="text-sm" style="font-weight:700;">Toyota Hilux 2019</div><div class="text-xs muted">Frenos · Pastillas de freno delanteras</div></div>
+        <span class="badge badge-gray">#1044</span>
+      </div>
+
+      <!-- Waiting state -->
+      <div id="waiting" class="card text-center" style="padding:28px;">
+        <div class="spinner" style="margin:0 auto 14px;"></div>
+        <div class="text-sm" style="font-weight:700;">Esperando que los comercios coticen…</div>
+        <div class="text-xs muted mt-4">Las ofertas se muestran todas juntas al cerrarse la ventana.</div>
+        <div class="divider"></div>
+        <div class="text-xs muted mb-12">Mientras esperás, ofertas de comercios:</div>
+        <div class="promo-card"><div class="promo-img" style="background:linear-gradient(135deg,#6D28D9,#8B5CF6);"><i class="fa-solid fa-record-vinyl"></i></div><div style="flex:1;text-align:left;"><div class="text-sm" style="font-weight:700;">Repuestos Centro</div><div class="text-xs muted">20% OFF en frenos esta semana</div></div><span class="promo-tag">Aviso</span></div>
+      </div>
+
+      <!-- Offers -->
+      <div id="offers" style="display:none;">
+        <div class="section-title"><h2>Ofertas recibidas (<span id="offerCount">3</span>)</h2><span class="text-xs muted">orden por calificación</span></div>
+        <div class="quotes-grid" id="quotesList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-foot" id="foot">
+    <div class="inner">
+      <a href="mecanico-pago.html" class="btn btn-yellow btn-block btn-lg"><i class="fa-solid fa-lock"></i> Continuar al pago</a>
+    </div>
+  </div>
+
+  <!-- Zoom -->
+  <div id="zoom" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:none;place-items:center;padding:20px;"></div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    const pool = RAT.data.quotePool.slice().sort((a, b) => b.rating - a.rating);
+    let secs = 462, revealed = false, selected = null;
+
+    const cd = document.getElementById('countdown');
+    const timer = setInterval(() => {
+      if (secs <= 1 && !revealed) { reveal(); secs = 0; }
+      else if (secs > 0) secs--;
+      cd.textContent = RAT.fmtTime(secs);
+    }, 1000);
+
+    function reveal() {
+      if (revealed) return;
+      revealed = true; clearInterval(timer); secs = 0; cd.textContent = '00:00';
+      document.getElementById('windowLabel').textContent = 'Ventana cerrada · ofertas';
+      document.getElementById('revealBtn').style.display = 'none';
+      document.getElementById('waiting').style.display = 'none';
+      document.getElementById('offers').style.display = 'block';
+      RAT.ping();
+      RAT.toast({ title: 'Ventana cerrada', sub: `${pool.length} ofertas recibidas`, icon: 'fa-flag-checkered', type: 'yellow' });
+      renderOffers();
+    }
+    document.getElementById('revealBtn').addEventListener('click', reveal);
+
+    function renderOffers() {
+      document.getElementById('offerCount').textContent = pool.length;
+      document.getElementById('quotesList').innerHTML = pool.map((q, i) => `
+        <div class="quote-card animate-in" data-i="${i}">
+          <div class="flex-between mb-12">
+            <div class="flex-center gap-12">
+              <div class="store-avatar"><i class="fa-solid fa-user-secret"></i></div>
+              <div><div style="font-weight:700;font-size:15px;">${q.alias}</div><div class="text-xs muted">${RAT.starsHtml(q.rating)} ${q.rating} · Zona ${q.zone}</div></div>
+            </div>
+            <span class="badge badge-green"><i class="fa-solid fa-shield-halved"></i> ${q.warranty}</span>
+          </div>
+          <div class="flex-between mb-12">
+            <div><div class="text-xs muted">Marca de la pieza</div><div class="text-sm" style="font-weight:700;">${q.partBrand}</div></div>
+            <div class="text-right"><div class="text-xs muted">Disponibilidad</div><div class="text-sm" style="font-weight:700;"><i class="fa-solid fa-circle-check text-green"></i> En stock</div></div>
+          </div>
+          <div class="divider"></div>
+          <div class="flex-between">
+            <div><div class="text-xs muted">Precio final</div><div class="price">${RAT.money(q.price)}</div></div>
+            <button class="btn btn-sm btn-primary choose-btn" data-i="${i}">Elegir oferta</button>
+          </div>
+          <div class="locked-info mt-12"><i class="fa-solid fa-lock"></i> Vendedor: <span class="badge badge-gray" style="margin-left:4px;">Anónimo hasta concretar</span></div>
+        </div>`).join('');
+      document.querySelectorAll('.choose-btn').forEach(b => b.addEventListener('click', () => choose(+b.dataset.i)));
+    }
+
+    function choose(i) {
+      selected = i;
+      try { sessionStorage.setItem('rat_selectedQuote', JSON.stringify(pool[i])); } catch (e) {}
+      document.querySelectorAll('.quote-card').forEach((c, idx) => {
+        c.classList.toggle('selected', idx === i);
+        const btn = c.querySelector('.choose-btn');
+        if (idx === i) { btn.className = 'btn btn-sm btn-success choose-btn'; btn.innerHTML = '<i class="fa-solid fa-check"></i> Elegida'; }
+        else { btn.className = 'btn btn-sm btn-primary choose-btn'; btn.textContent = 'Elegir oferta'; }
+      });
+      document.getElementById('foot').classList.add('on');
+    }
+  </script>
+</body>
+</html>

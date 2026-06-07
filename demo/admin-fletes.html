@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fletes y tarifas — Backoffice · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="admin.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Backoffice</span></a>
+          <div class="topbar-actions">
+            <button class="btn btn-primary btn-sm" id="newCompany"><i class="fa-solid fa-plus"></i> Empresa de fletes</button>
+            <div class="avatar" style="background:linear-gradient(135deg,#fff,var(--purple));color:#0B0B0F;">JN</div>
+          </div>
+        </div>
+
+        <div class="container admin-wide">
+          <div class="mb-16"><div class="eyebrow">Logística</div><h1 class="h-lg">Fletes y tarifas</h1><p class="text-sm muted">Empresas de envío tercerizadas y su tarifa por zona y tamaño de paquete</p></div>
+
+          <div class="float-notif mb-16" style="border-color:rgba(250,204,21,0.35);background:linear-gradient(135deg,rgba(250,204,21,0.12),rgba(31,41,55,0.5));">
+            <i class="fa-solid fa-circle-info text-yellow"></i>
+            <div class="text-sm subtle">El <b>cobro y liquidación del flete</b> (la "tercera pata" del pago) está pendiente de definir. Por ahora se muestran las tarifas a modo de referencia.</div>
+          </div>
+
+          <div class="store-layout">
+            <!-- Empresa -->
+            <div>
+              <div class="section-title"><h2>Empresas de fletes</h2></div>
+              <div class="card glow mb-16">
+                <div class="flex-between mb-12">
+                  <div class="flex-center gap-12"><div class="store-avatar" style="background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-truck-fast"></i></div><div><div style="font-weight:800;">Fletes del Sur</div><div class="text-xs muted">CUIT 30-70812345-6 · 6 repartidores</div></div></div>
+                  <span class="badge badge-green"><span class="dot-status dot-active"></span> Activa</span>
+                </div>
+                <div class="flex gap-8 flex-wrap mb-12">
+                  <span class="chip active"><i class="fa-solid fa-motorcycle"></i> Moto</span>
+                  <span class="chip active"><i class="fa-solid fa-car"></i> Auto</span>
+                  <span class="chip active"><i class="fa-solid fa-van-shuttle"></i> Utilitario</span>
+                </div>
+                <div class="text-xs muted mb-12"><i class="fa-solid fa-location-dot"></i> Cobertura: Centro, Oeste, Sur, Km 5–18, Dina Huapi</div>
+                <div class="flex gap-8">
+                  <button class="btn btn-ghost btn-sm" id="editCompany"><i class="fa-solid fa-pen"></i> Editar</button>
+                  <button class="btn btn-ghost btn-sm" id="couriers"><i class="fa-solid fa-users"></i> Ver repartidores</button>
+                </div>
+              </div>
+
+              <div class="card" style="opacity:.7;">
+                <div class="flex-between">
+                  <div class="flex-center gap-12"><div class="store-avatar"><i class="fa-solid fa-truck"></i></div><div><div style="font-weight:700;">Mensajería Andina</div><div class="text-xs muted">Pendiente de alta</div></div></div>
+                  <span class="badge badge-yellow"><span class="dot-status dot-pending"></span> Pendiente</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tarifas -->
+            <div>
+              <div class="section-title"><h2>Tarifa · Fletes del Sur</h2><a id="editTariff">Editar tarifa</a></div>
+              <div class="card" style="padding:0;overflow:hidden;">
+                <div style="overflow-x:auto;">
+                  <table class="table">
+                    <thead><tr><th>Zona</th><th>Moto</th><th>Auto</th><th>Utilitario</th></tr></thead>
+                    <tbody>
+                      <tr><td style="font-weight:700;">Centro</td><td>$2.500</td><td>$3.800</td><td>$5.500</td></tr>
+                      <tr><td style="font-weight:700;">Oeste</td><td>$3.200</td><td>$4.500</td><td>$6.500</td></tr>
+                      <tr><td style="font-weight:700;">Sur</td><td>$3.000</td><td>$4.200</td><td>$6.000</td></tr>
+                      <tr><td style="font-weight:700;">Km 5–18</td><td>$4.000</td><td>$5.500</td><td>$8.000</td></tr>
+                      <tr><td style="font-weight:700;">Dina Huapi</td><td>$5.500</td><td>$7.000</td><td>$10.500</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card mt-16">
+                <div class="section-title"><h2>Consolidación</h2></div>
+                <div class="text-sm subtle">Un envío puede <b>retirar de varios puntos de venta</b> y entregar en un único taller. La tarifa de consolidación suma un recargo por punto de retiro adicional.</div>
+                <div class="flex-between mt-12 text-sm"><span class="muted">Recargo por retiro extra</span><span style="font-weight:700;">$1.200</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('admin', 'fletes');
+    document.getElementById('newCompany').addEventListener('click', () => RAT.toast({ title: 'Nueva empresa de fletes', sub: 'Razón social, CUIT, vehículos y zonas', icon: 'fa-truck', type: 'purple' }));
+    document.getElementById('editCompany').addEventListener('click', () => RAT.toast({ title: 'Editar Fletes del Sur', icon: 'fa-pen', type: 'purple' }));
+    document.getElementById('editTariff').addEventListener('click', () => RAT.toast({ title: 'Editar tarifa', sub: 'Por zona y tamaño de paquete', icon: 'fa-pen', type: 'purple' }));
+    document.getElementById('couriers').addEventListener('click', () => window.location.href = 'admin-usuarios.html');
+  </script>
+</body>
+</html>

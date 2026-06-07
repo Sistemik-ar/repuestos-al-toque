@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel — Comercio · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="index.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Panel Comercio</span></a>
+          <div class="topbar-actions">
+            <button class="icon-btn" id="help"><i class="fa-regular fa-circle-question"></i></button>
+            <div class="avatar" style="background:linear-gradient(135deg,var(--yellow),var(--purple));">RC</div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="mb-16">
+            <div class="eyebrow">Repuestos Centro</div>
+            <h1 class="h-lg">Solicitudes entrantes</h1>
+            <p class="text-sm muted">Respondé rápido = ganás la venta</p>
+          </div>
+
+          <div class="dash-grid" style="align-items:start;">
+            <div class="col-span-2">
+              <!-- Reputación -->
+              <div class="card glow mb-16" style="background:linear-gradient(135deg,rgba(250,204,21,0.16),rgba(31,41,55,0.6));">
+                <div class="flex-between mb-12">
+                  <div class="flex-center gap-12">
+                    <div class="avatar" style="width:46px;height:46px;font-size:16px;background:linear-gradient(135deg,var(--yellow),var(--purple));">RC</div>
+                    <div><div style="font-weight:800;">Repuestos Centro</div><div class="mt-4"><span class="rep-badge rep-elite"><i class="fa-solid fa-crown"></i> Top Vendedor</span></div></div>
+                  </div>
+                  <div class="text-right"><div class="text-xs muted">Puntos</div><div class="h-md text-yellow">6.180</div></div>
+                </div>
+                <div class="rep-stats card" style="background:var(--bg-1);padding:12px;">
+                  <div><div class="v">312</div><div class="l">Ventas</div></div>
+                  <div><div class="v">⭐ 4.8</div><div class="l">Calificación</div></div>
+                  <div><div class="v">3 min</div><div class="l">Resp. prom.</div></div>
+                </div>
+              </div>
+
+              <div class="grid-3 mb-16">
+                <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow" id="cPend">3</div><div class="stat-label">Solicitudes</div></div>
+                <div class="card stat-card" style="padding:14px;"><div class="stat-value" id="cCot">2</div><div class="stat-label">Cotizadas</div></div>
+                <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green" id="cVen">1</div><div class="stat-label">Concretadas</div></div>
+              </div>
+
+              <div class="pill-tabs mb-16" id="tabs">
+                <button class="active" data-t="pend">Pendientes <span class="badge badge-yellow" style="margin-left:4px;" id="pendBadge">3</span></button>
+                <button data-t="cot">Cotizadas</button>
+                <button data-t="ven">Ventas</button>
+              </div>
+
+              <div id="leadList"></div>
+            </div>
+
+            <!-- Lateral -->
+            <div class="col-span-2">
+              <div class="card mb-16" style="background:linear-gradient(135deg,rgba(109,40,217,0.18),rgba(31,41,55,0.6));">
+                <div class="flex-center gap-12 mb-8"><i class="fa-solid fa-bolt text-yellow"></i><b class="text-sm">Tip para ganar ventas</b></div>
+                <div class="text-sm subtle">La cotización más rápida y mejor calificada se muestra primero al mecánico. ¡No la dejes pasar!</div>
+              </div>
+              <div class="card">
+                <div class="section-title"><h2>Mis avisos</h2><span class="badge badge-purple">patrocinado</span></div>
+                <div class="promo-card mb-12"><div class="promo-img" style="background:linear-gradient(135deg,#6D28D9,#8B5CF6);"><i class="fa-solid fa-record-vinyl"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">20% OFF en frenos</div><div class="text-xs muted">Activo · vence en 4 días</div></div></div>
+                <button class="btn btn-ghost btn-sm btn-block" id="newAd"><i class="fa-solid fa-plus"></i> Nuevo aviso</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cotizar modal -->
+  <div class="modal-backdrop" id="quoteModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="h-md mb-4">Enviar cotización</h2>
+      <p class="text-sm muted mb-16" id="qmLead">—</p>
+      <div class="field"><label>Precio final</label><input class="input" inputmode="numeric" id="qmPrice" placeholder="$ 0" /></div>
+      <div class="field"><label>Marca de la pieza</label><select class="select" id="qmBrand"><option>Bosch</option><option>TRW</option><option>Ferodo</option><option>Original / OEM</option><option>Alternativa</option></select></div>
+      <div class="field"><label>Garantía</label><select class="select" id="qmWarr"><option>3 meses</option><option>6 meses</option><option>12 meses</option><option>Sin garantía</option></select></div>
+      <div class="field">
+        <label>Fotos de la pieza <span class="muted">(hasta 3, opcional)</span></label>
+        <div class="flex gap-8" id="qmPhotos">
+          <button class="upload-area photo-add" style="width:64px;height:64px;padding:0;display:grid;place-items:center;"><i class="fa-solid fa-camera"></i></button>
+        </div>
+      </div>
+      <div class="field"><label>Notas <span class="muted">(opcional)</span></label><textarea class="textarea" id="qmNote" placeholder="Stock disponible, garantía, etc."></textarea></div>
+      <div class="flex gap-12">
+        <button class="btn btn-ghost" style="flex:0 0 auto;" id="qmCancel">Cancelar</button>
+        <button class="btn btn-yellow btn-block" id="qmSend"><i class="fa-solid fa-paper-plane"></i> Enviar Cotización</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pedir info modal -->
+  <div class="modal-backdrop" id="infoModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="h-md mb-4">Pedir más info</h2>
+      <p class="text-sm muted mb-16" id="imLead">elegí qué necesitás saber</p>
+      <div class="flex-col gap-8 mb-16" id="cannedList"></div>
+      <div class="field"><label>Otra consulta <span class="muted">(opcional)</span></label><textarea class="textarea" id="imText" placeholder="Escribí tu pregunta…"></textarea></div>
+      <div class="flex gap-12">
+        <button class="btn btn-ghost" style="flex:0 0 auto;" id="imCancel">Cancelar</button>
+        <button class="btn btn-primary btn-block" id="imSend"><i class="fa-solid fa-paper-plane"></i> Pedir al mecánico</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help -->
+  <div class="modal-backdrop" id="helpModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="h-md mb-4">Ayuda para cotizar</h2>
+      <p class="text-sm muted mb-16">Tips rápidos para responder bien y ganar la venta.</p>
+      <div class="flex-col gap-12 mb-16">
+        <div class="flex-center gap-12"><div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-bolt"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Respondé rápido</div><div class="text-xs muted">La cotización más rápida y mejor calificada se muestra primero.</div></div></div>
+        <div class="flex-center gap-12"><div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-camera"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Sumá fotos</div><div class="text-xs muted">Podés adjuntar hasta 3 fotos de la pieza para dar confianza.</div></div></div>
+        <div class="flex-center gap-12"><div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-user-secret"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Anonimato</div><div class="text-xs muted">El mecánico no ve tu nombre hasta que se concreta la venta.</div></div></div>
+      </div>
+      <button class="btn btn-yellow btn-block" id="helpClose">Entendido</button>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('comercio', 'solicitudes');
+
+    let leads = [
+      { id: 1044, part: 'Pastillas de freno delanteras', veh: 'Toyota Hilux 2019', cat: 'Frenos', icon: 'fa-record-vinyl', urgent: true, invoice: 'consumidor_final', photo: true, status: 'pend' },
+      { id: 1045, part: 'Kit de embrague completo', veh: 'VW Amarok 2021', cat: 'Embrague', icon: 'fa-gears', urgent: false, invoice: 'factura_a', emisor: 'Repuestos Centro SRL', emisorCuit: '30-71234567-9', solic: 'Transporte Andino SA', solicCuit: '30-69876543-2', photo: false, status: 'pend' },
+      { id: 1046, part: 'Bujías (juego x4)', veh: 'Ford Focus 2018', cat: 'Motor', icon: 'fa-gear', urgent: false, invoice: 'consumidor_final', photo: false, status: 'pend' }
+    ];
+    const cotizadas = [
+      { id: 1041, part: 'Disco de freno (par)', veh: 'Chevrolet S10 2018', myPrice: 86000 },
+      { id: 1038, part: 'Filtro de aire', veh: 'Renault Duster 2020', myPrice: 14500 }
+    ];
+    const ventas = [
+      { id: 1039, part: 'Bomba de agua', veh: 'Ford Ranger 2020', price: 39900, salio: false }
+    ];
+
+    const CANNED = ['Mandá una foto de la pieza','Indicá el lado/posición (izq/der, del/tras)','Pasá el número de parte (si lo tenés)','¿Original o alternativo?','Confirmá el motor / versión'];
+    let activeLead = null, photoCount = 0, infoSel = [];
+
+    let tab = (location.hash === '#cotizadas' || location.hash === '#cot') ? 'cot' : (location.hash === '#ventas' || location.hash === '#ven') ? 'ven' : 'pend';
+
+    function renderTabs() {
+      document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.t === tab));
+    }
+    function render() {
+      renderTabs();
+      const el = document.getElementById('leadList');
+      const pend = leads.filter(l => l.status === 'pend');
+      document.getElementById('cPend').textContent = pend.length;
+      document.getElementById('pendBadge').textContent = pend.length;
+
+      if (tab === 'pend') {
+        if (!pend.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon"><i class="fa-solid fa-inbox"></i></div><div class="text-sm">Sin solicitudes pendientes</div><div class="text-xs">Cuando un mecánico genere un pedido, aparece acá</div></div>'; return; }
+        el.innerHTML = '<div class="leads-grid">' + pend.map(l => `
+          <div class="card mb-12">
+            <div class="flex-between mb-12">
+              <div class="flex-center gap-12">
+                <div class="store-avatar" style="${l.urgent ? 'background:rgba(239,68,68,0.16);color:#FCA5A5;' : ''}"><i class="fa-solid ${l.icon}"></i></div>
+                <div><div class="text-sm" style="font-weight:700;">${l.part}</div><div class="text-xs muted">${l.veh} · ${l.cat}</div></div>
+              </div>
+              <span class="badge badge-gray">#${l.id}</span>
+            </div>
+            <div class="flex gap-8 mb-12 flex-wrap">
+              <span class="badge badge-gray"><i class="fa-solid fa-layer-group"></i> ${l.cat}</span>
+              <span class="badge badge-gray"><i class="fa-solid fa-file-invoice"></i> ${l.invoice === 'factura_a' ? 'Factura A' : 'Cons. Final'}</span>
+              ${l.urgent ? '<span class="badge badge-red"><i class="fa-solid fa-bolt"></i> Urgente</span>' : ''}
+              ${l.photo ? '<span class="badge badge-purple"><i class="fa-solid fa-image"></i> con foto</span>' : ''}
+            </div>
+            ${l.invoice === 'factura_a' ? `<div class="float-notif mb-12" style="padding:10px 12px;"><i class="fa-solid fa-file-invoice text-yellow"></i><div class="text-xs subtle"><b>Factura A.</b> Emisor: ${l.emisor} (${l.emisorCuit}) · Solicitante: ${l.solic} (${l.solicCuit})</div></div>` : ''}
+            <div class="locked-info mb-12"><i class="fa-solid fa-user-secret"></i> Mecánico anónimo hasta concretar</div>
+            <div class="flex gap-8">
+              <button class="btn btn-ghost btn-sm ask-info" data-id="${l.id}"><i class="fa-regular fa-circle-question"></i></button>
+              <button class="btn btn-ghost btn-sm no-stock" data-id="${l.id}"><i class="fa-solid fa-ban"></i> Sin stock</button>
+              <button class="btn btn-yellow btn-block cotizar" data-id="${l.id}"><i class="fa-solid fa-tag"></i> Cotizar</button>
+            </div>
+          </div>`).join('') + '</div>';
+        document.querySelectorAll('.cotizar').forEach(b => b.addEventListener('click', () => openQuote(+b.dataset.id)));
+        document.querySelectorAll('.ask-info').forEach(b => b.addEventListener('click', () => openInfo(+b.dataset.id)));
+        document.querySelectorAll('.no-stock').forEach(b => b.addEventListener('click', () => {
+          leads = leads.map(l => l.id === +b.dataset.id ? { ...l, status: 'gone' } : l);
+          RAT.toast({ title: 'Marcado sin disponibilidad', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' });
+          render();
+        }));
+      } else if (tab === 'cot') {
+        el.innerHTML = cotizadas.length ? '<div class="leads-grid">' + cotizadas.map(c => `
+          <div class="card mb-12"><div class="flex-between mb-8"><div><div class="text-sm" style="font-weight:700;">${c.part}</div><div class="text-xs muted">${c.veh}</div></div><span class="badge badge-purple">Esperando decisión</span></div>
+          <div class="flex-between text-sm"><span class="muted">Cotizaste</span><span style="font-weight:700;">${RAT.money(c.myPrice)}</span></div></div>`).join('') + '</div>'
+          : '<div class="empty-state"><div class="empty-icon"><i class="fa-solid fa-tags"></i></div><div class="text-sm">Todavía no cotizaste nada</div></div>';
+      } else {
+        el.innerHTML = ventas.length ? '<div class="leads-grid">' + ventas.map(v => `
+          <div class="card mb-12"><div class="flex-between mb-8"><div><div class="text-sm" style="font-weight:700;">${v.part}</div><div class="text-xs muted">${v.veh}</div></div><span class="badge badge-green"><i class="fa-solid fa-check"></i> Pagado</span></div>
+          <div class="flex-between"><span class="text-sm muted">Venta <b class="text-green">${RAT.money(v.price)}</b></span>
+          ${v.salio ? '<span class="badge badge-yellow"><i class="fa-solid fa-truck-fast"></i> Retira el flete</span>' : `<button class="btn btn-yellow btn-sm salio" data-id="${v.id}"><i class="fa-solid fa-box"></i> Salió el pedido</button>`}</div></div>`).join('') + '</div>'
+          : '<div class="empty-state"><div class="empty-icon"><i class="fa-solid fa-box"></i></div><div class="text-sm">Sin ventas concretadas todavía</div></div>';
+        document.querySelectorAll('.salio').forEach(b => b.addEventListener('click', () => {
+          ventas.forEach(v => { if (v.id === +b.dataset.id) v.salio = true; });
+          RAT.toast({ title: 'Pedido marcado como listo', sub: 'Avisamos a la empresa de envíos', icon: 'fa-box', type: 'green' });
+          render();
+        }));
+      }
+    }
+
+    document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => { tab = b.dataset.t; render(); }));
+
+    // Cotizar modal
+    function openQuote(id) {
+      activeLead = leads.find(l => l.id === id); photoCount = 0;
+      document.getElementById('qmLead').textContent = `${activeLead.part} · ${activeLead.veh}`;
+      document.getElementById('qmPrice').value = ''; document.getElementById('qmNote').value = '';
+      document.getElementById('qmPhotos').querySelectorAll('.thumb').forEach(t => t.remove());
+      document.getElementById('quoteModal').classList.add('open');
+    }
+    document.getElementById('qmCancel').addEventListener('click', () => document.getElementById('quoteModal').classList.remove('open'));
+    document.getElementById('qmSend').addEventListener('click', () => {
+      const price = document.getElementById('qmPrice').value.replace(/\D/g, '');
+      if (!price) { RAT.toast({ title: 'Ingresá un precio', icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+      leads = leads.map(l => l.id === activeLead.id ? { ...l, status: 'gone' } : l);
+      cotizadas.unshift({ id: activeLead.id, part: activeLead.part, veh: activeLead.veh, myPrice: +price });
+      document.getElementById('quoteModal').classList.remove('open');
+      document.getElementById('cCot').textContent = cotizadas.length;
+      RAT.ping();
+      RAT.toast({ title: 'Cotización enviada', sub: 'Se revela al mecánico al cerrarse la ventana', icon: 'fa-paper-plane', type: 'green' });
+      render();
+    });
+    document.querySelector('.photo-add').addEventListener('click', () => {
+      if (photoCount >= 3) return;
+      photoCount++;
+      const t = document.createElement('div');
+      t.className = 'thumb'; t.style.cssText = 'width:64px;height:64px;border-radius:10px;border:1px solid var(--border);background:var(--bg-3);display:grid;place-items:center;color:var(--purple-light);';
+      t.innerHTML = '<i class="fa-solid fa-image"></i>';
+      document.getElementById('qmPhotos').insertBefore(t, document.querySelector('.photo-add'));
+      if (photoCount >= 3) document.querySelector('.photo-add').style.display = 'none';
+    });
+
+    // Pedir info
+    function openInfo(id) {
+      activeLead = leads.find(l => l.id === id); infoSel = [];
+      document.getElementById('imLead').textContent = `${activeLead.part} · #${id} — elegí qué necesitás saber`;
+      document.getElementById('imText').value = '';
+      document.getElementById('cannedList').innerHTML = CANNED.map(q =>
+        `<button class="card hoverable canned" data-q="${q}" style="padding:12px 14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px;"><i class="fa-regular fa-circle"></i><span class="text-sm">${q}</span></button>`).join('');
+      document.querySelectorAll('.canned').forEach(b => b.addEventListener('click', () => {
+        const q = b.dataset.q;
+        if (infoSel.includes(q)) { infoSel = infoSel.filter(x => x !== q); b.classList.remove('glow'); b.querySelector('i').className = 'fa-regular fa-circle'; }
+        else { infoSel.push(q); b.classList.add('glow'); b.querySelector('i').className = 'fa-solid fa-circle-check text-yellow'; }
+      }));
+      document.getElementById('infoModal').classList.add('open');
+    }
+    document.getElementById('imCancel').addEventListener('click', () => document.getElementById('infoModal').classList.remove('open'));
+    document.getElementById('imSend').addEventListener('click', () => {
+      if (!infoSel.length && !document.getElementById('imText').value.trim()) { RAT.toast({ title: 'Elegí al menos una consulta', icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+      document.getElementById('infoModal').classList.remove('open');
+      RAT.toast({ title: 'Le pedimos más info al mecánico', sub: 'Te avisamos cuando responda', icon: 'fa-circle-question', type: 'purple' });
+    });
+
+    // Help / ad
+    document.getElementById('help').addEventListener('click', () => document.getElementById('helpModal').classList.add('open'));
+    document.getElementById('helpClose').addEventListener('click', () => document.getElementById('helpModal').classList.remove('open'));
+    document.getElementById('newAd').addEventListener('click', () => RAT.toast({ title: 'Nuevo aviso', sub: 'Marca + descuento + foto (sin enlace)', icon: 'fa-bullhorn', type: 'yellow' }));
+
+    document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+    render();
+  </script>
+</body>
+</html>

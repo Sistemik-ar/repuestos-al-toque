@@ -1,55 +1,132 @@
-# RepuestosAlToque — Prototipo navegable
+# RepuestosAlToque
 
-Prototipo de alta fidelidad (mockup clickeable) de **RepuestosAlToque**, marketplace de repuestos urgentes para Bariloche que conecta **mecánicos**, **casas de repuestos** y **repartidores**.
+**Marketplace de repuestos urgentes para Bariloche.** Conecta **mecánicos**, **casas de repuestos** y **repartidores**: el mecánico pide un repuesto, recibe cotizaciones en vivo de comercios cercanos, elige, paga y recibe el envío — sin perder horas al teléfono.
 
-> ⚠️ Esto es un prototipo de **frontend solamente**: sin backend, base de datos, auth ni pagos reales. Todos los datos son simulados. El objetivo es mostrar el producto, los flujos y la propuesta de valor.
+> El foco del producto es **velocidad operativa y simplicidad**. Los usuarios trabajan en talleres y comercios, muchas veces desde el celular. Mobile-first, pero funciona igual de bien en desktop.
 
-## Stack
-- HTML + CSS + JavaScript vanilla (sin framework, sin build).
-- TailwindCDN no es necesario: estilos propios en `assets/styles.css`.
-- FontAwesome vía CDN para los íconos.
+---
 
-## Estructura
+## La idea en 30 segundos
+
+1. El **mecánico** carga un pedido (un solo producto): vehículo, pieza, urgencia, tipo de factura.
+2. Se abre una **ventana de cotización de 10 minutos**. Las casas de repuestos cercanas reciben el lead y cotizan.
+3. Las ofertas se **revelan todas juntas al cerrar la ventana**, ordenadas por la reputación del vendedor.
+4. **Anonimato bilateral**: el mecánico ve un alias del vendedor; el vendedor ve solo la zona del taller. La identidad real se revela **al concretar la venta**.
+5. El mecánico elige una oferta y paga por **Mercado Pago** (split automático: repuesto al vendedor, **comisión 5%** a la plataforma, la paga el cliente).
+6. La **empresa de fletes tercerizada** retira (puede **consolidar** varios pedidos de distintos puntos) y entrega en el taller.
+7. Calificación **bidireccional** mecánico ↔ vendedor; la reputación ordena las cotizaciones.
+
+**Onboarding 100% manual (MVP):** los administradores dan de alta a todos por invitación; cada usuario define su contraseña.
+
+---
+
+## Roles
+
+| Rol | Qué hace |
+|-----|----------|
+| **Mecánico** | Pide repuestos, compara cotizaciones, paga, sigue el envío, califica. |
+| **Casa de repuestos (vendedor)** | Recibe leads en vivo, cotiza (con fotos/garantía), pide info, marca "salió el pedido". |
+| **Repartidor / Fletes** | Retira de uno o varios puntos y entrega en el taller. *(flujo en definición)* |
+| **Administrador (backoffice)** | Alta e invitaciones, suspender/activar/resetear, métricas, moderación de reseñas, fletes y tarifas, auditoría. |
+
+### Estados del pedido
+`Abierto → Cotizando → Cotización aceptada → Preparando → En reparto → Entregado` · (`Cancelado` en cualquier punto).
+
+---
+
+## Estructura del repo
+
 ```
-index.html               → Landing + selector de rol
-mechanic-dashboard.html  → Panel del mecánico (reputación, pedidos, envíos)
-request-flow.html        → Wizard de pedido en 5 pasos
-quotes.html              → Cotizaciones en vivo (countdown + anonimato + promos)
-payment.html             → Pago estilo MercadoPago + revelado del vendedor + WhatsApp
-store-dashboard.html     → Panel de la casa de repuestos (leads en vivo + cotizar)
-store-request-detail.html→ Detalle de un lead entrante
-delivery-dashboard.html  → Panel del repartidor (mapa + timeline de estados)
-admin-dashboard.html     → Métricas, reputación, reset de contraseñas
-assets/styles.css        → Design system (dark, púrpura/amarillo)
-assets/app.js            → Datos mock, toasts, timers, reputación, simulación en vivo
+repuestos-al-toque/
+├── web/                 # 🟢 APP REAL (producción) — Next.js
+│   ├── app/             #    rutas: /, /mecanico, /comercio, /admin, /terminos…
+│   ├── components/
+│   ├── lib/             #    datos, store, helpers
+│   └── app/globals.css  #    design system (fuente de verdad)
+│
+├── demo/                # 🟣 DEMO navegable — HTML/CSS/JS estático, datos simulados
+│   ├── index.html       #    landing
+│   ├── login.html       #    login (elegís cualquier rol)
+│   ├── mecanico-*.html  #    dashboard, pedido, cotizaciones, pago, seguimiento, historial, perfil
+│   ├── comercio*.html   #    panel + perfil del comercio
+│   ├── repartidor.html  #    vista preliminar
+│   ├── admin*.html      #    resumen, usuarios, moderación, fletes, auditoría
+│   ├── terminos.html
+│   └── assets/          #    styles.css (design system portado) + app.js (mock data, toasts, nav)
+│
+├── db/                  # esquema de base de datos (Postgres / Supabase)
+├── docs/                # modelo de datos + reglas de negocio
+└── README.md
 ```
 
-## Probar localmente
-Es estático, así que alcanza con abrir `index.html`. Para evitar restricciones del navegador conviene servirlo:
+### App real vs. Demo
 
+|  | **App real** (`web/`) | **Demo** (`demo/`) |
+|--|----------------------|--------------------|
+| Tecnología | Next.js (con backend/auth/MP reales) | HTML + CSS + JS vanilla, sin build |
+| Datos | reales (Supabase) | **simulados** en el navegador |
+| Login | email + contraseña → entra a **tu** rol | elegís cualquier rol para recorrer |
+| URL | `repuestosaltoque.com.ar/` | `repuestosaltoque.com.ar/demo/` |
+| Para qué | producción | mostrar producto / vender / validar flujos |
+
+---
+
+## Rutas en producción (objetivo)
+
+- **`/`** → Landing pública. Botón **Ingresar** → login.
+- **`/login`** → email + contraseña. Al autenticar, **redirige según el rol** de la cuenta:
+  - `admin` → `/admin` (backoffice)
+  - `seller` → `/comercio`
+  - `mechanic` → `/mecanico`
+  - `courier` → `/repartidor`
+- **`/demo/`** → la demo estática. Sirve para recorrer **cualquier** rol con datos simulados (no requiere cuenta real).
+
+> En la **app real** el rol viene de la cuenta (no se elige). En la **demo** se elige a propósito, para poder mostrar todo.
+
+---
+
+## Cómo levantarlo
+
+### App real (`web/`)
 ```bash
-# con Python
-python3 -m http.server 5173
-# luego abrir http://localhost:5173
+cd web
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-## Deploy en Vercel
-El proyecto es 100% estático y ya incluye `vercel.json`.
-
-**Opción A — desde la web (recomendado):**
-1. Entrá a https://vercel.com → **Add New → Project**.
-2. Importá el repo `Sistemik-ar/repuestos-al-toque`.
-3. Framework Preset: **Other** (no requiere build). Build Command y Output: dejar vacío.
-4. **Deploy**. Vercel te da una URL pública (ej: `https://repuestos-al-toque.vercel.app`).
-
-**Opción B — desde la CLI:**
+### Demo (`demo/`) — es estática, sin build
 ```bash
-npm i -g vercel
-vercel        # primer deploy (preview)
-vercel --prod # deploy a producción
+cd demo
+python3 -m http.server 5173    # http://localhost:5173
+# (o cualquier server estático; abrir index.html directo también funciona)
 ```
 
-## Probar desde el celular
-Una vez deployado, abrí la URL de Vercel desde el navegador del teléfono. La app es **mobile-first**: bottom-nav, botones grandes, y la simulación en vivo (cotizaciones que llegan, timers, toasts) funciona igual que en desktop.
+### Servir la demo bajo `/demo` en producción
+La demo son archivos estáticos. La forma más simple de tener `/` (app real) y `/demo` (demo) en el mismo dominio:
 
-> Tip para la demo: entrá como **Mecánico → Solicitar Repuesto**, completá el flujo y mirá llegar las cotizaciones; elegí una y pagá para ver el desbloqueo del vendedor. En otra pestaña entrá como **Comercio** para ver los leads en tiempo real.
+**Opción A — dentro de Next.js (recomendado):** copiar la carpeta a `web/public/demo/`. Next sirve `public/` en la raíz, así que queda disponible en `repuestosaltoque.com.ar/demo/`.
+```bash
+cp -r demo web/public/demo
+```
+
+**Opción B — deploy separado:** publicar `demo/` como sitio estático aparte (Vercel/Netlify) y apuntar `repuestosaltoque.com.ar/demo` con un rewrite.
+
+---
+
+## Design system
+
+Estética **dark automotive**, púrpura `#6D28D9` + amarillo `#FACC15`, tipografía Inter. La fuente de verdad es `web/app/globals.css`; la demo usa una copia en `demo/assets/styles.css` (mismos tokens, componentes y, además, una capa **responsive** con sidebar en desktop y bottom-nav en mobile). Cualquier cambio de marca debería reflejarse en ambos.
+
+---
+
+## Pendientes de definir (decisiones de negocio, no de diseño)
+
+- **Flete:** cómo se cobra y se liquida a la empresa de envíos (la "3ra pata" del pago).
+- **Repartidor:** flujo detallado (la demo trae una vista preliminar).
+- **Publicidad** de comercios y registro de **"sin disponibilidad"** para métricas.
+
+---
+
+## Estado
+
+Prototipo / MVP en construcción. La demo refleja el producto completo (landing, login, 3 roles operativos + backoffice). La app real (`web/`) se desarrolla en paralelo con backend.

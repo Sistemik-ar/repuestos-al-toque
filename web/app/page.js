@@ -4,22 +4,20 @@ export default function Home() {
   return (
     <div className="app-shell">
       <div className="container" style={{ paddingTop: 32 }}>
-        <div className="flex-center mb-24">
-          <div
-            className="logo-mark"
-            style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg,var(--purple),var(--purple-light))', display: 'grid', placeItems: 'center', boxShadow: 'var(--shadow-glow)' }}
-          >
-            <i className="fa-solid fa-gear" style={{ color: 'white', fontSize: 20 }}></i>
+        <div className="flex-center mb-24" style={{ justifyContent: 'space-between' }}>
+          <div className="flex-center" style={{ gap: 10 }}>
+            <div className="logo-mark" style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg,var(--purple),var(--purple-light))', display: 'grid', placeItems: 'center', boxShadow: 'var(--shadow-glow)' }}>
+              <i className="fa-solid fa-gear" style={{ color: 'white', fontSize: 20 }}></i>
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em' }}>RepuestosAlToque</div>
+              <div className="text-xs muted">Bariloche · Patagonia</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em' }}>RepuestosAlToque</div>
-            <div className="text-xs muted">Bariloche · Patagonia</div>
-          </div>
+          <Link href="/login" className="btn btn-ghost btn-sm"><i className="fa-solid fa-right-to-bracket"></i> Ingresar</Link>
         </div>
 
-        <div className="badge badge-yellow mb-12">
-          <i className="fa-solid fa-bolt"></i> Repuestos en minutos, no en días
-        </div>
+        <div className="badge badge-yellow mb-12"><i className="fa-solid fa-bolt"></i> Repuestos en minutos, no en días</div>
         <h1 className="h-xl mb-12">
           El repuesto que necesitás,<br />
           <span className="text-purple">al toque.</span>
@@ -27,6 +25,11 @@ export default function Home() {
         <p className="subtle mb-24" style={{ lineHeight: 1.5 }}>
           Pedí un repuesto y recibí cotizaciones de casas cercanas <b className="text-yellow">en tiempo real</b>. Vos elegís. Sin perder horas al teléfono.
         </p>
+
+        <div className="flex-col gap-12 mb-24">
+          <Link href="/login" className="btn btn-primary btn-lg btn-block"><i className="fa-solid fa-right-to-bracket"></i> Ingresar a mi cuenta</Link>
+          <Link href="/demo/" className="btn btn-yellow btn-lg btn-block"><i className="fa-solid fa-play"></i> Ver la demo</Link>
+        </div>
 
         <div className="grid-3 mb-24">
           <div className="card text-center" style={{ padding: '14px 8px' }}>
@@ -46,46 +49,18 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="section-title">
-          <h2>Ingresá como…</h2>
-          <span className="text-xs muted">demo</span>
-        </div>
-        <div className="flex-col gap-12">
-          <Link href="/mecanico" className="card hoverable" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="store-avatar" style={{ background: 'rgba(109,40,217,0.2)' }}>
-              <i className="fa-solid fa-screwdriver-wrench"></i>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="h-md">Mecánico</div>
-              <div className="text-sm muted">Pedí repuestos y recibí cotizaciones</div>
-            </div>
-            <i className="fa-solid fa-chevron-right muted"></i>
-          </Link>
-          <Link href="/comercio" className="card hoverable" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="store-avatar" style={{ background: 'rgba(250,204,21,0.18)', color: 'var(--yellow)' }}>
-              <i className="fa-solid fa-store"></i>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="h-md">Casa de Repuestos</div>
-              <div className="text-sm muted">Recibí pedidos y cotizá rápido</div>
-            </div>
-            <i className="fa-solid fa-chevron-right muted"></i>
-          </Link>
-          <Link href="/admin" className="card hoverable" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div className="store-avatar" style={{ background: 'rgba(255,255,255,0.08)', color: 'white' }}>
-              <i className="fa-solid fa-chart-line"></i>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="h-md">Admin</div>
-              <div className="text-sm muted">Métricas y gestión de la plataforma</div>
-            </div>
-            <i className="fa-solid fa-chevron-right muted"></i>
-          </Link>
+        <div className="card mb-16">
+          <div className="text-sm" style={{ fontWeight: 700, marginBottom: 6 }}>¿Cómo funciona?</div>
+          <ol className="text-sm subtle" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+            <li>El mecánico pide un repuesto (vehículo, pieza, urgencia).</li>
+            <li>Las casas cercanas cotizan en una ventana de 10 minutos.</li>
+            <li>Elige la mejor oferta y paga por Mercado Pago.</li>
+            <li>La empresa de envíos retira y entrega en el taller.</li>
+          </ol>
         </div>
 
         <p className="text-center text-xs muted mt-24">
-          Prototipo · Bariloche · v0.1<br />
-          <Link href="/terminos" className="text-purple" style={{ fontWeight: 600 }}>Términos y Condiciones</Link>
+          Bariloche, AR · <Link href="/terminos" className="text-purple" style={{ fontWeight: 600 }}>Términos y Condiciones</Link>
         </p>
       </div>
     </div>

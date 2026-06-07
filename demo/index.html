@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RepuestosAlToque — Repuestos urgentes en Bariloche</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .land-nav { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; background: rgba(11,11,15,0.6); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+    .land-wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
+    .hero { display: grid; grid-template-columns: 1fr; gap: 36px; padding: 48px 0 40px; align-items: center; }
+    .hero h1 { font-size: clamp(34px, 6vw, 60px); font-weight: 900; line-height: 1.02; letter-spacing: -0.03em; }
+    .hero p.lead { font-size: clamp(16px, 2.2vw, 20px); color: var(--text-1); line-height: 1.5; max-width: 540px; }
+    .hero-visual { position: relative; }
+    .phone { width: 300px; max-width: 86vw; margin: 0 auto; border-radius: 38px; border: 1px solid var(--border-strong); background: linear-gradient(180deg, var(--bg-1), var(--bg-0)); padding: 14px; box-shadow: 0 40px 90px rgba(0,0,0,0.6), var(--shadow-glow); }
+    .phone-screen { border-radius: 26px; overflow: hidden; background: var(--bg-0); border: 1px solid var(--border); }
+    .feat-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .step-row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .step { display: flex; gap: 14px; align-items: flex-start; }
+    .step .num { width: 38px; height: 38px; border-radius: 12px; background: rgba(109,40,217,0.18); color: var(--purple-light); display: grid; place-items: center; font-weight: 800; flex-shrink: 0; }
+    .roles { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .footer { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--text-2); font-size: 13px; }
+    @media (min-width: 820px) {
+      .hero { grid-template-columns: 1.1fr 0.9fr; padding: 72px 0 56px; }
+      .feat-grid { grid-template-columns: repeat(3, 1fr); }
+      .step-row { grid-template-columns: repeat(3, 1fr); }
+      .roles { grid-template-columns: repeat(3, 1fr); }
+    }
+    .sect { padding: 36px 0; }
+    .sect-head { text-align: center; max-width: 560px; margin: 0 auto 28px; }
+  </style>
+</head>
+<body>
+  <header class="land-nav">
+    <a href="index.html" class="brand" style="display:flex;align-items:center;gap:10px;font-weight:800;">
+      <span class="logo-mark" style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--purple-light));display:grid;place-items:center;box-shadow:var(--shadow-glow);"><i class="fa-solid fa-gear"></i></span>
+      <span>RepuestosAlToque <small style="display:block;font-size:11px;color:var(--text-2);font-weight:600;">Bariloche · Patagonia</small></span>
+    </a>
+    <div class="flex-center gap-12">
+      <span class="badge badge-yellow nowrap"><i class="fa-solid fa-flask"></i> Modo demo</span>
+      <a href="terminos.html" class="text-sm muted nowrap" style="font-weight:600;">Términos</a>
+      <a href="login.html" class="btn btn-primary btn-sm"><i class="fa-solid fa-right-to-bracket"></i> Ingresar</a>
+    </div>
+  </header>
+
+  <main class="land-wrap">
+    <!-- HERO -->
+    <section class="hero">
+      <div>
+        <div class="badge badge-yellow mb-16"><i class="fa-solid fa-bolt"></i> Repuestos en minutos, no en días</div>
+        <h1>El repuesto que necesitás,<br /><span class="text-purple">al toque.</span></h1>
+        <p class="lead mt-16 mb-24">Pedí un repuesto y recibí cotizaciones de casas cercanas <b class="text-yellow">en tiempo real</b>. Vos elegís. Sin perder horas al teléfono ni andar recorriendo locales.</p>
+        <div class="flex gap-12 flex-wrap mb-16">
+          <a href="login.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-bolt"></i> Empezar ahora</a>
+          <a href="#como" class="btn btn-ghost btn-lg">Cómo funciona</a>
+        </div>
+        <div class="flex-center gap-16 flex-wrap muted text-sm">
+          <span><i class="fa-solid fa-user-secret text-purple"></i> Anónimo hasta concretar</span>
+          <span><i class="fa-solid fa-shield-halved text-green"></i> Comercios verificados</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="phone">
+          <div class="phone-screen">
+            <div style="padding:14px 14px 10px;background:rgba(11,11,15,0.6);border-bottom:1px solid var(--border);">
+              <div class="text-xs muted" style="text-transform:uppercase;letter-spacing:.08em;">Ventana de ofertas · se revelan al cerrar</div>
+              <div class="countdown-big text-yellow" style="font-size:38px;">07:42</div>
+            </div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+              <div class="quote-card" style="padding:13px;">
+                <div class="flex-between mb-8">
+                  <div class="flex-center gap-8"><div class="store-avatar" style="width:34px;height:34px;font-size:14px;"><i class="fa-solid fa-user-secret"></i></div><div><div style="font-weight:700;font-size:13px;">Proveedor #12</div><div class="text-xs muted">★★★★★ 4.9 · Centro</div></div></div>
+                  <span class="badge badge-green" style="font-size:9px;">6 meses</span>
+                </div>
+                <div class="flex-between"><div class="price" style="font-size:19px;">$48.500</div><span class="btn btn-primary btn-sm" style="font-size:11px;padding:6px 10px;">Elegir</span></div>
+              </div>
+              <div class="quote-card selected" style="padding:13px;">
+                <div class="flex-between mb-8">
+                  <div class="flex-center gap-8"><div class="store-avatar" style="width:34px;height:34px;font-size:14px;"><i class="fa-solid fa-user-secret"></i></div><div><div style="font-weight:700;font-size:13px;">Zona Oeste Parts</div><div class="text-xs muted">★★★★★ 4.8 · Oeste</div></div></div>
+                  <span class="badge badge-green" style="font-size:9px;">12 meses</span>
+                </div>
+                <div class="flex-between"><div class="price text-yellow" style="font-size:19px;">$39.900</div><span class="badge badge-yellow" style="font-size:10px;">Elegida</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- POR QUÉ -->
+    <section class="sect">
+      <div class="feat-grid">
+        <div class="card text-center"><i class="fa-solid fa-bolt text-yellow" style="font-size:24px;"></i><div class="h-md mt-12">Velocidad</div><div class="text-sm muted mt-4">Optimizado para resolver, no para buscar el precio más bajo durante horas.</div></div>
+        <div class="card text-center"><i class="fa-solid fa-tower-broadcast text-purple" style="font-size:24px;"></i><div class="h-md mt-12">En vivo</div><div class="text-sm muted mt-4">Cotizaciones reales de casas de Bariloche en una ventana de 10 minutos.</div></div>
+        <div class="card text-center"><i class="fa-solid fa-user-secret text-yellow" style="font-size:24px;"></i><div class="h-md mt-12">Anónimo</div><div class="text-sm muted mt-4">Las dos partes son anónimas hasta concretar la venta. Sin presiones.</div></div>
+      </div>
+    </section>
+
+    <!-- CÓMO FUNCIONA -->
+    <section class="sect" id="como">
+      <div class="sect-head">
+        <div class="eyebrow mb-8">Cómo funciona</div>
+        <h2 class="h-xl">De la falla al repuesto, en tres pasos</h2>
+      </div>
+      <div class="step-row">
+        <div class="card step"><div class="num">1</div><div><div class="h-md">Pedís</div><div class="text-sm muted mt-4">Cargás el vehículo, la pieza y la urgencia. Sumás una foto si querés.</div></div></div>
+        <div class="card step"><div class="num">2</div><div><div class="h-md">Recibís ofertas</div><div class="text-sm muted mt-4">Varias casas cotizan. Al cerrar la ventana, ves todas juntas, ordenadas por reputación.</div></div></div>
+        <div class="card step"><div class="num">3</div><div><div class="h-md">Elegís y pagás</div><div class="text-sm muted mt-4">Pagás por Mercado Pago. Recién ahí se revela el vendedor y coordinás el envío.</div></div></div>
+      </div>
+    </section>
+
+    <!-- ROLES -->
+    <section class="sect">
+      <div class="sect-head">
+        <div class="eyebrow mb-8">Para todo el circuito</div>
+        <h2 class="h-xl">Una plataforma, cuatro roles</h2>
+      </div>
+      <div class="roles">
+        <div class="card hoverable">
+          <div class="store-avatar mb-12" style="background:rgba(109,40,217,0.2);"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+          <div class="h-md">Mecánicos</div>
+          <div class="text-sm muted mt-4">Piden repuestos, comparan y resuelven sin moverse del taller.</div>
+        </div>
+        <div class="card hoverable">
+          <div class="store-avatar mb-12" style="background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div>
+          <div class="h-md">Casas de repuestos</div>
+          <div class="text-sm muted mt-4">Reciben pedidos en vivo y cotizan en segundos. Más ventas, menos teléfono.</div>
+        </div>
+        <div class="card hoverable">
+          <div class="store-avatar mb-12" style="background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-truck-fast"></i></div>
+          <div class="h-md">Repartidores</div>
+          <div class="text-sm muted mt-4">Retiran de uno o varios puntos y entregan en el taller. Todo trazado.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="sect">
+      <div class="card glow text-center" style="padding:40px 24px;">
+        <h2 class="h-xl mb-8">Probá el prototipo</h2>
+        <p class="subtle mb-24" style="max-width:480px;margin:0 auto;">Entrá con cualquiera de los roles y recorré el flujo completo. Datos simulados.</p>
+        <a href="login.html" class="btn btn-yellow btn-lg"><i class="fa-solid fa-right-to-bracket"></i> Ingresar a la demo</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="land-wrap flex-between flex-wrap gap-12">
+      <div>RepuestosAlToque · Bariloche · v0.2 · Prototipo navegable</div>
+      <a href="terminos.html" class="text-purple" style="font-weight:600;">Términos y Condiciones</a>
+    </div>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

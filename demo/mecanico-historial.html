@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pedidos — Mecánico · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="mecanico-dashboard.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></a>
+          <div class="topbar-actions"><a href="mecanico-pedido.html" class="icon-btn"><i class="fa-solid fa-plus"></i></a><div class="avatar">MP</div></div>
+        </div>
+
+        <div class="container">
+          <div class="mb-16">
+            <div class="eyebrow">Taller Patagonia</div>
+            <h1 class="h-lg">Mis pedidos</h1>
+            <p class="text-sm muted">Historial completo y recompra rápida</p>
+          </div>
+
+          <div class="grid-3 mb-16">
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value">142</div><div class="stat-label">Totales</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">2</div><div class="stat-label">Activos</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green">127</div><div class="stat-label">Entregados</div></div>
+          </div>
+
+          <div class="pill-tabs mb-16" id="tabs">
+            <button class="active" data-f="todos">Todos</button>
+            <button data-f="activo">Activos</button>
+            <button data-f="entregado">Entregados</button>
+            <button data-f="cancelado">Cancelados</button>
+          </div>
+
+          <div id="list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('mecanico', 'pedidos');
+
+    const STATUS = {
+      cotizando: { label: 'Cotizando', cls: 'badge-yellow', icon: 'fa-tower-broadcast', group: 'activo' },
+      esperando: { label: 'Esperando ofertas', cls: 'badge-purple', icon: 'fa-clock', group: 'activo' },
+      reparto: { label: 'En reparto', cls: 'badge-yellow', icon: 'fa-truck-fast', group: 'activo' },
+      entregado: { label: 'Entregado', cls: 'badge-green', icon: 'fa-circle-check', group: 'entregado' },
+      cancelado: { label: 'Cancelado', cls: 'badge-red', icon: 'fa-xmark', group: 'cancelado' }
+    };
+    const orders = [
+      { id: 1044, part: 'Pastillas de freno delanteras', veh: 'Toyota Hilux 2019', cat: 'Frenos', icon: 'fa-record-vinyl', st: 'cotizando', price: null, date: 'Hoy 14:31' },
+      { id: 1043, part: 'Kit de embrague', veh: 'VW Amarok 2021', cat: 'Embrague', icon: 'fa-gears', st: 'esperando', price: null, date: 'Hoy 11:05' },
+      { id: 1039, part: 'Bomba de agua', veh: 'Ford Ranger 2020', cat: 'Refrigeración', icon: 'fa-snowflake', st: 'reparto', price: 41895, store: 'Patagonia Frenos', date: 'Hoy 09:48' },
+      { id: 1032, part: 'Filtro de aceite + aceite 10W40', veh: 'Toyota Hilux 2019', cat: 'Lubricación', icon: 'fa-oil-can', st: 'entregado', price: 28400, store: 'Andina Parts', date: 'Ayer', rated: true },
+      { id: 1027, part: 'Amortiguadores delanteros (par)', veh: 'Chevrolet S10 2018', cat: 'Suspensión', icon: 'fa-car-burst', st: 'entregado', price: 96500, store: 'Repuestos Centro', date: '3 jun', rated: false },
+      { id: 1019, part: 'Alternador', veh: 'Renault Kangoo 2017', cat: 'Electricidad', icon: 'fa-bolt', st: 'entregado', price: 112000, store: 'Repuestos Centro', date: '1 jun', rated: true },
+      { id: 1011, part: 'Correa de distribución', veh: 'VW Gol Trend 2016', cat: 'Motor', icon: 'fa-gear', st: 'cancelado', price: null, date: '28 may' }
+    ];
+
+    let filter = 'todos';
+    function render() {
+      const items = orders.filter(o => filter === 'todos' || STATUS[o.st].group === filter);
+      const el = document.getElementById('list');
+      if (!items.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon"><i class="fa-solid fa-clipboard-list"></i></div><div class="text-sm">Sin pedidos en este filtro</div></div>'; return; }
+      el.innerHTML = '<div class="leads-grid">' + items.map(o => {
+        const s = STATUS[o.st];
+        const active = s.group === 'activo';
+        const canRebuy = o.st === 'entregado';
+        return `<div class="card mb-12">
+          <div class="flex-between mb-12">
+            <div class="flex-center gap-12">
+              <div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid ${o.icon}"></i></div>
+              <div><div class="text-sm" style="font-weight:700;">${o.part}</div><div class="text-xs muted">${o.veh} · ${o.cat}</div></div>
+            </div>
+            <span class="badge ${s.cls}"><i class="fa-solid ${s.icon}"></i> ${s.label}</span>
+          </div>
+          <div class="flex-between text-xs muted mb-12">
+            <span>#${o.id} · ${o.date}${o.store ? ' · ' + o.store : ''}</span>
+            ${o.price ? `<span class="text-sm" style="font-weight:700;color:var(--text-0);">${RAT.money(o.price)}</span>` : ''}
+          </div>
+          <div class="flex gap-8">
+            ${active ? `<a href="${o.st === 'reparto' ? 'mecanico-seguimiento.html' : 'mecanico-cotizaciones.html'}" class="btn btn-primary btn-sm btn-block">${o.st === 'reparto' ? 'Seguir envío' : 'Ver ofertas'}</a>` : ''}
+            ${canRebuy ? `<button class="btn btn-yellow btn-sm btn-block rebuy" data-part="${o.part}"><i class="fa-solid fa-rotate-right"></i> Recomprar</button>` : ''}
+            ${o.st === 'entregado' && !o.rated ? `<button class="btn btn-ghost btn-sm rate" data-store="${o.store}"><i class="fa-regular fa-star"></i></button>` : ''}
+            ${o.st === 'cancelado' ? `<button class="btn btn-yellow btn-sm btn-block rebuy" data-part="${o.part}"><i class="fa-solid fa-rotate-right"></i> Reintentar pedido</button>` : ''}
+          </div>
+        </div>`;
+      }).join('') + '</div>';
+      document.querySelectorAll('.rebuy').forEach(b => b.addEventListener('click', () => {
+        RAT.toast({ title: 'Recompra iniciada', sub: b.dataset.part + ' · cargamos los datos del pedido anterior', icon: 'fa-rotate-right', type: 'purple' });
+        setTimeout(() => window.location.href = 'mecanico-pedido.html', 800);
+      }));
+      document.querySelectorAll('.rate').forEach(b => b.addEventListener('click', () => {
+        RAT.toast({ title: 'Calificá a ' + b.dataset.store, sub: 'Abrimos la reseña', icon: 'fa-star', type: 'yellow' });
+      }));
+    }
+    document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); filter = b.dataset.f; render();
+    }));
+    render();
+  </script>
+</body>
+</html>

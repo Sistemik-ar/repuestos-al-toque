@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi perfil — Mecánico · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="mecanico-dashboard.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></a>
+          <div class="topbar-actions"><button class="icon-btn" id="settings"><i class="fa-solid fa-gear"></i></button></div>
+        </div>
+
+        <div class="container">
+          <!-- Perfil header -->
+          <div class="card glow mb-16 text-center" style="background:linear-gradient(135deg,rgba(109,40,217,0.28),rgba(31,41,55,0.6));">
+            <div class="avatar" style="width:72px;height:72px;font-size:26px;margin:0 auto 12px;">MP</div>
+            <h1 class="h-lg">Taller Patagonia</h1>
+            <div class="text-sm muted mb-12">Martín Pérez · Bariloche Centro</div>
+            <span class="rep-badge rep-elite"><i class="fa-solid fa-bolt"></i> Mecánico Elite</span>
+          </div>
+
+          <div class="dash-grid" style="align-items:start;">
+            <div class="col-span-2">
+              <!-- Stats -->
+              <div class="card mb-16">
+                <div class="rep-stats">
+                  <div><div class="v">127</div><div class="l">Operaciones</div></div>
+                  <div><div class="v text-yellow">⭐ 4.9</div><div class="l">Calificación</div></div>
+                  <div><div class="v">96</div><div class="l">Reseñas</div></div>
+                  <div><div class="v text-yellow">2.540</div><div class="l">Puntos</div></div>
+                </div>
+              </div>
+
+              <!-- Progreso de nivel -->
+              <div class="card mb-16">
+                <div class="flex-between mb-12"><div class="text-sm" style="font-weight:700;">Progreso de nivel</div><span class="badge badge-purple">Elite</span></div>
+                <div class="progress-track mb-8"><div class="progress-fill" style="width:84%;"></div></div>
+                <div class="flex-between text-xs muted"><span>127 operaciones</span><span>Próx. insignia: 150</span></div>
+              </div>
+
+              <!-- Reseñas recibidas -->
+              <div class="section">
+                <div class="section-title"><h2>Reseñas de comercios</h2><span class="text-xs muted">bidireccional</span></div>
+                <div class="card mb-12">
+                  <div class="flex-between mb-8"><div class="flex-center gap-8"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div><div class="text-sm" style="font-weight:700;">Repuestos Centro</div></div><span class="stars">★★★★★</span></div>
+                  <div class="text-sm subtle">"Mecánico claro con lo que pide, paga al toque. Un gusto trabajar."</div>
+                </div>
+                <div class="card mb-12">
+                  <div class="flex-between mb-8"><div class="flex-center gap-8"><div class="store-avatar" style="width:32px;height:32px;font-size:13px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div><div class="text-sm" style="font-weight:700;">Andina Parts</div></div><span class="stars">★★★★★</span></div>
+                  <div class="text-sm subtle">"Siempre manda fotos y el número de parte. Cero vueltas."</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Datos del taller -->
+            <div class="col-span-2">
+              <div class="card mb-16">
+                <div class="section-title"><h2>Datos del taller</h2><a id="editData">Editar</a></div>
+                <div class="list-row" style="padding-top:0;"><i class="fa-solid fa-screwdriver-wrench text-purple" style="width:20px;"></i><div style="flex:1;"><div class="text-xs muted">Tipo</div><div class="text-sm" style="font-weight:700;">Taller mecánico</div></div></div>
+                <div class="list-row"><i class="fa-solid fa-location-dot text-purple" style="width:20px;"></i><div style="flex:1;"><div class="text-xs muted">Zona</div><div class="text-sm" style="font-weight:700;">Bariloche Centro</div></div></div>
+                <div class="list-row"><i class="fa-solid fa-phone text-purple" style="width:20px;"></i><div style="flex:1;"><div class="text-xs muted">Teléfono</div><div class="text-sm" style="font-weight:700;">+54 9 294 4555-678</div></div></div>
+                <div class="list-row" style="border-bottom:none;"><i class="fa-solid fa-id-card text-purple" style="width:20px;"></i><div style="flex:1;"><div class="text-xs muted">CUIT</div><div class="text-sm" style="font-weight:700;">20-34123456-7</div></div></div>
+              </div>
+
+              <div class="card mb-16">
+                <div class="section-title"><h2>Cuenta</h2></div>
+                <a class="list-row" style="padding-top:0;cursor:pointer;" id="changePw"><i class="fa-solid fa-key text-purple" style="width:20px;"></i><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Cambiar contraseña</div></div><i class="fa-solid fa-chevron-right muted"></i></a>
+                <a class="list-row" href="terminos.html" style="cursor:pointer;"><i class="fa-solid fa-file-lines text-purple" style="width:20px;"></i><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Términos y Condiciones</div></div><i class="fa-solid fa-chevron-right muted"></i></a>
+                <a class="list-row" href="login.html" style="border-bottom:none;cursor:pointer;"><i class="fa-solid fa-right-from-bracket text-red" style="width:20px;"></i><div style="flex:1;"><div class="text-sm" style="font-weight:700;color:#FCA5A5;">Cerrar sesión</div></div></a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('mecanico', 'perfil');
+    document.getElementById('settings').addEventListener('click', () => RAT.toast({ title: 'Ajustes', sub: 'Configuración de la cuenta', icon: 'fa-gear', type: 'purple' }));
+    document.getElementById('editData').addEventListener('click', () => RAT.toast({ title: 'Editar datos del taller', icon: 'fa-pen', type: 'purple' }));
+    document.getElementById('changePw').addEventListener('click', () => RAT.toast({ title: 'Cambiar contraseña', sub: 'Te enviamos un link por email', icon: 'fa-key', type: 'green' }));
+  </script>
+</body>
+</html>

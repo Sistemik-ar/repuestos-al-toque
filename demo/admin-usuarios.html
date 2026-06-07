@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Usuarios — Backoffice · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="admin.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Backoffice</span></a>
+          <div class="topbar-actions">
+            <button class="btn btn-primary btn-sm" id="newUser"><i class="fa-solid fa-user-plus"></i> Invitar usuario</button>
+            <div class="avatar" style="background:linear-gradient(135deg,#fff,var(--purple));color:#0B0B0F;">JN</div>
+          </div>
+        </div>
+
+        <div class="container admin-wide">
+          <div class="mb-16"><div class="eyebrow">Gestión de usuarios</div><h1 class="h-lg">Usuarios de la plataforma</h1><p class="text-sm muted">Alta manual e invitaciones · cada usuario define su contraseña</p></div>
+
+          <div class="grid-4 mb-16">
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value">171</div><div class="stat-label">Total</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-green">163</div><div class="stat-label">Activos</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-yellow">5</div><div class="stat-label">Pendientes</div></div>
+            <div class="card stat-card" style="padding:14px;"><div class="stat-value text-red">3</div><div class="stat-label">Suspendidos</div></div>
+          </div>
+
+          <div class="flex-between mb-16 flex-wrap gap-12">
+            <div class="pill-tabs" id="roleTabs">
+              <button class="active" data-r="todos">Todos</button>
+              <button data-r="seller">Comercios</button>
+              <button data-r="mechanic">Mecánicos</button>
+              <button data-r="courier">Repartidores</button>
+              <button data-r="admin">Admins</button>
+            </div>
+            <div style="position:relative;min-width:220px;">
+              <i class="fa-solid fa-magnifying-glass muted" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);"></i>
+              <input class="input" id="search" placeholder="Buscar por nombre o email…" style="padding-left:38px;" />
+            </div>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="table">
+                <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Alta</th><th>Reputación</th><th style="text-align:right;">Acciones</th></tr></thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invitar usuario modal -->
+  <div class="modal-backdrop" id="inviteModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h2 class="h-md mb-4">Invitar usuario</h2>
+      <p class="text-sm muted mb-16">Le mandamos un email con un link para que defina su contraseña.</p>
+      <div class="field"><label>Rol</label>
+        <div class="grid-2" id="roleSelect">
+          <button type="button" class="card hoverable text-center role-pick glow" data-role="seller" style="cursor:pointer;padding:12px 8px;"><i class="fa-solid fa-store text-yellow"></i><div class="text-sm mt-4" style="font-weight:700;">Comercio</div></button>
+          <button type="button" class="card hoverable text-center role-pick" data-role="mechanic" style="cursor:pointer;padding:12px 8px;"><i class="fa-solid fa-screwdriver-wrench text-purple"></i><div class="text-sm mt-4" style="font-weight:700;">Mecánico</div></button>
+          <button type="button" class="card hoverable text-center role-pick" data-role="courier" style="cursor:pointer;padding:12px 8px;"><i class="fa-solid fa-truck-fast text-green"></i><div class="text-sm mt-4" style="font-weight:700;">Repartidor</div></button>
+          <button type="button" class="card hoverable text-center role-pick" data-role="admin" style="cursor:pointer;padding:12px 8px;"><i class="fa-solid fa-chart-line"></i><div class="text-sm mt-4" style="font-weight:700;">Admin</div></button>
+        </div>
+      </div>
+      <div class="field"><label>Nombre / Razón social</label><input class="input" id="invName" placeholder="Ej: Repuestos del Lago" /></div>
+      <div class="field"><label>Email</label><input class="input" id="invEmail" type="email" placeholder="contacto@email.com" /></div>
+      <div class="grid-2">
+        <div class="field"><label>Teléfono</label><input class="input" id="invPhone" placeholder="+54 9 294…" /></div>
+        <div class="field"><label>CUIT <span class="muted">(opcional)</span></label><input class="input" id="invCuit" placeholder="11 dígitos" /></div>
+      </div>
+      <div class="field" id="zoneField"><label>Barrio / Zona</label><input class="input" id="invZone" placeholder="Ej: Centro" /></div>
+      <div class="flex gap-12">
+        <button class="btn btn-ghost" style="flex:0 0 auto;" id="invCancel">Cancelar</button>
+        <button class="btn btn-primary btn-block" id="invSend"><i class="fa-solid fa-paper-plane"></i> Enviar invitación</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset password modal -->
+  <div class="modal-backdrop" id="resetModal">
+    <div class="modal text-center">
+      <div class="modal-handle"></div>
+      <div class="store-avatar" style="width:54px;height:54px;margin:0 auto 12px;background:rgba(109,40,217,0.18);color:var(--purple-light);"><i class="fa-solid fa-key"></i></div>
+      <h2 class="h-md mb-4">Resetear contraseña</h2>
+      <p class="text-sm muted mb-16" id="resetName">—</p>
+      <div class="card flex-between mb-16" style="padding:12px 14px;"><span class="text-sm mono text-purple" id="resetCode">RAT-XXXXXX</span><button class="btn btn-ghost btn-sm" id="copyCode"><i class="fa-solid fa-copy"></i></button></div>
+      <div class="flex gap-12 mb-12">
+        <button class="btn btn-ghost btn-block btn-sm" id="resetEmail"><i class="fa-solid fa-envelope"></i> Email</button>
+        <button class="btn btn-success btn-block btn-sm" id="resetWa"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+      </div>
+      <button class="btn btn-ghost btn-block" id="resetClose">Cerrar</button>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('admin', 'usuarios');
+
+    const ROLE = { seller: { label: 'Comercio', icon: 'fa-store' }, mechanic: { label: 'Mecánico', icon: 'fa-screwdriver-wrench' }, courier: { label: 'Repartidor', icon: 'fa-truck-fast' }, admin: { label: 'Admin', icon: 'fa-chart-line' } };
+    const STA = { activo: { label: 'Activo', dot: 'dot-active', cls: 'badge-green' }, pendiente: { label: 'Pendiente', dot: 'dot-pending', cls: 'badge-yellow' }, suspendido: { label: 'Suspendido', dot: 'dot-susp', cls: 'badge-red' } };
+
+    let users = [
+      { name: 'Repuestos Centro', email: 'centro@rep.com', role: 'seller', status: 'activo', alta: '12 mar', rep: 'Top Vendedor', repCls: 'rep-elite', repIcon: 'fa-crown' },
+      { name: 'Andina Parts', email: 'andina@rep.com', role: 'seller', status: 'activo', alta: '20 mar', rep: 'Vendedor Destacado', repCls: 'rep-yellow', repIcon: 'fa-star' },
+      { name: 'Patagonia Frenos', email: 'patagonia@rep.com', role: 'seller', status: 'activo', alta: '02 abr', rep: 'Vendedor Destacado', repCls: 'rep-yellow', repIcon: 'fa-star' },
+      { name: 'Repuestos del Lago', email: 'lago@rep.com', role: 'seller', status: 'pendiente', alta: 'Hoy', rep: '—', repCls: 'rep-gray', repIcon: 'fa-clock' },
+      { name: 'Taller Patagonia', email: 'mperez@taller.com', role: 'mechanic', status: 'activo', alta: '05 feb', rep: 'Mecánico Elite', repCls: 'rep-elite', repIcon: 'fa-bolt' },
+      { name: 'MotorSur', email: 'motorsur@taller.com', role: 'mechanic', status: 'activo', alta: '18 feb', rep: 'Mecánico Pro', repCls: 'rep-yellow', repIcon: 'fa-star' },
+      { name: 'Bariloche Diesel', email: 'bchediesel@taller.com', role: 'mechanic', status: 'suspendido', alta: '01 mar', rep: 'Mecánico Activo', repCls: 'rep-purple', repIcon: 'fa-screwdriver-wrench' },
+      { name: 'Carlos · Nuevo Taller', email: 'carlos@taller.com', role: 'mechanic', status: 'pendiente', alta: 'Ayer', rep: '—', repCls: 'rep-gray', repIcon: 'fa-clock' },
+      { name: 'Diego · Fletes del Sur', email: 'diego@fletes.com', role: 'courier', status: 'activo', alta: '10 mar', rep: '—', repCls: 'rep-gray', repIcon: 'fa-truck-fast' },
+      { name: 'Jorge Nahuelpan', email: 'jorge@rat.com', role: 'admin', status: 'activo', alta: '01 ene', rep: 'Administrador', repCls: 'rep-purple', repIcon: 'fa-shield-halved' },
+      { name: 'Guille', email: 'guille@rat.com', role: 'admin', status: 'activo', alta: '01 ene', rep: 'Administrador', repCls: 'rep-purple', repIcon: 'fa-shield-halved' }
+    ];
+
+    let roleFilter = 'todos', q = '';
+    function actionsFor(u, i) {
+      let btns = '';
+      if (u.status === 'pendiente') btns += `<button class="btn btn-success btn-sm act" data-a="aprobar" data-i="${i}"><i class="fa-solid fa-check"></i> Aprobar</button>`;
+      if (u.status === 'activo') btns += `<button class="btn btn-danger btn-sm act" data-a="suspender" data-i="${i}"><i class="fa-solid fa-ban"></i> Suspender</button>`;
+      if (u.status === 'suspendido') btns += `<button class="btn btn-success btn-sm act" data-a="activar" data-i="${i}"><i class="fa-solid fa-circle-check"></i> Activar</button>`;
+      btns += `<button class="btn btn-ghost btn-sm act" data-a="reset" data-i="${i}" title="Resetear contraseña"><i class="fa-solid fa-key"></i></button>`;
+      if (u.status === 'pendiente') btns += `<button class="btn btn-ghost btn-sm act" data-a="reenviar" data-i="${i}" title="Reenviar invitación"><i class="fa-solid fa-paper-plane"></i></button>`;
+      return btns;
+    }
+    function render() {
+      const list = users.filter(u => (roleFilter === 'todos' || u.role === roleFilter) && (u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+      document.getElementById('rows').innerHTML = list.map((u) => {
+        const i = users.indexOf(u); const r = ROLE[u.role]; const s = STA[u.status];
+        return `<tr>
+          <td><div class="flex-center gap-8"><div class="store-avatar" style="width:30px;height:30px;font-size:12px;"><i class="fa-solid ${r.icon}"></i></div><div><div style="font-weight:700;">${u.name}</div><div class="text-xs muted">${u.email}</div></div></div></td>
+          <td><span class="badge badge-gray">${r.label}</span></td>
+          <td><span class="flex-center gap-8" style="font-weight:600;font-size:13px;"><span class="dot-status ${s.dot}"></span>${s.label}</span></td>
+          <td class="muted">${u.alta}</td>
+          <td>${u.rep === '—' ? '<span class="muted">—</span>' : `<span class="rep-badge ${u.repCls}"><i class="fa-solid ${u.repIcon}"></i> ${u.rep}</span>`}</td>
+          <td><div class="flex gap-8" style="justify-content:flex-end;">${actionsFor(u, i)}</div></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6" class="muted text-center" style="padding:24px;">Sin resultados</td></tr>';
+      document.querySelectorAll('.act').forEach(b => b.addEventListener('click', () => doAction(b.dataset.a, +b.dataset.i)));
+    }
+
+    let resetTarget = null;
+    function doAction(a, i) {
+      const u = users[i];
+      if (a === 'aprobar' || a === 'activar') { u.status = 'activo'; RAT.toast({ title: `${u.name} activado`, sub: 'Ya puede operar', icon: 'fa-circle-check', type: 'green' }); render(); }
+      else if (a === 'suspender') { u.status = 'suspendido'; RAT.toast({ title: `${u.name} suspendido`, icon: 'fa-ban', type: 'yellow' }); render(); }
+      else if (a === 'reenviar') { RAT.toast({ title: 'Invitación reenviada', sub: u.email, icon: 'fa-paper-plane', type: 'purple' }); }
+      else if (a === 'reset') {
+        resetTarget = u;
+        document.getElementById('resetName').textContent = u.name;
+        document.getElementById('resetCode').textContent = 'RAT-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        document.getElementById('resetModal').classList.add('open');
+      }
+    }
+
+    document.querySelectorAll('#roleTabs button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('#roleTabs button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); roleFilter = b.dataset.r; render();
+    }));
+    document.getElementById('search').addEventListener('input', e => { q = e.target.value.toLowerCase(); render(); });
+
+    // Invite
+    let invRole = 'seller';
+    document.getElementById('newUser').addEventListener('click', () => document.getElementById('inviteModal').classList.add('open'));
+    document.querySelectorAll('.role-pick').forEach(b => b.addEventListener('click', () => {
+      invRole = b.dataset.role;
+      document.querySelectorAll('.role-pick').forEach(x => x.classList.remove('glow'));
+      b.classList.add('glow');
+    }));
+    document.getElementById('invCancel').addEventListener('click', () => document.getElementById('inviteModal').classList.remove('open'));
+    document.getElementById('invSend').addEventListener('click', () => {
+      const name = document.getElementById('invName').value.trim(), email = document.getElementById('invEmail').value.trim();
+      if (!name || !email) { RAT.toast({ title: 'Completá nombre y email', icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+      users.unshift({ name, email, role: invRole, status: 'pendiente', alta: 'Hoy', rep: '—', repCls: 'rep-gray', repIcon: 'fa-clock' });
+      document.getElementById('inviteModal').classList.remove('open');
+      ['invName','invEmail','invPhone','invCuit','invZone'].forEach(id => document.getElementById(id).value = '');
+      roleFilter = 'todos'; document.querySelectorAll('#roleTabs button').forEach(x => x.classList.toggle('active', x.dataset.r === 'todos'));
+      render();
+      RAT.toast({ title: 'Invitación enviada', sub: `${email} · definirá su contraseña`, icon: 'fa-paper-plane', type: 'green' });
+    });
+
+    // Reset modal
+    document.getElementById('copyCode').addEventListener('click', () => RAT.toast({ title: 'Código copiado', icon: 'fa-copy', type: 'green' }));
+    document.getElementById('resetEmail').addEventListener('click', () => { document.getElementById('resetModal').classList.remove('open'); RAT.toast({ title: 'Reseteada', sub: `Enviada a ${resetTarget.name} por email`, icon: 'fa-key', type: 'green' }); });
+    document.getElementById('resetWa').addEventListener('click', () => { document.getElementById('resetModal').classList.remove('open'); RAT.toast({ title: 'Reseteada', sub: `Enviada a ${resetTarget.name} por WhatsApp`, icon: 'fa-key', type: 'green' }); });
+    document.getElementById('resetClose').addEventListener('click', () => document.getElementById('resetModal').classList.remove('open'));
+
+    document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+    render();
+  </script>
+</body>
+</html>
