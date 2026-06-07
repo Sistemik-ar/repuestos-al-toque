@@ -148,6 +148,12 @@ create table requests (
   description   text,
   urgency       urgency not null default 'ahora',
   photo_urls    text[] default '{}',
+  -- tipo de comprobante elegido por el mecánico al crear el pedido
+  invoice_type        text default 'consumidor_final',  -- 'consumidor_final' | 'factura_a'
+  invoice_emisor_name text,                              -- razón social comercio emisor (Factura A)
+  invoice_emisor_cuit text,
+  invoice_buyer_name  text,                              -- razón social solicitante (Factura A)
+  invoice_buyer_cuit  text,
   status        request_status not null default 'open',
   window_seconds int default 600,               -- 10 min
   window_ends_at timestamptz,
@@ -202,6 +208,7 @@ create table orders (
   total             numeric(12,2),
   payer             text default 'client',        -- 'client' (dueño del auto) | 'mechanic'
   status            order_status default 'paid',
+  shipment_id       uuid,                          -- envío que la agrupa (consolidación); FK más abajo
   created_at        timestamptz default now()
 );
 
@@ -219,16 +226,22 @@ create table payments (
 );
 
 -- ---------- Envíos ----------
+-- Un envío puede CONSOLIDAR varias órdenes (pedidos) del mismo mecánico, retirando
+-- de varios puntos de venta y entregando en un único destino (el taller).
+-- La relación es 1 envío → N órdenes (ver orders.shipment_id).
 create table shipments (
-  id                uuid primary key default gen_random_uuid(),
-  order_id          uuid references orders(id),
+  id                 uuid primary key default gen_random_uuid(),
+  mechanic_id        uuid references profiles(id),         -- destino (taller)
   freight_company_id uuid references freight_companies(id),
-  package_size      package_size,
-  status            shipment_status default 'pending',
-  picked_up_at      timestamptz,
-  delivered_at      timestamptz,
-  created_at        timestamptz default now()
+  package_size       package_size,
+  status             shipment_status default 'pending',
+  picked_up_at       timestamptz,
+  delivered_at       timestamptz,
+  created_at         timestamptz default now()
 );
+-- FK diferida: una orden pertenece (opcionalmente) a un envío consolidado.
+alter table orders
+  add constraint orders_shipment_fk foreign key (shipment_id) references shipments(id);
 
 -- ---------- Calificaciones ----------
 create table ratings (

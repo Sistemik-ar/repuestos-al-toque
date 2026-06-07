@@ -14,8 +14,9 @@ export default function Comercio() {
 
 function Setup({ onReady }) {
   const [name, setName] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const sug = ['Repuestos Centro', 'Andina Parts', 'Patagonia Frenos', 'Sur Repuestos'];
-  function enter(n) { const v = (n || name).trim(); if (!v) return; setSellerName(v); onReady(v); }
+  function enter() { const v = name.trim(); if (!v || !accepted) return; setSellerName(v); onReady(v); }
   return (
     <div className="app-shell">
       <div className="container" style={{ paddingTop: 40 }}>
@@ -25,8 +26,12 @@ function Setup({ onReady }) {
           <p className="text-sm muted">Así aparecés ante la plataforma (el mecánico te ve anónimo).</p>
         </div>
         <div className="field"><input className="input" placeholder="Nombre del comercio" value={name} onChange={(e) => setName(e.target.value)} /></div>
-        <div className="chip-row mb-16">{sug.map((s) => <button key={s} className="chip" onClick={() => enter(s)}>{s}</button>)}</div>
-        <button className="btn btn-yellow btn-block btn-lg" disabled={!name.trim()} onClick={() => enter()}>Entrar</button>
+        <div className="chip-row mb-16">{sug.map((s) => <button key={s} className="chip" onClick={() => setName(s)}>{s}</button>)}</div>
+        <label className="flex-center gap-8 mb-16" style={{ cursor: 'pointer' }}>
+          <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} style={{ width: 18, height: 18 }} />
+          <span className="text-sm subtle">Acepto los <Link href="/terminos" className="text-purple" style={{ fontWeight: 600 }}>Términos y Condiciones</Link></span>
+        </label>
+        <button className="btn btn-yellow btn-block btn-lg" disabled={!name.trim() || !accepted} onClick={enter}>Entrar</button>
       </div>
     </div>
   );
@@ -124,12 +129,20 @@ function Panel({ store, onChange }) {
                   <span className="badge badge-gray">#{r.id}</span>
                 </div>
                 <div className="flex-between mb-12">
-                  <div className="flex-center gap-8">
+                  <div className="flex-center gap-8" style={{ flexWrap: 'wrap' }}>
                     <span className="badge badge-gray"><i className="fa-solid fa-layer-group"></i> {r.catLabel}</span>
+                    <span className="badge badge-gray"><i className="fa-solid fa-file-invoice"></i> {r.invoiceType === 'factura_a' ? 'Factura A' : 'Cons. Final'}</span>
                     {r.urgency === 'Necesito ahora' && <span className="badge badge-red"><i className="fa-solid fa-bolt"></i> Urgente</span>}
                   </div>
                   {r.photo && <span className="badge badge-purple"><i className="fa-solid fa-image"></i> con foto</span>}
                 </div>
+
+                {r.invoiceType === 'factura_a' && (
+                  <div className="float-notif mb-12" style={{ padding: '10px 12px' }}>
+                    <i className="fa-solid fa-file-invoice text-yellow"></i>
+                    <div className="text-xs subtle"><b>Factura A.</b> Emisor: {r.emisorRazon} (CUIT {r.emisorCuit}) · Solicitante: {r.solicRazon} (CUIT {r.solicCuit})</div>
+                  </div>
+                )}
 
                 {r.extraInfo && (
                   <div className="float-notif mb-12" style={{ padding: '10px 12px' }}>

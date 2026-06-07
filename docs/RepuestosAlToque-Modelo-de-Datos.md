@@ -36,7 +36,7 @@ Repartidores individuales, **cargados a mano** por los admins (1‑a‑1 con pro
 Categorías de repuesto (Frenos, Motor…) y catálogo de marcas/modelos (las 24 marcas AR).
 
 ### 6. requests (pedidos del mecánico)
-Código legible (#1042), mecánico, vehículo (marca/modelo/año/VIN), categoría, descripción, **urgencia** (ahora/hoy/mañana), **fotos**, estado (open→closed→paid→shipped→delivered), ventana de cotización (segundos + cierre), e **info extra** (respuesta del mecánico cuando el vendedor pide datos).
+**Cada pedido es por un solo producto.** Código legible (#1042), mecánico, vehículo (marca/modelo/año/VIN), categoría, descripción, **urgencia** (ahora/hoy/mañana), **fotos**, **tipo de factura** (Consumidor Final o Factura A — con razón social y CUIT del comercio emisor y del solicitante), estado (open→closed→paid→shipped→delivered), ventana de cotización (segundos + cierre), e **info extra** (respuesta del mecánico cuando el vendedor pide datos).
 
 ### 7. info_requests (vendedor pide más info)
 Preguntas predefinidas + texto que un vendedor le hace al mecánico sobre un pedido, y si fue respondida.
@@ -51,7 +51,7 @@ Pedido + cotización elegida + mecánico + vendedor, con el desglose del dinero:
 Pago asociado a la orden: id de MP, estado, monto, **split** (vendedor / comisión / flete) y el payload crudo del webhook.
 
 ### 11. shipments (envío)
-Orden + empresa de fletes + tamaño de paquete + estado (pendiente→retirado→en camino→entregado). El "salió el pedido" del vendedor pasa el envío a *retirado*.
+Agrupa **una o varias órdenes** del mismo mecánico (**consolidación**): puede retirar de **varios puntos de venta** y entregar en un único destino (el taller). Empresa de fletes, tamaño de paquete, estado (pendiente→retirado→en camino→entregado). El "salió el pedido" del vendedor pasa el envío a *retirado*.
 
 ### 12. ratings (calificaciones bidireccionales)
 Por orden: de quién, a quién, estrellas (1–5), comentario. Alimenta la reputación de `profiles`.
@@ -70,7 +70,8 @@ Quién (de los 4 admins) hizo qué cambio y cuándo. Útil siendo varios adminis
 - `stores` N—N `categories` (vía `store_categories`).
 - `requests` N—1 `mechanics`; `requests` 1—N `quotes`; `quotes` N—1 `stores`.
 - `requests` 1—N `info_requests`.
-- `orders` 1—1 `request` y `quote`; `orders` 1—1 `payment`; `orders` 1—1 `shipment`; `orders` 1—N `ratings`.
+- `orders` 1—1 `request` y `quote`; `orders` 1—1 `payment`; `orders` 1—N `ratings`.
+- `shipments` 1—N `orders` (un envío **consolida** varias órdenes / puntos de retiro).
 - `freight_companies` 1—N `freight_tariffs`; `shipments` N—1 `freight_companies`.
 - `ads` N—1 `stores`.
 

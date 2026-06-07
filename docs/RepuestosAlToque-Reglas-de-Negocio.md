@@ -16,22 +16,23 @@ Cada frase describe una regla del producto. Sirve para chequear que el modelo de
 - Un vendedor pertenece a un comercio (nombre, razón social, CUIT, IVA, dirección, barrio, cuenta MP). ✅
 - Un repartidor puede pertenecer a una empresa de fletes. ✅
 - Cada usuario ve solo lo suyo; los administradores ven todo. ✅
+- Al ingresar por primera vez, el usuario acepta los **términos y condiciones**. ✅
 
 ## Pedidos
 - Un mecánico crea pedidos. ✅
-- **Un pedido puede incluir varios productos distintos (ej: 5).** ⚠️🔵 *(hoy el modelo tiene 1 pieza por pedido → requiere `request_items`)*
-- Cada producto del pedido tiene categoría, descripción, cantidad y fotos. ⚠️ *(hoy a nivel pedido)*
+- **Cada pedido es por un solo producto.** ✅ *(decisión tomada)*
 - Un pedido es para un vehículo (marca/modelo/año/VIN opcional). ✅
 - Un pedido tiene una urgencia (necesito ahora / hoy / mañana). ✅
+- Al crear el pedido, el mecánico elige el **tipo de factura**: Consumidor Final o Factura A (con razón social y CUIT del comercio emisor y del solicitante). ✅
 - Un pedido recibe ofertas durante una ventana de 10 minutos. ✅
 - Las ofertas no se ven hasta que cierra la ventana; entran todas juntas. ✅
 - Si no llega ninguna oferta, el pedido se puede reintentar en otra ventana. ✅
 - El mecánico puede adjuntar fotos al pedido. ✅
-- **El mecánico puede pedir que todo llegue en un mismo envío**, aunque sean de varios vendedores. ⚠️🔵 *(requiere agrupar envío)*
+- **Varios pedidos se pueden consolidar en un mismo envío**, retirando de **distintos puntos de venta**. ✅ *(decisión tomada)*
 
 ## Cotizaciones
 - Varios vendedores pueden cotizar un mismo pedido. ✅
-- Un vendedor cotiza por producto (si el pedido tiene varios). ⚠️ *(depende de `request_items`)*
+- Cada cotización corresponde a un pedido (un producto). ✅
 - Un vendedor puede ofrecer más de una opción (A/B) para lo mismo. ✅
 - Una cotización tiene precio, marca de pieza, garantía, nota y hasta 3 fotos. ✅
 - Las cotizaciones se ordenan por la calificación del vendedor. ✅
@@ -45,8 +46,8 @@ Cada frase describe una regla del producto. Sirve para chequear que el modelo de
 - La identidad real se revela al concretarse la venta (o con el remito). ✅
 
 ## Selección, pago y comisión
-- El mecánico elige una cotización. ✅ *(por producto si el pedido es multi‑producto)* ⚠️
-- **Si el pedido tiene varios productos, puede elegir distinto vendedor para cada uno.** ⚠️🔵
+- El mecánico elige una cotización por pedido. ✅
+- El mecánico puede comprarle a **distintos vendedores** (un pedido a cada uno) y **unificar el envío**. ✅
 - Paga el cliente (dueño del auto) o el mecánico; la comisión la paga el cliente. ✅
 - La comisión es 5% del precio del repuesto. ✅
 - El pago es por Mercado Pago y se reparte automático: repuesto al vendedor, comisión a la plataforma. ✅
@@ -55,9 +56,9 @@ Cada frase describe una regla del producto. Sirve para chequear que el modelo de
 - Cada venta deriva en factura del vendedor al cliente y factura de la plataforma por la comisión. ✅ *(facturación fuera del sistema)*
 
 ## Envío (flete tercerizado)
-- Cada venta concretada genera un envío. ✅
-- **Un envío puede consolidar varios productos** (incluso de varios vendedores) en un solo flete. ⚠️🔵
-- **Un envío puede retirar de uno o varios puntos de venta** y entregar en el taller. ⚠️🔵
+- Cada venta concretada genera (o se suma a) un envío. ✅
+- **Un envío puede consolidar varios pedidos** (incluso de varios vendedores) en un solo flete. ✅ *(decisión tomada)*
+- **Un envío puede retirar de uno o varios puntos de venta** y entregar en el taller. ✅ *(decisión tomada)*
 - El vendedor marca "salió el pedido"; la empresa de fletes retira y entrega. ✅
 - El envío pasa por estados: preparando → retirado → en camino → entregado. ✅
 - El tamaño del paquete (moto/auto/utilitario) define el tipo de vehículo del flete. ✅
@@ -82,14 +83,13 @@ Cada frase describe una regla del producto. Sirve para chequear que el modelo de
 
 ---
 
-## Decisiones clave a confirmar (y su impacto en el modelo)
+## Decisiones ya tomadas
+- **Cada pedido es por un solo producto** (no es un carrito).
+- **Varios pedidos se consolidan en un envío** que retira de distintos puntos de venta y entrega en el taller.
+- **Tipo de factura** en el pedido (Consumidor Final / Factura A).
 
-1. **¿Un pedido es 1 producto o varios (carrito)?** — Es el cambio más grande. Si es multi‑producto, se agrega `request_items` (cada ítem con categoría/descripción/cantidad/fotos) y las cotizaciones pasan a ser **por ítem**.
-2. **¿Se puede elegir distinto vendedor por producto?** — Si sí, una `order` agrupa ítems de varios vendedores (y el split de MP reparte a cada uno).
-3. **¿Envío consolidado con varios retiros?** — Un `shipment` con múltiples puntos de retiro → una entrega en el taller.
-4. **¿El flete cómo se cobra y se le paga a la empresa?** (la 3ra pata).
-5. **¿"Sin disponibilidad" se registra** para medir el comportamiento del comercio?
-6. **¿Cómo se cobra la publicidad?**
-
-> Si vamos a multi‑producto (1‑3), el modelo evoluciona así (resumen):
-> `requests` (el pedido/carrito) → `request_items` (cada producto) → `quotes` por ítem → `order_items` (lo elegido, posiblemente de distintos vendedores) → `shipment` que agrupa ítems en un flete.
+## Decisiones que faltan confirmar
+1. **¿El flete cómo se cobra y se le paga a la empresa de envíos?** (la 3ra pata del pago).
+2. **¿"Sin disponibilidad" se registra** para medir el comportamiento del comercio?
+3. **¿Cómo se cobra la publicidad?**
+4. **Términos y condiciones:** revisar el texto (el que está en el grupo de WhatsApp) y validar que no falte nada — ver checklist propuesto.

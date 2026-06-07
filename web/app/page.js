@@ -83,7 +83,10 @@ export default function Home() {
           </Link>
         </div>
 
-        <p className="text-center text-xs muted mt-24">Prototipo · Bariloche · v0.1 (Next + Supabase)</p>
+        <p className="text-center text-xs muted mt-24">
+          Prototipo · Bariloche · v0.1<br />
+          <Link href="/terminos" className="text-purple" style={{ fontWeight: 600 }}>Términos y Condiciones</Link>
+        </p>
       </div>
     </div>
   );

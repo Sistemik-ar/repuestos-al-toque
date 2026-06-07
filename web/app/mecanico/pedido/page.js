@@ -13,7 +13,7 @@ const labels = ['Vehículo', 'Categoría', 'Descripción', 'Urgencia', 'Confirma
 export default function Pedido() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photo: false });
+  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photo: false, invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
   const [searching, setSearching] = useState(false);
   const [prog, setProg] = useState(5);
 
@@ -21,12 +21,20 @@ export default function Pedido() {
   const needsOther = st.brand && (models.length === 0 || st.model === 'Otro');
   const set = (patch) => setSt((s) => ({ ...s, ...patch }));
 
+  const cuitOk = (v) => /^\d{11}$/.test(String(v || '').replace(/\D/g, ''));
+  const step3Valid = st.invoiceType !== 'factura_a' ||
+    (st.emisorRazon.trim() && cuitOk(st.emisorCuit) && st.solicRazon.trim() && cuitOk(st.solicCuit));
+
   function quickVehicle(b, m, y) {
     set({ brand: b, model: m, year: y, modelOther: '' });
     toast({ title: `${b} ${m}`, sub: 'Vehículo cargado', icon: 'fa-car', type: 'purple', duration: 1800 });
   }
 
   function next() {
+    if (step === 3 && !step3Valid) {
+      toast({ title: 'Completá los datos de Factura A', sub: 'Razón social y CUIT (11 dígitos) en ambos bloques', icon: 'fa-triangle-exclamation', type: 'yellow' });
+      return;
+    }
     if (step < 5) { setStep(step + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else submit();
   }
@@ -144,6 +152,8 @@ export default function Pedido() {
                 </div>
               )}
             </div>
+
+            <InvoiceSection st={st} set={set} />
           </div>
         )}
 
@@ -176,7 +186,8 @@ export default function Pedido() {
               <Row icon="fa-car" label="Vehículo" value={`${st.brand || 'Toyota'} ${(needsOther ? st.modelOther : st.model) || 'Hilux'} ${st.year || '2019'}`} />
               <Row icon="fa-layer-group" label="Categoría" value={st.catLabel || 'Frenos'} />
               <Row icon="fa-align-left" label="Detalle" value={st.desc || 'Pastillas de freno delanteras'} />
-              <Row icon="fa-bolt" label="Urgencia" value={st.urgency} last />
+              <Row icon="fa-bolt" label="Urgencia" value={st.urgency} />
+              <Row icon="fa-file-invoice" label="Factura" value={st.invoiceType === 'factura_a' ? 'Factura A' : 'Consumidor Final'} last />
             </div>
             <div className="float-notif">
               <i className="fa-solid fa-circle-info text-purple"></i>
@@ -190,7 +201,7 @@ export default function Pedido() {
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '14px 16px', background: 'linear-gradient(0deg,var(--bg-0),transparent)' }}>
         <div className="flex gap-12">
           {step > 1 && <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={() => setStep(step - 1)}><i className="fa-solid fa-arrow-left"></i></button>}
-          <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} onClick={next}>
+          <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} disabled={step === 3 && !step3Valid} onClick={next}>
             {step === 5 ? <><i className="fa-solid fa-paper-plane"></i> Enviar pedido</> : <>Continuar <i className="fa-solid fa-arrow-right"></i></>}
           </button>
         </div>
@@ -205,6 +216,54 @@ export default function Pedido() {
           <h2 className="h-lg mb-8">Buscando casas de repuestos cercanas…</h2>
           <p className="subtle mb-16">Notificando comercios de {st.catLabel || 'Frenos'} en Bariloche</p>
           <div style={{ width: 220 }} className="progress-track"><div className="progress-fill" style={{ width: prog + '%' }}></div></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvoiceSection({ st, set }) {
+  const cuitErr = (v) => v && !/^\d{11}$/.test(String(v).replace(/\D/g, ''));
+  return (
+    <div className="field">
+      <label>Tipo de factura *</label>
+      <div className="grid-2 mb-12">
+        <button type="button" className={`card hoverable text-center ${st.invoiceType === 'consumidor_final' ? 'glow' : ''}`} style={{ cursor: 'pointer', padding: '14px 8px' }} onClick={() => set({ invoiceType: 'consumidor_final' })}>
+          <i className="fa-solid fa-user text-purple" style={{ fontSize: 18 }}></i>
+          <div className="text-sm mt-8" style={{ fontWeight: 700 }}>Consumidor Final</div>
+        </button>
+        <button type="button" className={`card hoverable text-center ${st.invoiceType === 'factura_a' ? 'glow' : ''}`} style={{ cursor: 'pointer', padding: '14px 8px' }} onClick={() => set({ invoiceType: 'factura_a' })}>
+          <i className="fa-solid fa-file-invoice text-yellow" style={{ fontSize: 18 }}></i>
+          <div className="text-sm mt-8" style={{ fontWeight: 700 }}>Factura A</div>
+        </button>
+      </div>
+
+      {st.invoiceType === 'factura_a' && (
+        <div className="animate-in">
+          <div className="card mb-12">
+            <div className="eyebrow mb-8">Datos del comercio emisor</div>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Razón Social</label>
+              <input className="input" value={st.emisorRazon} onChange={(e) => set({ emisorRazon: e.target.value })} placeholder="Razón social del comercio" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>CUIT</label>
+              <input className="input" inputMode="numeric" value={st.emisorCuit} onChange={(e) => set({ emisorCuit: e.target.value })} placeholder="11 dígitos" />
+              {cuitErr(st.emisorCuit) && <div className="text-xs text-red mt-4">El CUIT debe tener 11 dígitos</div>}
+            </div>
+          </div>
+          <div className="card mb-12">
+            <div className="eyebrow mb-8">Datos del solicitante de la factura</div>
+            <div className="field" style={{ marginBottom: 10 }}>
+              <label>Razón Social</label>
+              <input className="input" value={st.solicRazon} onChange={(e) => set({ solicRazon: e.target.value })} placeholder="Razón social del solicitante" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>CUIT</label>
+              <input className="input" inputMode="numeric" value={st.solicCuit} onChange={(e) => set({ solicCuit: e.target.value })} placeholder="11 dígitos" />
+              {cuitErr(st.solicCuit) && <div className="text-xs text-red mt-4">El CUIT debe tener 11 dígitos</div>}
+            </div>
+          </div>
         </div>
       )}
     </div>
