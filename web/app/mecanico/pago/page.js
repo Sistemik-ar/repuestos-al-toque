@@ -36,7 +36,8 @@ export default function Pago() {
 
   const part = q.price;
   const fee = Math.round(part * 0.05); // comisión 5% (la paga el cliente)
-  const total = part + fee;
+  const ship = 3500; // envío estimado (empresa de fletes)
+  const total = part + fee + ship;
 
   function pay() {
     if (payMode === 'link') {
@@ -94,9 +95,10 @@ export default function Pago() {
           <div className="card mb-16">
             <div className="flex-between mb-12"><span className="subtle">Repuesto ({q.partBrand})</span><span style={{ fontWeight: 700 }}>{money(part)}</span></div>
             <div className="flex-between mb-12"><span className="subtle">Comisión RepuestosAlToque <span className="badge badge-purple" style={{ marginLeft: 4 }}>5%</span></span><span style={{ fontWeight: 700 }}>{money(fee)}</span></div>
+            <div className="flex-between mb-12"><span className="subtle">Envío <span className="text-xs muted">(empresa de fletes)</span></span><span style={{ fontWeight: 700 }}>{money(ship)}</span></div>
             <div className="divider"></div>
             <div className="flex-between"><span className="h-md">Total</span><span className="h-md text-yellow">{money(total)}</span></div>
-            <div className="text-xs muted mt-8"><i className="fa-solid fa-truck-fast"></i> El flete lo coordina la empresa de envíos (se abona según tarifa).</div>
+            <div className="text-xs muted mt-8"><i className="fa-solid fa-truck-fast"></i> Tarifa de envío estimada; puede variar según zona y tamaño del paquete.</div>
           </div>
 
           <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, borderColor: 'rgba(0,158,227,0.4)' }}>

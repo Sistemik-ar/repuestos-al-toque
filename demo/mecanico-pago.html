@@ -48,9 +48,10 @@
       <div class="card mb-16">
         <div class="flex-between mb-12"><span class="subtle">Repuesto (<span id="qBrand2">Ferodo</span>)</span><span style="font-weight:700;" id="dPart">$39.900</span></div>
         <div class="flex-between mb-12"><span class="subtle">Comisión RepuestosAlToque <span class="badge badge-purple" style="margin-left:4px;">5%</span></span><span style="font-weight:700;" id="dFee">$1.995</span></div>
+        <div class="flex-between mb-12"><span class="subtle">Envío <span class="text-xs muted">(empresa de fletes)</span></span><span style="font-weight:700;" id="dShip">$3.500</span></div>
         <div class="divider"></div>
-        <div class="flex-between"><span class="h-md">Total</span><span class="h-md text-yellow" id="dTotal">$41.895</span></div>
-        <div class="text-xs muted mt-8"><i class="fa-solid fa-truck-fast"></i> El flete lo coordina la empresa de envíos (se abona según tarifa).</div>
+        <div class="flex-between"><span class="h-md">Total</span><span class="h-md text-yellow" id="dTotal">$45.395</span></div>
+        <div class="text-xs muted mt-8"><i class="fa-solid fa-truck-fast"></i> Tarifa de envío estimada; puede variar según zona y tamaño del paquete.</div>
       </div>
 
       <div class="card mb-16" style="display:flex;align-items:center;gap:12px;border-color:rgba(0,158,227,0.4);">
@@ -113,13 +114,14 @@
     if (!q) q = RAT.data.quotePool[2]; // Patagonia Frenos $39900 por defecto
     let payMode = 'self';
 
-    const part = q.price, fee = Math.round(part * 0.05), total = part + fee;
+    const part = q.price, fee = Math.round(part * 0.05), ship = 3500, total = part + fee + ship;
     document.getElementById('qAlias').textContent = q.alias;
     document.getElementById('qBrand').textContent = q.partBrand;
     document.getElementById('qBrand2').textContent = q.partBrand;
     document.getElementById('qWarr').textContent = q.warranty;
     document.getElementById('dPart').textContent = RAT.money(part);
     document.getElementById('dFee').textContent = RAT.money(fee);
+    document.getElementById('dShip').textContent = RAT.money(ship);
     document.getElementById('dTotal').textContent = RAT.money(total);
     document.getElementById('dTotal2').textContent = RAT.money(total);
     document.getElementById('realName').textContent = q.real.name;
