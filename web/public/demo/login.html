@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/demo/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ingresar — RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .login-split { min-height: 100vh; display: grid; grid-template-columns: 1fr; }
+    .login-aside { display: none; }
+    .login-main { display: flex; align-items: center; justify-content: center; padding: 28px 20px; }
+    .login-card { width: 100%; max-width: 400px; }
+    .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .role-opt { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--border); cursor: pointer; transition: all .15s ease; }
+    .role-opt:hover { border-color: var(--border-strong); }
+    .role-opt.on { border-color: var(--purple); background: rgba(109,40,217,0.12); box-shadow: 0 0 0 1px var(--purple); }
+    .role-opt .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; font-size: 15px; }
+    .role-opt .lbl { font-size: 13px; font-weight: 700; }
+    .pw-wrap { position: relative; }
+    .pw-wrap .toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-2); cursor: pointer; background: none; border: none; font-size: 15px; }
+    @media (min-width: 920px) {
+      .login-split { grid-template-columns: 1.05fr 0.95fr; }
+      .login-aside { display: flex; flex-direction: column; justify-content: space-between; padding: 44px; position: relative; overflow: hidden; border-right: 1px solid var(--border);
+        background: radial-gradient(900px 500px at 20% 10%, rgba(109,40,217,0.25), transparent 60%), radial-gradient(700px 400px at 90% 90%, rgba(250,204,21,0.08), transparent 55%); }
+    }
+    .aside-quote-card { background: linear-gradient(180deg, rgba(31,41,55,0.7), rgba(17,24,39,0.5)); border: 1px solid var(--border); border-radius: 20px; padding: 20px; }
+  </style>
+</head>
+<body>
+  <div class="login-split">
+    <!-- ASIDE (desktop) -->
+    <aside class="login-aside">
+      <a href="index.html" class="brand" style="display:flex;align-items:center;gap:10px;font-weight:800;">
+        <span class="logo-mark" style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--purple-light));display:grid;place-items:center;box-shadow:var(--shadow-glow);"><i class="fa-solid fa-gear"></i></span>
+        <span>RepuestosAlToque <small style="display:block;font-size:11px;color:var(--text-2);font-weight:600;">Bariloche · Patagonia</small></span>
+      </a>
+      <div>
+        <div class="badge badge-yellow mb-16"><i class="fa-solid fa-bolt"></i> Repuestos en minutos</div>
+        <h1 class="h-xl" style="font-size:38px;max-width:420px;">Conectá tu taller con las casas de repuestos de Bariloche.</h1>
+        <div class="aside-quote-card mt-24" style="max-width:380px;">
+          <div class="flex-center gap-12 mb-12">
+            <div class="store-avatar" style="background:rgba(109,40,217,0.2);"><i class="fa-solid fa-quote-left"></i></div>
+            <div><div style="font-weight:700;">"Antes perdía media mañana al teléfono."</div></div>
+          </div>
+          <div class="text-sm muted">Ahora cargo el pedido, sigo trabajando y en 10 minutos tengo las ofertas. Elijo y listo.</div>
+          <div class="text-xs muted mt-12">— Mecánico, Taller Patagonia</div>
+        </div>
+      </div>
+      <div class="text-xs muted">Onboarding manual · cada usuario entra por invitación.</div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="login-main">
+      <div class="login-card">
+        <a href="index.html" class="brand" style="display:flex;align-items:center;gap:10px;font-weight:800;margin-bottom:28px;">
+          <span class="logo-mark" style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--purple-light));display:grid;place-items:center;box-shadow:var(--shadow-glow);"><i class="fa-solid fa-gear"></i></span>
+          <span>RepuestosAlToque</span>
+        </a>
+
+        <span class="badge badge-yellow mb-12"><i class="fa-solid fa-flask"></i> Modo demo · datos simulados</span>
+        <h2 class="h-lg mb-4">Ingresá a tu cuenta</h2>
+        <p class="text-sm muted mb-24">Elegí cualquier rol y recorré el flujo completo. Email y contraseña ya cargados.</p>
+
+        <form id="loginForm" autocomplete="off">
+          <div class="field">
+            <label>Email</label>
+            <input class="input" type="email" id="email" placeholder="tu@email.com" value="demo@repuestosaltoque.com" />
+          </div>
+          <div class="field">
+            <label>Contraseña</label>
+            <div class="pw-wrap">
+              <input class="input" type="password" id="pass" placeholder="••••••••" value="demo1234" />
+              <button type="button" class="toggle" id="pwToggle" aria-label="Mostrar contraseña"><i class="fa-solid fa-eye"></i></button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Entrar como <span class="muted">(demo · en producción viene de tu cuenta)</span></label>
+            <div class="role-grid">
+              <div class="role-opt on" data-role="mecanico" data-href="mecanico-dashboard.html">
+                <span class="ic" style="background:rgba(109,40,217,0.2);color:var(--purple-light);"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+                <span class="lbl">Mecánico</span>
+              </div>
+              <div class="role-opt" data-role="comercio" data-href="comercio.html">
+                <span class="ic" style="background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></span>
+                <span class="lbl">Casa de repuestos</span>
+              </div>
+              <div class="role-opt" data-role="repartidor" data-href="repartidor.html">
+                <span class="ic" style="background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-truck-fast"></i></span>
+                <span class="lbl">Repartidor</span>
+              </div>
+              <div class="role-opt" data-role="admin" data-href="admin.html">
+                <span class="ic" style="background:rgba(255,255,255,0.1);color:#fff;"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="lbl">Backoffice</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-between mb-16">
+            <label class="flex-center gap-8 text-sm subtle" style="cursor:pointer;">
+              <input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--purple);" /> Recordarme
+            </label>
+            <a href="#" class="text-sm text-purple" style="font-weight:600;" id="forgot">¿Olvidaste la contraseña?</a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg"><i class="fa-solid fa-right-to-bracket"></i> Ingresar</button>
+        </form>
+
+        <div class="float-notif mt-24">
+          <i class="fa-solid fa-circle-info text-purple"></i>
+          <div class="text-xs subtle">¿No tenés cuenta? El alta es manual: un administrador te invita y vos definís tu contraseña.</div>
+        </div>
+
+        <p class="text-center text-xs muted mt-24">
+          Al ingresar aceptás los <a href="terminos.html" class="text-purple" style="font-weight:600;">Términos y Condiciones</a>
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let dest = 'mecanico-dashboard.html';
+    document.querySelectorAll('.role-opt').forEach((opt) => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.role-opt').forEach((o) => o.classList.remove('on'));
+        opt.classList.add('on');
+        dest = opt.getAttribute('data-href');
+      });
+    });
+    document.getElementById('pwToggle').addEventListener('click', () => {
+      const p = document.getElementById('pass');
+      const isPw = p.type === 'password';
+      p.type = isPw ? 'text' : 'password';
+      document.querySelector('#pwToggle i').className = isPw ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    });
+    document.getElementById('forgot').addEventListener('click', (e) => {
+      e.preventDefault();
+      RAT.toast({ title: 'Recuperación enviada', sub: 'Te mandamos un link por email para resetear la contraseña', icon: 'fa-envelope', type: 'green' });
+    });
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type=submit]');
+      btn.innerHTML = '<span class="spinner"></span> Ingresando…';
+      btn.disabled = true;
+      setTimeout(() => { window.location.href = dest; }, 700);
+    });
+  </script>
+</body>
+</html>

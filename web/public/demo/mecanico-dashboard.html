@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/demo/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inicio — Mecánico · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="index.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></a>
+          <div class="topbar-actions">
+            <button class="icon-btn" id="bell"><span class="dot"></span><i class="fa-regular fa-bell"></i></button>
+            <div class="avatar">MP</div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="mb-16">
+            <div class="eyebrow">Taller Patagonia</div>
+            <h1 class="h-lg">Buenas, Martín 👋</h1>
+            <p class="text-sm muted">¿Qué repuesto necesitás hoy?</p>
+          </div>
+
+          <!-- Reputación -->
+          <div class="card glow mb-16" style="background:linear-gradient(135deg,rgba(109,40,217,0.28),rgba(31,41,55,0.6));">
+            <div class="flex-between mb-12">
+              <div class="flex-center gap-12">
+                <div class="avatar" style="width:46px;height:46px;font-size:16px;">MP</div>
+                <div>
+                  <div style="font-weight:800;">Taller Patagonia</div>
+                  <div class="mt-4"><span class="rep-badge rep-elite"><i class="fa-solid fa-bolt"></i> Mecánico Elite</span></div>
+                </div>
+              </div>
+              <div class="text-right"><div class="text-xs muted">Puntos</div><div class="h-md text-yellow">2.540</div></div>
+            </div>
+            <div class="rep-stats card" style="background:var(--bg-1);padding:12px;">
+              <div><div class="v">127</div><div class="l">Operaciones</div></div>
+              <div><div class="v">⭐ 4.9</div><div class="l">Calificación</div></div>
+              <div><div class="v">96</div><div class="l">Reseñas</div></div>
+            </div>
+          </div>
+
+          <!-- CTA -->
+          <a href="mecanico-pedido.html" class="card glow hoverable mb-24" style="display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,rgba(109,40,217,0.35),rgba(31,41,55,0.7));">
+            <div class="store-avatar" style="background:var(--yellow);color:#0B0B0F;"><i class="fa-solid fa-bolt"></i></div>
+            <div style="flex:1;">
+              <div class="h-md">Solicitar Repuesto</div>
+              <div class="text-sm subtle">Recibí cotizaciones en minutos</div>
+            </div>
+            <i class="fa-solid fa-arrow-right"></i>
+          </a>
+
+          <div class="dash-grid" style="align-items:start;">
+            <div class="col-span-2">
+              <!-- Pedidos activos -->
+              <div class="section">
+                <div class="section-title"><h2>Pedidos activos</h2><a href="mecanico-historial.html">Ver todos</a></div>
+
+                <a href="mecanico-cotizaciones.html" class="card hoverable mb-12" style="display:block;">
+                  <div class="flex-between mb-8">
+                    <div class="flex-center">
+                      <div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-record-vinyl"></i></div>
+                      <div>
+                        <div class="text-sm" style="font-weight:700;">Pastillas de freno delanteras</div>
+                        <div class="text-xs muted">Toyota Hilux 2019 · Frenos</div>
+                      </div>
+                    </div>
+                    <span class="badge badge-yellow"><i class="fa-solid fa-tower-broadcast"></i> Cotizando</span>
+                  </div>
+                  <div class="flex-between">
+                    <span class="badge badge-red"><i class="fa-solid fa-bolt"></i> Necesito ahora</span>
+                    <span class="text-xs text-purple" style="font-weight:700;">3 ofertas · cierra en 07:42 →</span>
+                  </div>
+                </a>
+
+                <a href="mecanico-cotizaciones.html" class="card hoverable mb-12" style="display:block;">
+                  <div class="flex-between mb-8">
+                    <div class="flex-center">
+                      <div class="store-avatar" style="width:38px;height:38px;"><i class="fa-solid fa-gears"></i></div>
+                      <div>
+                        <div class="text-sm" style="font-weight:700;">Kit de embrague</div>
+                        <div class="text-xs muted">VW Amarok 2021 · Embrague</div>
+                      </div>
+                    </div>
+                    <span class="badge badge-purple">#1043</span>
+                  </div>
+                  <div class="flex-between">
+                    <span class="badge badge-yellow"><i class="fa-solid fa-sun"></i> Hoy</span>
+                    <span class="text-xs text-purple" style="font-weight:700;">Esperando ofertas →</span>
+                  </div>
+                </a>
+              </div>
+
+              <!-- A coordinar / envíos -->
+              <div class="section">
+                <div class="section-title"><h2>A coordinar</h2><a href="mecanico-seguimiento.html">Seguir envío</a></div>
+                <a href="mecanico-seguimiento.html" class="card hoverable" style="display:block;">
+                  <div class="flex-between mb-12">
+                    <div class="text-sm" style="font-weight:700;">Bomba de agua · #1039</div>
+                    <span class="badge badge-green"><i class="fa-solid fa-check"></i> Pagado</span>
+                  </div>
+                  <div class="flex-between">
+                    <span class="text-xs muted">Repuestos Centro · llega con remito</span>
+                    <span class="badge badge-yellow"><i class="fa-solid fa-truck-fast"></i> En reparto</span>
+                  </div>
+                </a>
+              </div>
+            </div>
+
+            <!-- Lateral: promos + acceso rápido -->
+            <div class="col-span-2">
+              <div class="section">
+                <div class="section-title"><h2>Ofertas de comercios</h2><span class="text-xs muted">patrocinado</span></div>
+                <div class="promo-card mb-12">
+                  <div class="promo-img" style="background:linear-gradient(135deg,#6D28D9,#8B5CF6);"><i class="fa-solid fa-record-vinyl"></i></div>
+                  <div style="flex:1;"><div class="text-sm" style="font-weight:700;">Repuestos Centro</div><div class="text-xs muted">20% OFF en frenos esta semana</div></div>
+                  <span class="promo-tag">Aviso</span>
+                </div>
+                <div class="promo-card">
+                  <div class="promo-img" style="background:linear-gradient(135deg,#EAB308,#FACC15);"><i class="fa-solid fa-oil-can"></i></div>
+                  <div style="flex:1;"><div class="text-sm" style="font-weight:700;">Andina Parts</div><div class="text-xs muted">15% OFF en lubricantes</div></div>
+                  <span class="promo-tag">Aviso</span>
+                </div>
+              </div>
+
+              <div class="section">
+                <div class="section-title"><h2>Accesos rápidos</h2></div>
+                <div class="grid-2">
+                  <a href="mecanico-historial.html" class="card hoverable text-center" style="padding:18px 8px;"><i class="fa-solid fa-clock-rotate-left text-purple" style="font-size:20px;"></i><div class="text-sm mt-8" style="font-weight:700;">Historial</div></a>
+                  <a href="mecanico-perfil.html" class="card hoverable text-center" style="padding:18px 8px;"><i class="fa-solid fa-user text-purple" style="font-size:20px;"></i><div class="text-sm mt-8" style="font-weight:700;">Mi perfil</div></a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('mecanico', 'inicio');
+    document.getElementById('bell').addEventListener('click', () => RAT.toast({ title: 'Tenés 3 ofertas nuevas', sub: 'En tu pedido de pastillas de freno', icon: 'fa-bell', type: 'yellow' }));
+  </script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/demo/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pago — Mecánico · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .flow { max-width: 620px; margin: 0 auto; min-height: 100vh; padding-bottom: 100px; }
+    .flow-foot { position: fixed; bottom: 0; left: 0; right: 0; padding: 14px 16px; background: linear-gradient(0deg, var(--bg-0) 60%, transparent); }
+    .flow-foot .inner { max-width: 620px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="flow">
+    <div class="topbar">
+      <div class="flex-center">
+        <a href="mecanico-cotizaciones.html" class="icon-btn"><i class="fa-solid fa-arrow-left"></i></a>
+        <div><div style="font-weight:800;" id="topTitle">Confirmar y pagar</div><div class="text-xs muted">Pedido #1044</div></div>
+      </div>
+      <div class="flex-center gap-8"><i class="fa-solid fa-lock text-green"></i><span class="text-xs muted">Pago seguro</span></div>
+    </div>
+
+    <!-- PRE -->
+    <div class="container" id="pre">
+      <div class="section-title"><h2>Oferta elegida</h2></div>
+      <div class="card mb-16">
+        <div class="flex-between mb-12">
+          <div class="flex-center gap-12">
+            <div class="store-avatar"><i class="fa-solid fa-user-secret"></i></div>
+            <div><div style="font-weight:700;" id="qAlias">Zona Oeste Parts</div><div class="text-xs muted"><span id="qBrand">Ferodo</span> · <i class="fa-solid fa-circle-check text-green"></i> En stock</div></div>
+          </div>
+          <span class="badge badge-green"><i class="fa-solid fa-shield-halved"></i> <span id="qWarr">12 meses</span></span>
+        </div>
+        <div class="locked-info"><i class="fa-solid fa-lock"></i> Vendedor anónimo <span class="badge badge-gray" style="margin-left:4px;">se identifica al concretar</span></div>
+      </div>
+
+      <div class="section-title"><h2>¿Quién paga?</h2></div>
+      <div class="grid-2 mb-16">
+        <button class="card hoverable text-center pay-opt glow" data-mode="self" style="cursor:pointer;padding:16px 8px;"><i class="fa-solid fa-wallet text-purple" style="font-size:20px;"></i><div class="text-sm mt-8" style="font-weight:700;">Pago yo</div><div class="text-xs muted">Como mecánico</div></button>
+        <button class="card hoverable text-center pay-opt" data-mode="link" style="cursor:pointer;padding:16px 8px;"><i class="fa-solid fa-link text-yellow" style="font-size:20px;"></i><div class="text-sm mt-8" style="font-weight:700;">Link al cliente</div><div class="text-xs muted">Lo paga el dueño</div></button>
+      </div>
+
+      <div class="section-title"><h2>Detalle</h2></div>
+      <div class="card mb-16">
+        <div class="flex-between mb-12"><span class="subtle">Repuesto (<span id="qBrand2">Ferodo</span>)</span><span style="font-weight:700;" id="dPart">$39.900</span></div>
+        <div class="flex-between mb-12"><span class="subtle">Comisión RepuestosAlToque <span class="badge badge-purple" style="margin-left:4px;">5%</span></span><span style="font-weight:700;" id="dFee">$1.995</span></div>
+        <div class="divider"></div>
+        <div class="flex-between"><span class="h-md">Total</span><span class="h-md text-yellow" id="dTotal">$41.895</span></div>
+        <div class="text-xs muted mt-8"><i class="fa-solid fa-truck-fast"></i> El flete lo coordina la empresa de envíos (se abona según tarifa).</div>
+      </div>
+
+      <div class="card mb-16" style="display:flex;align-items:center;gap:12px;border-color:rgba(0,158,227,0.4);">
+        <div class="store-avatar" style="background:#009EE3;color:white;"><i class="fa-solid fa-credit-card"></i></div>
+        <div style="flex:1;"><div class="text-sm" style="font-weight:700;">Mercado Pago</div><div class="text-xs muted">Reparte automático: vendedor + comisión</div></div>
+        <i class="fa-solid fa-circle-check text-green"></i>
+      </div>
+    </div>
+
+    <!-- PROCESSING -->
+    <div class="container text-center" id="processing" style="display:none;padding-top:80px;">
+      <div class="radar-wrap mb-24"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-core" style="background:#009EE3;"><i class="fa-solid fa-credit-card"></i></div></div>
+      <h2 class="h-lg mb-8">Procesando pago…</h2>
+      <p class="subtle">Conectando con Mercado Pago</p>
+    </div>
+
+    <!-- DONE -->
+    <div class="container" id="done" style="display:none;">
+      <div class="text-center" style="padding:24px 0 16px;">
+        <div class="success-check mb-16"><i class="fa-solid fa-check"></i></div>
+        <h2 class="h-lg">¡Pago aprobado!</h2>
+        <p class="subtle">Comprobante #MP-90432187 · <span id="dTotal2">$41.895</span></p>
+      </div>
+
+      <!-- REVEAL del vendedor -->
+      <div class="section-title"><h2>Vendedor revelado</h2><span class="badge badge-green"><i class="fa-solid fa-lock-open"></i> desbloqueado</span></div>
+      <div class="card glow reveal-card mb-16" style="background:linear-gradient(135deg,rgba(34,197,94,0.12),rgba(31,41,55,0.5));">
+        <div class="flex-between mb-12">
+          <div class="flex-center gap-12">
+            <div class="store-avatar" style="background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div>
+            <div><div style="font-weight:800;" id="realName">Patagonia Frenos</div><div class="text-xs muted" id="realAddr">Km 5 Av. Bustillo, Bariloche</div></div>
+          </div>
+          <span class="rep-badge rep-yellow"><i class="fa-solid fa-star"></i> 4.8</span>
+        </div>
+        <div class="flex gap-12">
+          <a id="waBtn" class="btn btn-success btn-block btn-sm" href="#" target="_blank"><i class="fa-brands fa-whatsapp"></i> Coordinar por WhatsApp</a>
+          <a id="callBtn" class="btn btn-ghost btn-sm" href="#" style="flex:0 0 auto;"><i class="fa-solid fa-phone"></i></a>
+        </div>
+      </div>
+
+      <div class="float-notif mb-16" style="border-color:rgba(34,197,94,0.35);background:linear-gradient(135deg,rgba(34,197,94,0.14),rgba(31,41,55,0.5));">
+        <i class="fa-solid fa-truck-fast text-green"></i>
+        <div class="text-sm subtle">Tu repuesto sale en camino. <b>Te llega con la factura/remito</b> a través de la empresa de envíos.</div>
+      </div>
+      <a href="mecanico-seguimiento.html" class="btn btn-yellow btn-block btn-lg mb-12"><i class="fa-solid fa-location-dot"></i> Seguir el envío en vivo</a>
+      <a href="mecanico-dashboard.html" class="btn btn-ghost btn-block"><i class="fa-solid fa-house"></i> Volver al inicio</a>
+    </div>
+  </div>
+
+  <div class="flow-foot" id="foot">
+    <div class="inner">
+      <button class="btn btn-block btn-lg" id="payBtn" style="background:#009EE3;color:white;"><i class="fa-solid fa-credit-card"></i> Pagar con Mercado Pago</button>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let q;
+    try { q = JSON.parse(sessionStorage.getItem('rat_selectedQuote')); } catch (e) {}
+    if (!q) q = RAT.data.quotePool[2]; // Patagonia Frenos $39900 por defecto
+    let payMode = 'self';
+
+    const part = q.price, fee = Math.round(part * 0.05), total = part + fee;
+    document.getElementById('qAlias').textContent = q.alias;
+    document.getElementById('qBrand').textContent = q.partBrand;
+    document.getElementById('qBrand2').textContent = q.partBrand;
+    document.getElementById('qWarr').textContent = q.warranty;
+    document.getElementById('dPart').textContent = RAT.money(part);
+    document.getElementById('dFee').textContent = RAT.money(fee);
+    document.getElementById('dTotal').textContent = RAT.money(total);
+    document.getElementById('dTotal2').textContent = RAT.money(total);
+    document.getElementById('realName').textContent = q.real.name;
+    document.getElementById('realAddr').textContent = q.real.address;
+    document.getElementById('waBtn').href = 'https://wa.me/' + q.real.whatsapp;
+    document.getElementById('callBtn').href = 'tel:' + q.real.phone;
+
+    document.querySelectorAll('.pay-opt').forEach(b => b.addEventListener('click', () => {
+      payMode = b.dataset.mode;
+      document.querySelectorAll('.pay-opt').forEach(x => x.classList.remove('glow'));
+      b.classList.add('glow');
+      const pb = document.getElementById('payBtn');
+      pb.innerHTML = payMode === 'link' ? '<i class="fa-solid fa-link"></i> Generar link de pago' : '<i class="fa-solid fa-credit-card"></i> Pagar con Mercado Pago';
+    }));
+
+    document.getElementById('payBtn').addEventListener('click', () => {
+      if (payMode === 'link') {
+        RAT.toast({ title: 'Link de pago generado', sub: 'mpago.la/RAToque/1044 · enviado al cliente', icon: 'fa-link', type: 'yellow' });
+        return;
+      }
+      document.getElementById('pre').style.display = 'none';
+      document.getElementById('foot').style.display = 'none';
+      document.getElementById('processing').style.display = 'block';
+      document.getElementById('topTitle').textContent = 'Procesando…';
+      window.scrollTo({ top: 0 });
+      setTimeout(() => {
+        document.getElementById('processing').style.display = 'none';
+        document.getElementById('done').style.display = 'block';
+        document.getElementById('topTitle').textContent = 'Pago aprobado';
+        RAT.ping();
+        RAT.toast({ title: 'Pago aprobado', sub: 'Mercado Pago reparte automáticamente', icon: 'fa-circle-check', type: 'green' });
+      }, 2200);
+    });
+  </script>
+</body>
+</html>

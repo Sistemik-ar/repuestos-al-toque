@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/demo/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resumen — Backoffice · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="index.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Backoffice</span></a>
+          <div class="topbar-actions">
+            <span class="badge badge-gray"><i class="fa-solid fa-location-dot"></i> Bariloche</span>
+            <button class="icon-btn" id="bell"><span class="dot"></span><i class="fa-regular fa-bell"></i></button>
+            <div class="avatar" style="background:linear-gradient(135deg,#fff,var(--purple));color:#0B0B0F;">JN</div>
+          </div>
+        </div>
+
+        <div class="container admin-wide">
+          <div class="flex-between mb-16 flex-wrap gap-12">
+            <div><div class="eyebrow">Panel de control · Jorge</div><h1 class="h-lg">Resumen del día</h1></div>
+            <div class="flex-center gap-8">
+              <span class="pill-tabs"><button class="active">Hoy</button><button id="semBtn">7 días</button><button id="mesBtn">Mes</button></span>
+            </div>
+          </div>
+
+          <!-- KPIs -->
+          <div class="dash-grid mb-16">
+            <div class="card stat-card"><div class="flex-between"><span class="stat-label">Pedidos generados</span><i class="fa-solid fa-receipt text-purple"></i></div><div class="stat-value">48</div><span class="stat-trend trend-up"><i class="fa-solid fa-arrow-up"></i> 31 pagados</span></div>
+            <div class="card stat-card"><div class="flex-between"><span class="stat-label">Ingresos (comisión 5%)</span><i class="fa-solid fa-coins text-yellow"></i></div><div class="stat-value text-yellow">$84.230</div><span class="stat-trend trend-up"><i class="fa-solid fa-arrow-up"></i> +12% vs ayer</span></div>
+            <div class="card stat-card"><div class="flex-between"><span class="stat-label">Tiempo prom. entrega</span><i class="fa-solid fa-stopwatch text-purple"></i></div><div class="stat-value">38 min</div><span class="stat-trend trend-down"><i class="fa-solid fa-arrow-down"></i> -4 min</span></div>
+            <div class="card stat-card"><div class="flex-between"><span class="stat-label">Conversión</span><i class="fa-solid fa-bullseye text-purple"></i></div><div class="stat-value">61%</div><span class="stat-trend trend-up"><i class="fa-solid fa-arrow-up"></i> +3 pts</span></div>
+          </div>
+
+          <div class="dash-grid mb-16">
+            <!-- Bar chart -->
+            <div class="card col-span-2">
+              <div class="section-title"><h2>Pedidos por hora</h2><span class="badge badge-purple">Hoy</span></div>
+              <div class="bar-chart" id="bars"></div>
+              <div class="bar-labels"><span>9h</span><span>11h</span><span>13h</span><span>15h</span><span>17h</span><span>19h</span><span>21h</span></div>
+            </div>
+            <!-- Conversión donut -->
+            <div class="card">
+              <div class="section-title"><h2>Embudo</h2></div>
+              <div class="flex-center" style="justify-content:center;margin:8px 0 16px;"><div class="donut"><div class="donut-label"><div class="h-md">61%</div><div class="text-xs muted">conversión</div></div></div></div>
+              <div class="flex-col gap-8">
+                <div class="flex-between text-sm"><span class="flex-center gap-8"><span class="dot-status" style="background:var(--purple);"></span> Pagados</span><span style="font-weight:700;">31</span></div>
+                <div class="flex-between text-sm"><span class="flex-center gap-8"><span class="dot-status" style="background:var(--yellow);"></span> Cotizando</span><span style="font-weight:700;">12</span></div>
+                <div class="flex-between text-sm"><span class="flex-center gap-8"><span class="dot-status" style="background:var(--bg-3);"></span> Sin oferta</span><span style="font-weight:700;">5</span></div>
+              </div>
+            </div>
+            <!-- Ecosistema -->
+            <div class="card">
+              <div class="section-title"><h2>Ecosistema</h2></div>
+              <div class="list-row" style="padding-top:0;"><div class="store-avatar" style="width:34px;height:34px;background:rgba(109,40,217,0.18);color:var(--purple-light);"><i class="fa-solid fa-screwdriver-wrench"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Mecánicos</div><div class="text-xs muted">28 conectados</div></div><span class="h-md">142</span></div>
+              <div class="list-row"><div class="store-avatar" style="width:34px;height:34px;background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-store"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Casas de repuestos</div><div class="text-xs muted">19 cotizando hoy</div></div><span class="h-md">23</span></div>
+              <div class="list-row" style="border-bottom:none;"><div class="store-avatar" style="width:34px;height:34px;background:rgba(34,197,94,0.16);color:#4ADE80;"><i class="fa-solid fa-truck-fast"></i></div><div style="flex:1;"><div class="text-sm" style="font-weight:700;">Repartidores</div><div class="text-xs muted">Fletes del Sur</div></div><span class="h-md">6</span></div>
+            </div>
+          </div>
+
+          <!-- Últimos pedidos -->
+          <div class="card mb-16">
+            <div class="section-title"><h2>Últimos pedidos</h2><a id="export">Exportar CSV</a></div>
+            <div style="overflow-x:auto;">
+              <table class="table">
+                <thead><tr><th>#</th><th>Repuesto</th><th>Vehículo</th><th>Comercio</th><th>Total</th><th>Comisión</th><th>Estado</th></tr></thead>
+                <tbody>
+                  <tr><td>1044</td><td>Pastillas de freno del.</td><td>Toyota Hilux</td><td class="muted">— anónimo</td><td>—</td><td>—</td><td><span class="badge badge-yellow">Cotizando</span></td></tr>
+                  <tr><td>1039</td><td>Bomba de agua</td><td>Ford Ranger</td><td>Patagonia Frenos</td><td>$41.895</td><td class="text-yellow">$1.995</td><td><span class="badge badge-yellow">En reparto</span></td></tr>
+                  <tr><td>1032</td><td>Filtro + aceite 10W40</td><td>Toyota Hilux</td><td>Andina Parts</td><td>$28.400</td><td class="text-yellow">$1.353</td><td><span class="badge badge-green">Entregado</span></td></tr>
+                  <tr><td>1027</td><td>Amortiguadores del. (par)</td><td>Chevrolet S10</td><td>Repuestos Centro</td><td>$96.500</td><td class="text-yellow">$4.595</td><td><span class="badge badge-green">Entregado</span></td></tr>
+                  <tr><td>1019</td><td>Alternador</td><td>Renault Kangoo</td><td>Repuestos Centro</td><td>$112.000</td><td class="text-yellow">$5.333</td><td><span class="badge badge-green">Entregado</span></td></tr>
+                  <tr><td>1011</td><td>Correa de distribución</td><td>VW Gol Trend</td><td class="muted">—</td><td>—</td><td>—</td><td><span class="badge badge-red">Cancelado</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p class="text-center text-xs muted mb-24">RepuestosAlToque · Backoffice · Datos simulados</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('admin', 'resumen');
+    const heights = [30, 55, 80, 65, 90, 72, 48];
+    document.getElementById('bars').innerHTML = heights.map(h => `<div class="bar" style="height:${h}%;"></div>`).join('');
+    document.getElementById('export').addEventListener('click', () => RAT.toast({ title: 'Exportando CSV', sub: '48 pedidos del día', icon: 'fa-file-csv', type: 'green' }));
+    document.getElementById('bell').addEventListener('click', () => RAT.toast({ title: '2 comercios pendientes de aprobación', icon: 'fa-bell', type: 'yellow' }));
+    ['semBtn','mesBtn'].forEach(id => document.getElementById(id).addEventListener('click', e => RAT.toast({ title: 'Rango: ' + e.target.textContent, icon: 'fa-calendar', type: 'purple' })));
+  </script>
+</body>
+</html>

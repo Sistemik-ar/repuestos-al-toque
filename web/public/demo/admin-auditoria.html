@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/demo/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auditoría — Backoffice · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="admin.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Backoffice</span></a>
+          <div class="topbar-actions"><div class="avatar" style="background:linear-gradient(135deg,#fff,var(--purple));color:#0B0B0F;">JN</div></div>
+        </div>
+
+        <div class="container admin-wide">
+          <div class="mb-16"><div class="eyebrow">Calidad</div><h1 class="h-lg">Auditoría</h1><p class="text-sm muted">Registro de cada cambio: qué administrador hizo qué y cuándo</p></div>
+
+          <div class="flex-between mb-16 flex-wrap gap-12">
+            <div class="pill-tabs" id="adminTabs">
+              <button class="active" data-a="todos">Todos los admins</button>
+              <button data-a="Jorge">Jorge</button>
+              <button data-a="Guille">Guille</button>
+              <button data-a="Ale">Ale</button>
+              <button data-a="Felipe">Felipe</button>
+            </div>
+            <span class="badge badge-gray"><i class="fa-solid fa-clock-rotate-left"></i> Últimos 30 días</span>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div style="overflow-x:auto;">
+              <table class="table">
+                <thead><tr><th>Cuándo</th><th>Admin</th><th>Acción</th><th>Objetivo</th><th>Detalle</th></tr></thead>
+                <tbody id="rows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('admin', 'auditoria');
+
+    const ACT = {
+      alta: { label: 'Alta de usuario', icon: 'fa-user-plus', cls: 'badge-green' },
+      invitacion: { label: 'Invitación', icon: 'fa-paper-plane', cls: 'badge-purple' },
+      suspender: { label: 'Suspensión', icon: 'fa-ban', cls: 'badge-red' },
+      activar: { label: 'Activación', icon: 'fa-circle-check', cls: 'badge-green' },
+      reset: { label: 'Reset contraseña', icon: 'fa-key', cls: 'badge-yellow' },
+      tarifa: { label: 'Cambio de tarifa', icon: 'fa-truck', cls: 'badge-purple' },
+      resena: { label: 'Moderó reseña', icon: 'fa-star-half-stroke', cls: 'badge-yellow' }
+    };
+    const log = [
+      { t: 'Hoy 15:12', admin: 'Jorge', a: 'invitacion', obj: 'Repuestos del Lago', d: 'Rol comercio · email lago@rep.com' },
+      { t: 'Hoy 14:48', admin: 'Guille', a: 'suspender', obj: 'Bariloche Diesel', d: 'Reiterados reclamos (6 en 30 días)' },
+      { t: 'Hoy 11:30', admin: 'Ale', a: 'reset', obj: 'MotorSur', d: 'Enviada por WhatsApp' },
+      { t: 'Hoy 10:05', admin: 'Jorge', a: 'resena', obj: 'Repuestos Express', d: 'Ocultó reseña con lenguaje ofensivo' },
+      { t: 'Ayer 18:20', admin: 'Felipe', a: 'tarifa', obj: 'Fletes del Sur', d: 'Zona Dina Huapi: $5.000 → $5.500' },
+      { t: 'Ayer 16:40', admin: 'Guille', a: 'activar', obj: 'Carlos · Nuevo Taller', d: 'Aprobado tras verificación' },
+      { t: 'Ayer 09:15', admin: 'Jorge', a: 'alta', obj: 'Diego · Fletes del Sur', d: 'Repartidor · moto' },
+      { t: '5 jun 17:02', admin: 'Ale', a: 'invitacion', obj: 'Andina Parts', d: 'Rol comercio' },
+      { t: '5 jun 12:33', admin: 'Felipe', a: 'reset', obj: 'Taller Patagonia', d: 'Enviada por email' },
+      { t: '4 jun 19:48', admin: 'Jorge', a: 'suspender', obj: 'Repuestos Express', d: 'Aviso previo · calificación 3.4' }
+    ];
+
+    let filter = 'todos';
+    function render() {
+      const list = log.filter(l => filter === 'todos' || l.admin === filter);
+      document.getElementById('rows').innerHTML = list.map(l => {
+        const a = ACT[l.a];
+        const initials = l.admin.slice(0, 2).toUpperCase();
+        return `<tr>
+          <td class="muted nowrap">${l.t}</td>
+          <td><div class="flex-center gap-8"><div class="avatar" style="width:26px;height:26px;font-size:11px;">${initials}</div>${l.admin}</div></td>
+          <td><span class="badge ${a.cls}"><i class="fa-solid ${a.icon}"></i> ${a.label}</span></td>
+          <td style="font-weight:700;">${l.obj}</td>
+          <td class="muted">${l.d}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="5" class="muted text-center" style="padding:24px;">Sin movimientos</td></tr>';
+    }
+    document.querySelectorAll('#adminTabs button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('#adminTabs button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); filter = b.dataset.a; render();
+    }));
+    render();
+  </script>
+</body>
+</html>

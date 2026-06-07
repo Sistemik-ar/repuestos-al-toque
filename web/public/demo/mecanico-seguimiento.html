@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/demo/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seguimiento — Mecánico · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="mecanico-dashboard.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></a>
+          <div class="topbar-actions"><div class="avatar">MP</div></div>
+        </div>
+
+        <div class="container">
+          <div class="mb-16">
+            <div class="eyebrow">Envío en curso</div>
+            <h1 class="h-lg">Seguimiento del pedido</h1>
+            <p class="text-sm muted">Bomba de agua · #1039 · Patagonia Frenos</p>
+          </div>
+
+          <div class="dash-grid" style="align-items:start;">
+            <!-- Mapa + ETA -->
+            <div class="col-span-2">
+              <div class="card mb-16" style="padding:0;overflow:hidden;">
+                <div class="map-mock">
+                  <div class="map-route"></div>
+                  <div class="map-pin start"></div>
+                  <div class="map-pin driver"></div>
+                  <div class="map-pin end"></div>
+                </div>
+                <div class="flex-between" style="padding:14px 16px;">
+                  <div><div class="text-xs muted">Llega aprox.</div><div class="h-md text-yellow" id="eta">12 min</div></div>
+                  <div class="flex-center gap-8"><span class="dot-status dot-active"></span><span class="text-sm" style="font-weight:700;" id="stateLabel">En reparto</span></div>
+                </div>
+              </div>
+
+              <!-- Repartidor -->
+              <div class="card mb-16">
+                <div class="flex-between">
+                  <div class="flex-center gap-12">
+                    <div class="store-avatar"><i class="fa-solid fa-motorcycle"></i></div>
+                    <div><div class="text-sm" style="font-weight:700;">Diego · Fletes del Sur</div><div class="text-xs muted">Moto · Patente A123 BCD</div></div>
+                  </div>
+                  <div class="flex-center gap-8">
+                    <a class="icon-btn" href="https://wa.me/5492944111222" target="_blank"><i class="fa-brands fa-whatsapp text-green"></i></a>
+                    <a class="icon-btn" href="tel:+5492944111222"><i class="fa-solid fa-phone"></i></a>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn btn-success btn-block btn-lg" id="receiveBtn"><i class="fa-solid fa-box-open"></i> Confirmar recepción</button>
+              <div class="text-center text-xs muted mt-8">Verificá el paquete y que el repuesto coincida antes de confirmar.</div>
+            </div>
+
+            <!-- Timeline de estados -->
+            <div class="col-span-2">
+              <div class="card">
+                <div class="section-title"><h2>Estado del pedido</h2></div>
+                <div class="timeline" id="timeline"></div>
+              </div>
+
+              <div class="card mt-16" style="display:flex;align-items:center;gap:12px;">
+                <div class="store-avatar" style="background:rgba(250,204,21,0.18);color:var(--yellow);"><i class="fa-solid fa-file-invoice"></i></div>
+                <div style="flex:1;"><div class="text-sm" style="font-weight:700;">Remito / Factura</div><div class="text-xs muted">Llega con el paquete</div></div>
+                <span class="badge badge-gray">CF</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rating modal -->
+  <div class="modal-backdrop" id="rateModal">
+    <div class="modal text-center">
+      <div class="modal-handle"></div>
+      <div class="success-check mb-16" style="width:64px;height:64px;"><i class="fa-solid fa-check" style="font-size:28px;"></i></div>
+      <h2 class="h-md mb-4">¡Pedido recibido!</h2>
+      <p class="text-sm muted mb-16">¿Cómo fue la experiencia con <b>Patagonia Frenos</b>?</p>
+      <div class="rating-stars mb-16" id="stars">
+        <i class="fa-solid fa-star" data-v="1"></i><i class="fa-solid fa-star" data-v="2"></i><i class="fa-solid fa-star" data-v="3"></i><i class="fa-solid fa-star" data-v="4"></i><i class="fa-solid fa-star" data-v="5"></i>
+      </div>
+      <div class="field"><textarea class="textarea" id="review" placeholder="Dejá un comentario (opcional)…"></textarea></div>
+      <button class="btn btn-yellow btn-block btn-lg" id="sendRate"><i class="fa-solid fa-paper-plane"></i> Enviar calificación</button>
+      <button class="btn btn-ghost btn-block mt-12" id="skipRate">Ahora no</button>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    RAT.mountNav('mecanico', 'envios');
+
+    // Estados del pedido (sistema completo)
+    const states = [
+      { k: 'Pago acreditado', t: '14:02', done: true, icon: 'fa-check' },
+      { k: 'Preparando pedido', t: '14:08', done: true, icon: 'fa-check' },
+      { k: 'Retirado del comercio', t: '14:21', done: true, icon: 'fa-check' },
+      { k: 'En reparto', t: 'Ahora', current: true, icon: 'fa-truck-fast' },
+      { k: 'Entregado', t: 'Pendiente', icon: '' }
+    ];
+    function renderTimeline() {
+      document.getElementById('timeline').innerHTML = states.map(s =>
+        `<div class="timeline-item ${s.done ? 'done' : s.current ? 'current' : ''}">
+          <div class="dot">${s.icon ? `<i class="fa-solid ${s.icon}"></i>` : ''}</div>
+          <div class="t-title">${s.k}</div>
+          <div class="t-time">${s.t}</div>
+        </div>`).join('');
+    }
+    renderTimeline();
+
+    // ETA countdown
+    let eta = 12;
+    setInterval(() => { if (eta > 1) { eta--; document.getElementById('eta').textContent = eta + ' min'; } }, 4000);
+
+    // Confirmar recepción → entregado + rating
+    document.getElementById('receiveBtn').addEventListener('click', () => {
+      states[3].current = false; states[3].done = true; states[3].t = '14:39';
+      states[4].current = true; states[4].t = 'Ahora'; states[4].icon = 'fa-check';
+      renderTimeline();
+      document.getElementById('stateLabel').textContent = 'Entregado';
+      document.getElementById('eta').textContent = '¡Listo!';
+      RAT.ping();
+      document.getElementById('rateModal').classList.add('open');
+    });
+
+    // Rating
+    let rating = 0;
+    document.querySelectorAll('#stars i').forEach(s => {
+      s.addEventListener('click', () => {
+        rating = +s.dataset.v;
+        document.querySelectorAll('#stars i').forEach(x => x.classList.toggle('on', +x.dataset.v <= rating));
+      });
+    });
+    document.getElementById('sendRate').addEventListener('click', () => {
+      document.getElementById('rateModal').classList.remove('open');
+      RAT.toast({ title: '¡Gracias por tu calificación!', sub: rating ? `${rating} estrellas a Patagonia Frenos` : 'Reseña enviada', icon: 'fa-star', type: 'green' });
+      setTimeout(() => window.location.href = 'mecanico-historial.html', 900);
+    });
+    document.getElementById('skipRate').addEventListener('click', () => document.getElementById('rateModal').classList.remove('open'));
+  </script>
+</body>
+</html>
