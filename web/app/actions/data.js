@@ -85,6 +85,14 @@ export async function acceptQuote(quoteId) {
   return { ok: true, requestId: q.requestId, quoteId };
 }
 
+export async function closeWindow(requestId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const r = await prisma.request.findUnique({ where: { id: requestId }, select: { mechanicId: true } });
+  if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
+  await prisma.request.update({ where: { id: requestId }, data: { windowEndsAt: new Date() } });
+  return { ok: true };
+}
+
 export async function reopenWindow(requestId) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
   const r = await prisma.request.findUnique({ where: { id: requestId }, select: { mechanicId: true } });
@@ -116,6 +124,8 @@ export async function createMpCheckout(requestId, quoteId) {
   const part = num(q.price) || 0;
   const ship = await computeShip(requestId, q.storeId);
   const total = part + Math.round(part * 0.05) + ship; // repuesto + comisión 5% + envío
+  // Monto de prueba: si MP_TEST_AMOUNT está seteado, cobra eso (ej: 10) en vez del total real.
+  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : total;
 
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
@@ -126,7 +136,7 @@ export async function createMpCheckout(requestId, quoteId) {
     const { link } = await createPaymentLink({
       orderRef: `${requestId}::${quoteId}`,
       title: `Repuesto · pedido #${q.request.code}`,
-      amount: total,
+      amount,
       backUrl: `${appUrl}/api/mp/return`,
       notificationUrl: `${appUrl}/api/mp/webhook`,
     });

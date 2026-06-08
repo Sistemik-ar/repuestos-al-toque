@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { money, ping, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
-import { getRequestForMechanic, acceptQuote, reopenWindow } from '@/app/actions/data';
+import { getRequestForMechanic, acceptQuote, reopenWindow, closeWindow } from '@/app/actions/data';
 
 export default function Cotizaciones() {
   const router = useRouter();
@@ -47,6 +47,7 @@ export default function Cotizaciones() {
     router.push('/mecanico/pago');
   }
   async function retry() { announced.current = false; await reopenWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
+  async function cerrar() { await closeWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
 
   const veh = request ? `${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() : '—';
   const part = request ? (request.desc || request.catLabel) : '—';
@@ -69,6 +70,7 @@ export default function Cotizaciones() {
             <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
               <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>{revealed ? 'Ventana cerrada · ofertas' : 'Ventana de ofertas — se revelan al cerrarse'}</div>
               <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
+              {!revealed && <button className="btn btn-ghost btn-sm mt-12" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y ver ofertas</button>}
             </div>
 
             <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
