@@ -14,7 +14,10 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.mjs"
+    "db:seed": "node prisma/seed.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",
@@ -26,6 +29,8 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
-    "prisma": "^5.18.0"
+    "@playwright/test": "^1.60.0",
+    "prisma": "^5.18.0",
+    "vitest": "^4.1.8"
   }
 }

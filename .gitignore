@@ -22,3 +22,8 @@ next-env.d.ts
 
 # Prisma lee .env (DATABASE_URL secreta)
 .env
+
+# Playwright
+web/test-results/
+web/playwright-report/
+web/.playwright/
