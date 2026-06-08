@@ -1,6 +1,8 @@
 'use server';
+import { headers } from 'next/headers';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/session';
+import { createPaymentLink } from '@/lib/mercadopago';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
@@ -92,6 +94,34 @@ export async function markRequestPaid(requestId, quoteId) {
   });
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
   return { ok: true };
+}
+
+// ---- Mercado Pago: crea el link de pago (cobro centralizado a la cuenta de Jorge) ----
+export async function createMpCheckout(requestId, quoteId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
+  if (!q || q.request.mechanicId !== s.id) return { error: 'No autorizado' };
+
+  const part = num(q.price) || 0;
+  const total = part + Math.round(part * 0.05) + 3500; // repuesto + comisión 5% + envío
+
+  const h = headers();
+  const host = h.get('host') || 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+  const appUrl = `${proto}://${host}`;
+
+  try {
+    const { link } = await createPaymentLink({
+      orderRef: `${requestId}::${quoteId}`,
+      title: `Repuesto · pedido #${q.request.code}`,
+      amount: total,
+      backUrl: `${appUrl}/api/mp/return`,
+      notificationUrl: `${appUrl}/api/mp/webhook`,
+    });
+    return { link };
+  } catch (e) {
+    return { error: e?.message || 'No se pudo generar el link de pago.' };
+  }
 }
 
 // ---- Comercio (vendedor) ----

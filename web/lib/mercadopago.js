@@ -17,7 +17,8 @@ export async function createPaymentLink({ orderRef, title, amount, payerEmail, b
       external_reference: orderRef, // para mapear el pago a la orden en el webhook
       payer: payerEmail ? { email: payerEmail } : undefined,
       back_urls: backUrl ? { success: backUrl, pending: backUrl, failure: backUrl } : undefined,
-      auto_return: backUrl ? 'approved' : undefined,
+      // auto_return solo con https (MP lo rechaza en localhost)
+      auto_return: backUrl && backUrl.startsWith('https://') ? 'approved' : undefined,
       notification_url: notificationUrl || process.env.MP_WEBHOOK_URL || undefined,
     }),
   });
