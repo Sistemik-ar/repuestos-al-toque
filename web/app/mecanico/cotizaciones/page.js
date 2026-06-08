@@ -8,14 +8,17 @@ import { getRequestForMechanic, acceptQuote, reopenWindow, closeWindow } from '@
 
 export default function Cotizaciones() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [id, setId] = useState(null);
   const [request, setRequest] = useState(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const [selected, setSelected] = useState(null);
   const [zoom, setZoom] = useState(null);
   const announced = useRef(false);
 
   useEffect(() => {
+    setMounted(true);
+    setNow(Date.now());
     const rid = new URLSearchParams(window.location.search).get('id');
     setId(rid);
     if (!rid) return;
@@ -52,6 +55,10 @@ export default function Cotizaciones() {
   const veh = request ? `${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() : '—';
   const part = request ? (request.desc || request.catLabel) : '—';
 
+  if (!mounted) {
+    return <div className="app-shell"><div className="container" style={{ paddingTop: 80, textAlign: 'center' }}><div className="spinner" style={{ margin: '0 auto' }}></div></div></div>;
+  }
+
   return (
     <div className="app-shell">
       <div className="topbar">
@@ -80,7 +87,12 @@ export default function Cotizaciones() {
             </div>
 
             {!revealed ? (
-              <div className="card text-center" style={{ padding: 28 }}><div className="spinner" style={{ margin: '0 auto 14px' }}></div><div className="text-sm" style={{ fontWeight: 700 }}>Esperando que los comercios coticen…</div><div className="text-xs muted mt-4">Las ofertas se muestran todas juntas al cerrar la ventana.</div></div>
+              <div className="card text-center" style={{ padding: 28 }}>
+                <div className="spinner" style={{ margin: '0 auto 14px' }}></div>
+                <div className="text-sm" style={{ fontWeight: 700 }}>Esperando que los comercios coticen…</div>
+                <div className="text-xs muted mt-4">Las ofertas se muestran todas juntas al cerrar la ventana.</div>
+                {quotes.length > 0 && <div className="badge badge-yellow mt-12"><i className="fa-solid fa-tags"></i> {quotes.length} cotización(es) recibida(s)</div>}
+              </div>
             ) : quotes.length === 0 ? (
               <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">No llegaron ofertas</div><div className="text-xs mb-16">Podés reintentar otra ventana</div><button className="btn btn-primary btn-sm" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</button></div>
             ) : (
