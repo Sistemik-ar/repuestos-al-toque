@@ -426,3 +426,29 @@ model Setting {
   value String
   @@map("settings")
 }
+
+enum CreditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CreditAccount {
+  id           String       @id @default(cuid())
+  mechanicId   String       @map("mechanic_id")
+  storeId      String       @map("store_id")
+  adminStatus  CreditStatus @default(PENDING) @map("admin_status")
+  storeStatus  CreditStatus @default(PENDING) @map("store_status")
+  adminNote    String?      @map("admin_note")
+  active       Boolean      @default(false)
+  adminActedAt DateTime?    @map("admin_acted_at")
+  storeActedAt DateTime?    @map("store_acted_at")
+  disabledAt   DateTime?    @map("disabled_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@unique([mechanicId, storeId])
+  @@index([mechanicId])
+  @@index([storeId])
+  @@map("credit_accounts")
+}

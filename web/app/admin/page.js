@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
@@ -56,6 +56,9 @@ export default function Admin() {
 
         {/* Comisión y recargo */}
         <Pricing />
+
+        {/* Cuentas corrientes */}
+        <CreditRequests />
 
         {/* Tarifas de envío */}
         <div className="card mb-16">
@@ -130,6 +133,52 @@ function Kpi({ label, value, icon, yellow }) {
     <div className="card stat-card">
       <div className="flex-between"><span className="stat-label">{label}</span><i className={`fa-solid ${icon} ${yellow ? 'text-yellow' : 'text-purple'}`}></i></div>
       <div className={`stat-value ${yellow ? 'text-yellow' : ''}`}>{value}</div>
+    </div>
+  );
+}
+
+const CC_BADGE = { PENDING: ['badge-yellow', 'Pendiente'], APPROVED: ['badge-green', 'Aprobado'], REJECTED: ['badge-red', 'Rechazado'] };
+const CC_STATE = { PENDING: ['badge-yellow', 'Pendiente'], ACTIVE: ['badge-green', 'Activa'], REJECTED: ['badge-red', 'Rechazada'], DISABLED: ['badge-gray', 'Desactivada'] };
+
+function CreditRequests() {
+  const [rows, setRows] = useState([]);
+  const load = async () => setRows(await getCreditRequests());
+  useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []);
+
+  async function approve(r) { await adminActOnCredit(r.id, true, null); toast({ title: 'Vinculación validada', icon: 'fa-check', type: 'green' }); load(); }
+  async function reject(r) { const note = window.prompt('Observación interna (opcional):') || null; await adminActOnCredit(r.id, false, note); toast({ title: 'Rechazada', icon: 'fa-ban', type: 'purple' }); load(); }
+  async function disable(r) { await disableCreditAccount(r.id); toast({ title: 'Relación desactivada', icon: 'fa-ban', type: 'purple' }); load(); }
+
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Solicitudes de Cuenta Corriente</h2><span className="text-xs muted">{rows.length}</span></div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table">
+          <thead><tr><th>Mecánico</th><th>Comercio</th><th>Admin</th><th>Comercio</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin solicitudes</td></tr>}
+            {rows.map((r) => {
+              const st = CC_STATE[r.status] || ['badge-gray', r.status];
+              const a = CC_BADGE[r.adminStatus]; const sc = CC_BADGE[r.storeStatus];
+              return (
+                <tr key={r.id}>
+                  <td>{r.mechanicName}</td>
+                  <td>{r.storeName}</td>
+                  <td><span className={`badge ${a[0]}`}>{a[1]}</span></td>
+                  <td><span className={`badge ${sc[0]}`}>{sc[1]}</span></td>
+                  <td><span className={`badge ${st[0]}`}>{st[1]}</span>{r.adminNote && <div className="text-xs muted mt-4" title={r.adminNote}><i className="fa-solid fa-note-sticky"></i> nota</div>}</td>
+                  <td>
+                    <div className="flex gap-8">
+                      {r.adminStatus === 'PENDING' && <><button className="btn btn-success btn-sm" onClick={() => approve(r)}>Validar</button><button className="btn btn-ghost btn-sm" onClick={() => reject(r)}>Rechazar</button></>}
+                      {r.status === 'ACTIVE' && <button className="btn btn-danger btn-sm" onClick={() => disable(r)}>Desactivar</button>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

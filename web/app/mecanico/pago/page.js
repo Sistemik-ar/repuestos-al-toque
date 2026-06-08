@@ -7,13 +7,19 @@ import { createMpCheckout, getOrderBreakdown } from '@/app/actions/data';
 export default function Pago() {
   const [q, setQ] = useState(null);
   const [bd, setBd] = useState(null);
+  const [cc, setCc] = useState(false);
   const [payMode, setPayMode] = useState('self');
   const [loading, setLoading] = useState(false);
   const [linkCliente, setLinkCliente] = useState('');
 
   useEffect(() => {
-    try { const s = JSON.parse(sessionStorage.getItem('rat_selectedQuote')); if (s) { setQ(s); getOrderBreakdown(s.requestId, s.id).then(setBd); } } catch {}
+    try { const s = JSON.parse(sessionStorage.getItem('rat_selectedQuote')); if (s) setQ(s); } catch {}
   }, []);
+
+  useEffect(() => {
+    if (!q) return;
+    getOrderBreakdown(q.requestId, q.id, { creditAccount: cc }).then(setBd);
+  }, [q, cc]);
 
   if (!q) {
     return (
@@ -33,7 +39,7 @@ export default function Pago() {
 
   async function pay() {
     setLoading(true);
-    const res = await createMpCheckout(q.requestId, q.id);
+    const res = await createMpCheckout(q.requestId, q.id, { creditAccount: cc });
     setLoading(false);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
     if (payMode === 'link') {
@@ -71,9 +77,18 @@ export default function Pago() {
           </button>
         </div>
 
+        {q.creditEligible && (
+          <div className="card mb-16" style={{ borderColor: 'rgba(109,40,217,0.45)', background: 'linear-gradient(135deg,rgba(109,40,217,0.12),rgba(31,41,55,0.5))' }}>
+            <label className="flex-between" style={{ cursor: 'pointer', gap: 12 }}>
+              <div className="flex-center gap-12"><div className="store-avatar"><i className="fa-solid fa-id-card-clip"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>Pagar con Cuenta Corriente</div><div className="text-xs muted">El repuesto va a tu cuenta con el comercio. Acá pagás solo comisión + envío.</div></div></div>
+              <input type="checkbox" checked={cc} onChange={(e) => setCc(e.target.checked)} />
+            </label>
+          </div>
+        )}
+
         <div className="section-title"><h2>Detalle</h2></div>
         <div className="card mb-16">
-          <div className="flex-between mb-12"><span className="subtle">Repuesto ({q.partBrand})</span><span style={{ fontWeight: 700 }}>{money(part)}</span></div>
+          <div className="flex-between mb-12"><span className="subtle">Repuesto ({q.partBrand}) {cc && <span className="badge badge-purple" style={{ marginLeft: 4 }}>cuenta corriente</span>}</span><span style={{ fontWeight: 700, textDecoration: cc ? 'line-through' : 'none', opacity: cc ? 0.55 : 1 }}>{money(part)}</span></div>
           <div className="flex-between mb-12"><span className="subtle">Comisión RepuestosAlToque <span className="badge badge-purple" style={{ marginLeft: 4 }}>{commissionPct}%</span></span><span style={{ fontWeight: 700 }}>{money(fee)}</span></div>
           <div className="flex-between mb-12"><span className="subtle">Envío <span className="text-xs muted">(empresa de fletes)</span></span><span style={{ fontWeight: 700 }}>{money(ship)}</span></div>
           {mpFee > 0 && <div className="flex-between mb-12"><span className="subtle">Recargo Mercado Pago</span><span style={{ fontWeight: 700 }}>{money(mpFee)}</span></div>}

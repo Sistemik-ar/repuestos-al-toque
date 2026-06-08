@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor } from '@/lib/ui';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 
@@ -65,6 +65,8 @@ export default function Comercio() {
             <div><div className="v text-green">{sales.length}</div><div className="l">Concretadas</div></div>
           </div>
         </div>
+
+        <CreditRequestsStore />
 
         <div className="pill-tabs mb-16">
           <button className={tab === 'pend' ? 'active' : ''} onClick={() => setTab('pend')}>Pendientes <span className="badge badge-yellow" style={{ marginLeft: 4 }}>{pend.length}</span></button>
@@ -128,6 +130,28 @@ function EntregaCard({ r, label, veh }) {
         <span className="text-sm muted">Venta <b className="text-green">{r.part ? '$' + r.part.toLocaleString('es-AR') : ''}</b></span>
         {salio ? <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retira el flete</span> : <button className="btn btn-yellow btn-sm" onClick={() => { setSalio(true); toast({ title: 'Pedido listo', sub: 'Avisamos a la empresa de envíos', icon: 'fa-box', type: 'green' }); }}><i className="fa-solid fa-box"></i> Salió el pedido</button>}
       </div>
+    </div>
+  );
+}
+
+function CreditRequestsStore() {
+  const [rows, setRows] = useState([]);
+  const load = async () => setRows(await getStoreCreditRequests());
+  useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []);
+  if (rows.length === 0) return null;
+  const pend = rows.filter((r) => r.storeStatus === 'PENDING');
+  async function act(r, approve) { await storeActOnCredit(r.id, approve); toast({ title: approve ? 'Cuenta corriente aprobada' : 'Solicitud rechazada', icon: approve ? 'fa-check' : 'fa-ban', type: approve ? 'green' : 'purple' }); load(); }
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Solicitudes de Cuenta Corriente</h2>{pend.length > 0 && <span className="badge badge-yellow">{pend.length}</span>}</div>
+      {rows.map((r) => (
+        <div className="flex-between mb-12" key={r.id}>
+          <div className="flex-center gap-12"><div className="store-avatar"><i className="fa-solid fa-screwdriver-wrench"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{r.mechanicName}</div><div className="text-xs muted">Solicita operar con cuenta corriente</div></div></div>
+          {r.storeStatus === 'PENDING'
+            ? <div className="flex gap-8"><button className="btn btn-success btn-sm" onClick={() => act(r, true)}>Aprobar</button><button className="btn btn-ghost btn-sm" onClick={() => act(r, false)}>Rechazar</button></div>
+            : <span className={`badge ${r.storeStatus === 'APPROVED' ? 'badge-green' : 'badge-red'}`}>{r.storeStatus === 'APPROVED' ? 'Aprobada' : 'Rechazada'}</span>}
+        </div>
+      ))}
     </div>
   );
 }

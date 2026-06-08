@@ -73,6 +73,12 @@ export default function MecanicoDashboard() {
           <i className="fa-solid fa-arrow-right"></i>
         </Link>
 
+        <Link href="/mecanico/cuentas" className="card hoverable mb-16" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="store-avatar"><i className="fa-solid fa-id-card-clip"></i></div>
+          <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 700 }}>Mis Cuentas Corrientes</div><div className="text-xs muted">Vinculá tus proveedores habituales</div></div>
+          <i className="fa-solid fa-arrow-right"></i>
+        </Link>
+
         <div className="section">
           <div className="section-title"><h2>Pedidos activos</h2></div>
           {activos.length === 0 ? (

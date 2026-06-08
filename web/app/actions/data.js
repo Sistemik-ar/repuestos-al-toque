@@ -33,8 +33,8 @@ function reqBase(r) {
   };
 }
 // Para el mecánico: sin identidad del vendedor (anónimo)
-function quotePublic(q) {
-  return { id: q.id, alias: q.alias, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: num(q.ratingSnapshot) || 4.8, zone: 'Centro', status: q.status };
+function quotePublic(q, creditEligible = false) {
+  return { id: q.id, alias: q.alias, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: num(q.ratingSnapshot) || 4.8, zone: 'Centro', status: q.status, creditEligible };
 }
 
 export async function getMe() {
@@ -75,7 +75,10 @@ export async function getRequestForMechanic(id) {
   const s = await getSession(); if (!s) return null;
   const r = await prisma.request.findUnique({ where: { id }, include: { category: true, quotes: { orderBy: { ratingSnapshot: 'desc' } } } });
   if (!r || r.mechanicId !== s.id) return null;
-  return { ...reqBase(r), quotes: r.quotes.map(quotePublic) };
+  // cuentas corrientes activas del mecánico (para etiquetar ofertas sin revelar identidad)
+  const cc = await prisma.creditAccount.findMany({ where: { mechanicId: s.id, active: true }, select: { storeId: true } });
+  const ccSet = new Set(cc.map((c) => c.storeId));
+  return { ...reqBase(r), quotes: r.quotes.map((q) => quotePublic(q, ccSet.has(q.storeId))) };
 }
 
 export async function acceptQuote(quoteId) {
@@ -299,4 +302,90 @@ export async function saveBusinessSettings(input) {
 export async function geocodeAddress(address) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   return geocode(address);
+}
+
+// ================= Cuenta Corriente =================
+function estadoCC(c) {
+  if (c.disabledAt) return 'DISABLED';
+  if (c.adminStatus === 'REJECTED' || c.storeStatus === 'REJECTED') return 'REJECTED';
+  if (c.active) return 'ACTIVE';
+  return 'PENDING';
+}
+
+// --- Mecánico ---
+export async function getMyCreditAccounts() {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return [];
+  const ccs = await prisma.creditAccount.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' } });
+  const stores = await prisma.storeProfile.findMany({ where: { userId: { in: ccs.map((c) => c.storeId) } }, select: { userId: true, tradeName: true } });
+  const nameOf = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
+  return ccs.map((c) => ({ id: c.id, storeName: nameOf[c.storeId] || 'Comercio', status: estadoCC(c) }));
+}
+
+// Comercios disponibles para solicitar CC + estado actual con este mecánico.
+export async function getStoresForCredit() {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return [];
+  const stores = await prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, barrio: true } });
+  const ccs = await prisma.creditAccount.findMany({ where: { mechanicId: s.id } });
+  const byStore = Object.fromEntries(ccs.map((c) => [c.storeId, c]));
+  return stores.map((st) => ({ storeId: st.userId, name: st.tradeName, barrio: st.barrio, status: byStore[st.userId] ? estadoCC(byStore[st.userId]) : 'NONE' }));
+}
+
+export async function requestCreditAccount(storeId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const store = await prisma.user.findFirst({ where: { id: storeId, role: 'STORE' } });
+  if (!store) return { error: 'Comercio inválido' };
+  await prisma.creditAccount.upsert({
+    where: { mechanicId_storeId: { mechanicId: s.id, storeId } },
+    update: { adminStatus: 'PENDING', storeStatus: 'PENDING', active: false, disabledAt: null, adminActedAt: null, storeActedAt: null },
+    create: { mechanicId: s.id, storeId },
+  });
+  return { ok: true };
+}
+
+// --- Comercio (repuestero) ---
+export async function getStoreCreditRequests() {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return [];
+  const ccs = await prisma.creditAccount.findMany({ where: { storeId: s.id }, orderBy: { createdAt: 'desc' } });
+  const mechs = await prisma.mechanicProfile.findMany({ where: { userId: { in: ccs.map((c) => c.mechanicId) } }, select: { userId: true, workshopName: true } });
+  const nameOf = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
+  return ccs.map((c) => ({ id: c.id, mechanicName: nameOf[c.mechanicId] || 'Taller', storeStatus: c.storeStatus, status: estadoCC(c) }));
+}
+
+export async function storeActOnCredit(id, approve) {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  const cc = await prisma.creditAccount.findUnique({ where: { id } });
+  if (!cc || cc.storeId !== s.id) return { error: 'No autorizado' };
+  const storeStatus = approve ? 'APPROVED' : 'REJECTED';
+  const active = storeStatus === 'APPROVED' && cc.adminStatus === 'APPROVED' && !cc.disabledAt;
+  await prisma.creditAccount.update({ where: { id }, data: { storeStatus, storeActedAt: new Date(), active } });
+  return { ok: true };
+}
+
+// --- Admin ---
+export async function getCreditRequests() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];
+  const ccs = await prisma.creditAccount.findMany({ orderBy: { createdAt: 'desc' } });
+  const [mechs, stores] = await Promise.all([
+    prisma.mechanicProfile.findMany({ where: { userId: { in: ccs.map((c) => c.mechanicId) } }, select: { userId: true, workshopName: true } }),
+    prisma.storeProfile.findMany({ where: { userId: { in: ccs.map((c) => c.storeId) } }, select: { userId: true, tradeName: true } }),
+  ]);
+  const mName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
+  const sName = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
+  return ccs.map((c) => ({ id: c.id, mechanicName: mName[c.mechanicId] || 'Taller', storeName: sName[c.storeId] || 'Comercio', adminStatus: c.adminStatus, storeStatus: c.storeStatus, adminNote: c.adminNote, status: estadoCC(c) }));
+}
+
+export async function adminActOnCredit(id, approve, note) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const cc = await prisma.creditAccount.findUnique({ where: { id } });
+  if (!cc) return { error: 'No encontrado' };
+  const adminStatus = approve ? 'APPROVED' : 'REJECTED';
+  const active = adminStatus === 'APPROVED' && cc.storeStatus === 'APPROVED' && !cc.disabledAt;
+  await prisma.creditAccount.update({ where: { id }, data: { adminStatus, adminNote: note || null, adminActedAt: new Date(), active } });
+  return { ok: true };
+}
+
+export async function disableCreditAccount(id) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  await prisma.creditAccount.update({ where: { id }, data: { active: false, disabledAt: new Date() } });
+  return { ok: true };
 }

@@ -108,6 +108,9 @@ export default function Cotizaciones() {
                         </div>
                         <span className="badge badge-green"><i className="fa-solid fa-shield-halved"></i> {q.warranty}</span>
                       </div>
+                      {q.creditEligible && (
+                        <div className="mb-12"><span className="badge badge-purple" style={{ fontSize: 12 }}><i className="fa-solid fa-id-card-clip"></i> Cuenta Corriente disponible</span></div>
+                      )}
                       <div className="flex-between mb-12">
                         <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}</div></div>
                         <div style={{ textAlign: 'right' }}><div className="text-xs muted">Disponibilidad</div><div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-circle-check text-green"></i> En stock</div></div>
