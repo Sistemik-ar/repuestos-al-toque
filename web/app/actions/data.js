@@ -195,9 +195,10 @@ export async function getStoreSales() {
 
 export async function createQuote(requestId, input) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
-  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true } });
+  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true } });
   if (!req) return { error: 'Solicitud no encontrada' };
   if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
+  if (req.windowEndsAt && req.windowEndsAt.getTime() < Date.now()) return { error: 'La ventana de cotización ya cerró' };
   const dup = await prisma.requestQuote.findFirst({ where: { requestId, storeId: s.id } });
   if (dup) return { error: 'Ya cotizaste esta solicitud' };
   const store = await prisma.storeProfile.findUnique({ where: { userId: s.id } });
