@@ -41,7 +41,7 @@ export default function Repartidor() {
         <div className="section-title"><h2>Para retirar y entregar</h2></div>
         {pend.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-truck-fast"></i></div><div className="text-sm">No hay entregas pendientes</div><div className="text-xs">Aparecen cuando se concreta una venta</div></div>
-        ) : pend.map((o) => (
+        ) : <div className="cards-grid">{pend.map((o) => (
           <div className="card mb-12" key={o.orderId}>
             <div className="flex-between mb-12">
               <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(o)}</div><div className="text-xs muted">Pedido #{o.code}</div></div></div>
@@ -52,7 +52,7 @@ export default function Repartidor() {
               <button className="btn btn-success btn-sm" onClick={() => entregar(o)}><i className="fa-solid fa-check"></i> Marcar entregado</button>
             </div>
           </div>
-        ))}
+        ))}</div>}
       </div>
 
       <nav className="bottom-nav">

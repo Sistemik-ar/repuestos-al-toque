@@ -76,7 +76,7 @@ export default function Comercio() {
 
         {tab === 'pend' && (pend.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">Sin solicitudes pendientes</div><div className="text-xs">Cuando un mecánico pida un repuesto, aparece acá</div></div>
-        ) : pend.map((r) => (
+        ) : <div className="cards-grid">{pend.map((r) => (
           <div className="card mb-12" key={r.id}>
             <div className="flex-between mb-12">
               <div className="flex-center gap-12"><div className="store-avatar" style={r.urgency === 'Necesito ahora' ? { background: 'rgba(239,68,68,0.16)', color: '#FCA5A5' } : {}}><i className="fa-solid fa-bolt"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div></div>
@@ -100,20 +100,20 @@ export default function Comercio() {
               <button className="btn btn-yellow btn-block" onClick={() => setModal(r)}><i className="fa-solid fa-tag"></i> Cotizar</button>
             </div>
           </div>
-        )))}
+        ))}</div>)}
 
         {tab === 'cot' && (cot.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
-        ) : cot.map((r) => (
+        ) : <div className="cards-grid">{cot.map((r) => (
           <div className="card mb-12" key={r.id}>
             <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div><span className="badge badge-purple">Esperando decisión</span></div>
             <div className="flex-between text-sm"><span className="muted">Cotizaste</span><span style={{ fontWeight: 700 }}>{r.myPrice ? '$' + r.myPrice.toLocaleString('es-AR') : '—'}</span></div>
           </div>
-        )))}
+        ))}</div>)}
 
         {tab === 'ent' && (sales.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box"></i></div><div className="text-sm">Sin ventas concretadas todavía</div></div>
-        ) : sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} />))}
+        ) : <div className="cards-grid">{sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} />)}</div>)}
       </div>
 
       {modal && <CotizarModal lead={modal} label={label(modal)} veh={veh(modal)} onClose={() => setModal(null)} onSend={sendQuote} />}

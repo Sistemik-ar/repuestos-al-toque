@@ -81,7 +81,7 @@ export default function Pedido() {
         <Link href="/mecanico" className="icon-btn"><i className="fa-solid fa-xmark"></i></Link>
       </div>
 
-      <div className="container">
+      <div className="container form-narrow">
         <div className="steps">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className={`step ${i < step ? 'done' : i === step ? 'current' : ''}`}></div>

@@ -83,7 +83,7 @@ export default function MecanicoDashboard() {
           <div className="section-title"><h2>Pedidos activos</h2></div>
           {activos.length === 0 ? (
             <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-list"></i></div><div className="text-sm">Todavía no tenés pedidos</div><div className="text-xs">Tocá “Solicitar Repuesto” para crear el primero</div></div>
-          ) : activos.map((r) => (
+          ) : <div className="cards-grid">{activos.map((r) => (
             <Link key={r.id} href={`/mecanico/cotizaciones?id=${r.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
               <div className="flex-between mb-8">
                 <div className="flex-center">
@@ -97,18 +97,18 @@ export default function MecanicoDashboard() {
                 <span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver ofertas →</span>
               </div>
             </Link>
-          ))}
+          ))}</div>}
         </div>
 
         {coordinar.length > 0 && (
           <div className="section">
             <div className="section-title"><h2>A coordinar</h2></div>
-            {coordinar.map((r) => (
+            <div className="cards-grid">{coordinar.map((r) => (
               <div className="card mb-12" key={r.id}>
                 <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)} · #{r.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
                 <div className="flex-between"><span className="text-xs muted">Te llega con el remito vía la empresa de envíos</span><span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> En camino</span></div>
               </div>
-            ))}
+            ))}</div>
           </div>
         )}
       </div>

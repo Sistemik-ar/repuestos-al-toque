@@ -69,7 +69,7 @@ export default function Cotizaciones() {
         <div className="icon-btn"><i className="fa-solid fa-tower-broadcast text-purple"></i></div>
       </div>
 
-      <div className="container">
+      <div className="container form-narrow">
         {!request ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-question"></i></div><div className="text-sm">No hay un pedido para mostrar</div><div className="text-xs mb-16">Creá un pedido para empezar</div><Link href="/mecanico/pedido" className="btn btn-primary btn-sm"><i className="fa-solid fa-plus"></i> Nuevo pedido</Link></div>
         ) : (

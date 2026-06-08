@@ -25,7 +25,7 @@ export default function Pago() {
     return (
       <div className="app-shell">
         <div className="topbar"><div className="flex-center"><Link href="/mecanico" className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link><div style={{ fontWeight: 800 }}>Pago</div></div></div>
-        <div className="container"><div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-receipt"></i></div><div className="text-sm">No hay una oferta elegida</div><Link href="/mecanico" className="btn btn-primary btn-sm mt-16">Volver</Link></div></div>
+        <div className="container form-narrow"><div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-receipt"></i></div><div className="text-sm">No hay una oferta elegida</div><Link href="/mecanico" className="btn btn-primary btn-sm mt-16">Volver</Link></div></div>
       </div>
     );
   }
@@ -57,7 +57,7 @@ export default function Pago() {
         <div className="flex-center gap-8"><i className="fa-solid fa-lock text-green"></i><span className="text-xs muted">Pago seguro</span></div>
       </div>
 
-      <div className="container">
+      <div className="container form-narrow">
         <div className="section-title"><h2>Oferta elegida</h2></div>
         <div className="card mb-16">
           <div className="flex-between mb-12">
