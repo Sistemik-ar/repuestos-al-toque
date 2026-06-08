@@ -34,7 +34,7 @@ function reqBase(r) {
 }
 // Para el mecánico: sin identidad del vendedor (anónimo)
 function quotePublic(q, creditEligible = false) {
-  return { id: q.id, alias: q.alias, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: num(q.ratingSnapshot) || 4.8, zone: 'Centro', status: q.status, creditEligible };
+  return { id: q.id, alias: q.alias, optionLabel: q.optionLabel, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: num(q.ratingSnapshot) || 4.8, zone: 'Centro', status: q.status, creditEligible };
 }
 
 export async function getMe() {
@@ -184,7 +184,7 @@ export async function getOpenRequestsForStore() {
     include: { category: true, quotes: { where: { storeId: s.id }, select: { id: true, price: true } } },
   });
   // sin identidad del mecánico
-  return rows.map((r) => ({ ...reqBase(r), mineQuoted: r.quotes.length > 0, myPrice: r.quotes[0] ? num(r.quotes[0].price) : null }));
+  return rows.map((r) => ({ ...reqBase(r), myCount: r.quotes.length, myPrices: r.quotes.map((q) => num(q.price)) }));
 }
 
 export async function getStoreSales() {
@@ -199,12 +199,15 @@ export async function createQuote(requestId, input) {
   if (!req) return { error: 'Solicitud no encontrada' };
   if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
   if (req.windowEndsAt && req.windowEndsAt.getTime() < Date.now()) return { error: 'La ventana de cotización ya cerró' };
-  const dup = await prisma.requestQuote.findFirst({ where: { requestId, storeId: s.id } });
-  if (dup) return { error: 'Ya cotizaste esta solicitud' };
+  // El repuestero puede enviar varias opciones (ej. Original / Alternativa), hasta un tope.
+  const MAX_OPCIONES = 3;
+  const mine = await prisma.requestQuote.count({ where: { requestId, storeId: s.id } });
+  if (mine >= MAX_OPCIONES) return { error: `Podés enviar hasta ${MAX_OPCIONES} opciones por solicitud` };
   const store = await prisma.storeProfile.findUnique({ where: { userId: s.id } });
   await prisma.requestQuote.create({
     data: {
       requestId, storeId: s.id, alias: aliasFor(s.name || store?.tradeName),
+      optionLabel: input.optionLabel || null,
       partBrand: input.partBrand || null, price: Number(String(input.price).replace(/\D/g, '')) || 0,
       warranty: input.warranty || '6 meses', note: input.note || null,
       ratingSnapshot: store?.ratingAvg ?? 4.8, photoUrls: input.photoUrls || [],

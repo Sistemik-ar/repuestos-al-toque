@@ -23,8 +23,8 @@ export default function Comercio() {
   };
   useEffect(() => { load(); const t = setInterval(load, 4000); return () => clearInterval(t); }, []);
 
-  const pend = open.filter((r) => !r.mineQuoted && !dismissed.includes(r.id));
-  const cot = open.filter((r) => r.mineQuoted);
+  const pend = open.filter((r) => r.myCount === 0 && !dismissed.includes(r.id));
+  const cot = open.filter((r) => r.myCount > 0);
   const initials = (me?.name || 'RC').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
@@ -106,8 +106,9 @@ export default function Comercio() {
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
         ) : <div className="cards-grid">{cot.map((r) => (
           <div className="card mb-12" key={r.id}>
-            <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div><span className="badge badge-purple">Esperando decisión</span></div>
-            <div className="flex-between text-sm"><span className="muted">Cotizaste</span><span style={{ fontWeight: 700 }}>{r.myPrice ? '$' + r.myPrice.toLocaleString('es-AR') : '—'}</span></div>
+            <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div><span className="badge badge-purple">{r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</span></div>
+            <div className="flex-between text-sm mb-12"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{r.myPrices.map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
+            {r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
           </div>
         ))}</div>)}
 
@@ -159,6 +160,7 @@ function CreditRequestsStore() {
 function CotizarModal({ lead, label, veh, onClose, onSend }) {
   const [price, setPrice] = useState('');
   const [brand, setBrand] = useState('Bosch');
+  const [opcion, setOpcion] = useState('Original / OEM');
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -178,10 +180,13 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <div className="modal-handle"></div>
-        <h2 className="h-md mb-4">Enviar cotización</h2>
-        <p className="text-sm muted mb-16">{label} · {veh}</p>
+        <h2 className="h-md mb-4">Enviar cotización{lead.myCount > 0 ? ` · opción ${lead.myCount + 1}` : ''}</h2>
+        <p className="text-sm muted mb-16">{label} · {veh}{lead.myCount > 0 ? ' · podés ofrecer otra alternativa' : ''}</p>
         <div className="field"><label>Precio final</label><input className="input" inputMode="numeric" placeholder="$ 0" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-        <div className="field"><label>Marca de la pieza</label><select className="select" value={brand} onChange={(e) => setBrand(e.target.value)}><option>Bosch</option><option>TRW</option><option>Ferodo</option><option>Original / OEM</option><option>Alternativa</option></select></div>
+        <div className="grid-2">
+          <div className="field"><label>Marca de la pieza</label><select className="select" value={brand} onChange={(e) => setBrand(e.target.value)}><option>Bosch</option><option>TRW</option><option>Ferodo</option><option>Original / OEM</option><option>Alternativa</option></select></div>
+          <div className="field"><label>Tipo de opción</label><select className="select" value={opcion} onChange={(e) => setOpcion(e.target.value)}><option>Original / OEM</option><option>Alternativa</option><option>Usado</option><option>Reacondicionado</option></select></div>
+        </div>
         <div className="field">
           <label>Fotos de la pieza <span className="muted">(hasta 3, opcional)</span></label>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPick} />
@@ -198,7 +203,7 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">
           <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={onClose}>Cancelar</button>
-          <button className="btn btn-yellow btn-block" disabled={!price} onClick={() => onSend({ price, partBrand: brand, note, photoUrls: photos })}><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</button>
+          <button className="btn btn-yellow btn-block" disabled={!price} onClick={() => onSend({ price, partBrand: brand, optionLabel: opcion, note, photoUrls: photos })}><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</button>
         </div>
       </div>
     </div>

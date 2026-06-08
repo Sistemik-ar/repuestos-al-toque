@@ -112,7 +112,7 @@ export default function Cotizaciones() {
                         <div className="mb-12"><span className="badge badge-purple" style={{ fontSize: 12 }}><i className="fa-solid fa-id-card-clip"></i> Cuenta Corriente disponible</span></div>
                       )}
                       <div className="flex-between mb-12">
-                        <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}</div></div>
+                        <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}{q.optionLabel ? ` · ${q.optionLabel}` : ''}</div></div>
                         <div style={{ textAlign: 'right' }}><div className="text-xs muted">Disponibilidad</div><div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-circle-check text-green"></i> En stock</div></div>
                       </div>
                       {q.photoUrls?.length > 0 && <div className="flex gap-8 mb-12">{q.photoUrls.map((src, j) => <img key={j} src={src} alt="" onClick={() => setZoom(src)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }} />)}</div>}

@@ -20,8 +20,8 @@ test('pago sin oferta elegida muestra aviso', async ({ page }) => {
   await expect(page.getByText(/No hay una oferta elegida/i)).toBeVisible();
 });
 
-test('un comercio no puede cotizar dos veces la misma solicitud', async ({ browser }) => {
-  const desc = `DobleCot E2E ${Date.now()}`;
+test('un comercio puede enviar varias opciones para la misma solicitud', async ({ browser }) => {
+  const desc = `MultiOpcion E2E ${Date.now()}`;
 
   const mc = await browser.newContext();
   const m = await mc.newPage();
@@ -39,16 +39,30 @@ test('un comercio no puede cotizar dos veces la misma solicitud', async ({ brows
   const sc = await browser.newContext();
   const s = await sc.newPage();
   await login(s, 'vendedor@repuestosaltoque.com.ar', /\/comercio/);
-  const card = s.locator('.card', { hasText: desc });
-  await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
+
+  // Opción 1
+  const pendCard = s.locator('.card', { hasText: desc });
+  await expect(pendCard).toBeVisible({ timeout: 15000 });
+  await pendCard.getByRole('button', { name: /Cotizar/i }).click();
   await s.locator('input[inputmode="numeric"]').first().fill('45000');
   await s.getByRole('button', { name: /Enviar Cotización/i }).click();
 
-  // ya no aparece en Pendientes y sí en Cotizadas
-  await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
+  // Pasa a Cotizadas mostrando "1 opción" + permite agregar otra
+  await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 }); // ya no en Pendientes
   await s.getByRole('button', { name: /Cotizadas/i }).click();
-  await expect(s.locator('.card', { hasText: desc })).toBeVisible();
+  const cotCard = s.locator('.card', { hasText: desc });
+  await expect(cotCard.getByText(/1 opción/)).toBeVisible();
+
+  // Opción 2 (alternativa más barata)
+  await cotCard.getByRole('button', { name: /Agregar otra opción/i }).click();
+  await s.locator('input[inputmode="numeric"]').first().fill('38000');
+  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await expect(s.locator('.card', { hasText: desc }).getByText(/2 opciones/)).toBeVisible({ timeout: 10000 });
+
+  // El mecánico ve las 2 ofertas
+  await m.bringToFront();
+  await m.getByRole('button', { name: /Cerrar y ver ofertas/i }).click();
+  await expect(m.getByText(/Ofertas recibidas \(2\)/i)).toBeVisible({ timeout: 15000 });
 
   await mc.close();
   await sc.close();
