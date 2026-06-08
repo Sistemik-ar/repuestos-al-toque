@@ -4,19 +4,16 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { money, ping, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
-import { getRequestForMechanic, acceptQuote } from '@/app/actions/data';
-
-const WINDOW = 600;
+import { getRequestForMechanic, acceptQuote, reopenWindow } from '@/app/actions/data';
 
 export default function Cotizaciones() {
   const router = useRouter();
   const [id, setId] = useState(null);
   const [request, setRequest] = useState(null);
-  const [secs, setSecs] = useState(WINDOW);
-  const [revealed, setRevealed] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [selected, setSelected] = useState(null);
   const [zoom, setZoom] = useState(null);
-  const revealedRef = useRef(false);
+  const announced = useRef(false);
 
   useEffect(() => {
     const rid = new URLSearchParams(window.location.search).get('id');
@@ -26,34 +23,30 @@ export default function Cotizaciones() {
     const load = async () => { const r = await getRequestForMechanic(rid); if (alive) setRequest(r); };
     load();
     const t = setInterval(load, 3000);
-    return () => { alive = false; clearInterval(t); };
+    const c = setInterval(() => setNow(Date.now()), 1000);
+    return () => { alive = false; clearInterval(t); clearInterval(c); };
   }, []);
 
-  useEffect(() => {
-    const t = setInterval(() => setSecs((s) => { if (s <= 1 && !revealedRef.current) { reveal(); return 0; } return s > 0 ? s - 1 : 0; }), 1000);
-    return () => clearInterval(t);
-  }, []);
-
+  const endsAt = request?.windowEndsAt || 0;
+  const secs = endsAt ? Math.max(0, Math.round((endsAt - now) / 1000)) : 0;
+  const revealed = (!!endsAt && now >= endsAt) || ['CLOSED', 'PAID'].includes(request?.status);
   const quotes = (request?.quotes || []).slice().sort((a, b) => b.rating - a.rating);
 
-  function reveal() {
-    if (revealedRef.current) return;
-    revealedRef.current = true; setRevealed(true); ping();
-    toast({ title: quotes.length ? 'Ventana cerrada' : 'Ventana cerrada · sin ofertas', sub: quotes.length ? `${quotes.length} oferta(s)` : 'Podés reintentar', icon: 'fa-flag-checkered', type: quotes.length ? 'yellow' : 'purple' });
-  }
-  function retry() { revealedRef.current = false; setRevealed(false); setSecs(WINDOW); }
+  useEffect(() => {
+    if (revealed && !announced.current && request) {
+      announced.current = true; ping();
+      toast({ title: quotes.length ? 'Ventana cerrada' : 'Ventana cerrada · sin ofertas', sub: quotes.length ? `${quotes.length} oferta(s)` : 'Podés reintentar', icon: 'fa-flag-checkered', type: quotes.length ? 'yellow' : 'purple' });
+    }
+  }, [revealed]); // eslint-disable-line
 
-  async function choose(q) {
-    setSelected(q.id);
-    sessionStorage.setItem('rat_selectedQuote', JSON.stringify({ ...q, requestId: id }));
-  }
+  async function choose(q) { setSelected(q.id); sessionStorage.setItem('rat_selectedQuote', JSON.stringify({ ...q, requestId: id })); }
   async function continuar() {
-    const q = quotes.find((x) => x.id === selected);
-    if (!q) return;
+    const q = quotes.find((x) => x.id === selected); if (!q) return;
     const res = await acceptQuote(q.id);
     if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
     router.push('/mecanico/pago');
   }
+  async function retry() { announced.current = false; await reopenWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
 
   const veh = request ? `${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() : '—';
   const part = request ? (request.desc || request.catLabel) : '—';
@@ -76,7 +69,6 @@ export default function Cotizaciones() {
             <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
               <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>{revealed ? 'Ventana cerrada · ofertas' : 'Ventana de ofertas — se revelan al cerrarse'}</div>
               <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
-              {!revealed && <button className="btn btn-ghost btn-sm mt-12" onClick={reveal}><i className="fa-solid fa-eye"></i> Ver ofertas ahora</button>}
             </div>
 
             <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
@@ -106,9 +98,7 @@ export default function Cotizaciones() {
                         <div><div className="text-xs muted">Marca de la pieza</div><div className="text-sm" style={{ fontWeight: 700 }}>{q.partBrand}</div></div>
                         <div style={{ textAlign: 'right' }}><div className="text-xs muted">Disponibilidad</div><div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-circle-check text-green"></i> En stock</div></div>
                       </div>
-                      {q.photoUrls?.length > 0 && (
-                        <div className="flex gap-8 mb-12">{q.photoUrls.map((src, j) => <img key={j} src={src} alt="" onClick={() => setZoom(src)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }} />)}</div>
-                      )}
+                      {q.photoUrls?.length > 0 && <div className="flex gap-8 mb-12">{q.photoUrls.map((src, j) => <img key={j} src={src} alt="" onClick={() => setZoom(src)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }} />)}</div>}
                       {q.note && <div className="text-xs muted mb-12"><i className="fa-solid fa-note-sticky"></i> {q.note}</div>}
                       <div className="divider" style={{ margin: '12px 0' }}></div>
                       <div className="flex-between">

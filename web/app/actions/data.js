@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
+import { computeShip } from '@/lib/orders';
+import { geocode } from '@/lib/geo';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
@@ -24,6 +26,7 @@ function reqBase(r) {
     status: r.status, photoUrls: r.photoUrls || [],
     invoiceType: r.invoiceType === 'FACTURA_A' ? 'factura_a' : 'consumidor_final',
     emisorRazon: r.invEmisorName, emisorCuit: r.invEmisorCuit, solicRazon: r.invBuyerName, solicCuit: r.invBuyerCuit,
+    windowEndsAt: r.windowEndsAt ? r.windowEndsAt.getTime() : null,
     createdAt: r.createdAt?.getTime() || 0,
   };
 }
@@ -82,11 +85,19 @@ export async function acceptQuote(quoteId) {
   return { ok: true, requestId: q.requestId, quoteId };
 }
 
+export async function reopenWindow(requestId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const r = await prisma.request.findUnique({ where: { id: requestId }, select: { mechanicId: true } });
+  if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
+  await prisma.request.update({ where: { id: requestId }, data: { status: 'OPEN', windowEndsAt: new Date(Date.now() + 10 * 60 * 1000) } });
+  return { ok: true };
+}
+
 export async function markRequestPaid(requestId, quoteId) {
   const s = await getSession(); if (!s) return { error: 'No autorizado' };
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId } });
   if (!q) return { error: 'Cotización no encontrada' };
-  const part = num(q.price) || 0; const commission = Math.round(part * 0.05); const ship = 3500; const total = part + commission + ship;
+  const part = num(q.price) || 0; const commission = Math.round(part * 0.05); const ship = await computeShip(requestId, q.storeId); const total = part + commission + ship;
   await prisma.order.upsert({
     where: { requestId },
     update: { quoteId, storeId: q.storeId, partAmount: part, commissionAmount: commission, freightAmount: ship, total, status: 'PAID' },
@@ -103,7 +114,8 @@ export async function createMpCheckout(requestId, quoteId) {
   if (!q || q.request.mechanicId !== s.id) return { error: 'No autorizado' };
 
   const part = num(q.price) || 0;
-  const total = part + Math.round(part * 0.05) + 3500; // repuesto + comisión 5% + envío
+  const ship = await computeShip(requestId, q.storeId);
+  const total = part + Math.round(part * 0.05) + ship; // repuesto + comisión 5% + envío
 
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
@@ -155,4 +167,57 @@ export async function createQuote(requestId, input) {
   });
   await prisma.request.update({ where: { id: requestId }, data: { status: 'QUOTED' } }).catch(() => {});
   return { ok: true };
+}
+
+// ---- Repartidor ----
+export async function getMyDeliveries() {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return [];
+  const orders = await prisma.order.findMany({ where: { status: { in: ['PAID', 'SHIPPED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
+  return orders.map((o) => ({ orderId: o.id, status: o.status, ...reqBase(o.request) }));
+}
+export async function markDelivered(orderId) {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
+  await prisma.order.update({ where: { id: orderId }, data: { status: 'DELIVERED' } });
+  return { ok: true };
+}
+
+// ---- Admin ----
+export async function getAdminData() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const [usersCount, reqCount, paid, users, recent] = await Promise.all([
+    prisma.user.count(),
+    prisma.request.count(),
+    prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
+    prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, email: true, name: true, role: true, status: true } }),
+    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 15, include: { category: true, order: true } }),
+  ]);
+  const commission = paid.reduce((a, o) => a + num(o.commissionAmount), 0);
+  return {
+    kpis: { users: usersCount, requests: reqCount, paid: paid.length, commission },
+    users,
+    recent: recent.map((r) => ({ id: r.id, code: r.code, label: r.description || r.category?.name || 'Repuesto', vehicle: `${r.brand || ''} ${r.model || ''}`.trim(), status: r.status, total: r.order ? num(r.order.total) : null })),
+  };
+}
+export async function setUserStatus(userId, status) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  await prisma.user.update({ where: { id: userId }, data: { status } });
+  return { ok: true };
+}
+
+// ---- Tarifas de envío (backoffice) ----
+export async function getShippingTariffs() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];
+  const rows = await prisma.shippingTariff.findMany({ orderBy: { uptoKm: 'asc' } });
+  return rows.map((r) => ({ uptoKm: r.uptoKm, price: num(r.price) }));
+}
+export async function saveShippingTariffs(rows) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const clean = (rows || []).map((r) => ({ uptoKm: parseInt(r.uptoKm, 10), price: Math.round(Number(r.price)) || 0 })).filter((r) => r.uptoKm > 0 && r.price > 0);
+  await prisma.shippingTariff.deleteMany({});
+  if (clean.length) await prisma.shippingTariff.createMany({ data: clean, skipDuplicates: true });
+  return { ok: true, count: clean.length };
+}
+export async function geocodeAddress(address) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  return geocode(address);
 }

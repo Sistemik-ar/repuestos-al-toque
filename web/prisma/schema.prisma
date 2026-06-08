@@ -411,3 +411,10 @@ model AuditLog {
   @@index([entity])
   @@map("audit_logs")
 }
+
+model ShippingTariff {
+  id     Int     @id @default(autoincrement())
+  uptoKm Int     @unique @map("upto_km") // banda: hasta N km
+  price  Decimal @db.Decimal(12, 2)
+  @@map("shipping_tariffs")
+}
