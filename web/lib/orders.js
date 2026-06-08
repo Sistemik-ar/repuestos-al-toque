@@ -1,8 +1,20 @@
 // Lógica de órdenes/envío (server-only). NO es server action.
 import { prisma } from '@/lib/db';
 import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
+import { getSettings } from '@/lib/settings';
 
 const num = (d) => (d == null ? 0 : Number(d));
+
+// Desglose de precios según la config (comisión % + recargo MP).
+// creditAccount: cuenta corriente -> el repuesto NO se cobra por la plataforma (se imputa a la CC),
+// la plataforma solo cobra comisión + envío.
+export function computePricing(part, ship, settings, creditAccount = false) {
+  const commissionPct = Number(settings.commissionPct);
+  const commission = Math.round(part * (commissionPct / 100));
+  const cobrable = (creditAccount ? 0 : part) + commission + ship;
+  const mpFeeAmount = settings.mpFeeEnabled ? Math.round(cobrable * (Number(settings.mpFeePct) / 100)) : 0;
+  return { part, commission, commissionPct, ship, mpFeeAmount, creditAccount, total: cobrable + mpFeeAmount };
+}
 
 // Costo de envío de una orden: distancia (comercio → taller) según coords guardadas + tabla de bandas.
 // Si faltan coordenadas o tabla, usa el mínimo ($5000).
@@ -24,22 +36,24 @@ export async function computeShip(requestId, storeId) {
   }
 }
 
-// ref = "requestId::quoteId". Crea la orden y marca el pedido como pagado (idempotente).
+// ref = "requestId::quoteId" (o "requestId::quoteId::cc" para cuenta corriente).
+// Crea la orden y marca el pedido como pagado (idempotente).
 export async function confirmPaidByRef(ref) {
   if (!ref || !String(ref).includes('::')) return false;
-  const [requestId, quoteId] = String(ref).split('::');
+  const [requestId, quoteId, mode] = String(ref).split('::');
+  const creditAccount = mode === 'cc';
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
   if (!q || q.requestId !== requestId) return false;
 
   const part = num(q.price);
-  const commission = Math.round(part * 0.05);
   const ship = await computeShip(requestId, q.storeId);
-  const total = part + commission + ship;
+  const settings = await getSettings();
+  const p = computePricing(part, ship, settings, creditAccount);
 
   await prisma.order.upsert({
     where: { requestId },
     update: { status: 'PAID' },
-    create: { requestId, quoteId, mechanicId: q.request.mechanicId, storeId: q.storeId, partAmount: part, commissionAmount: commission, freightAmount: ship, total, status: 'PAID' },
+    create: { requestId, quoteId, mechanicId: q.request.mechanicId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: p.ship, mpFeeAmount: p.mpFeeAmount, creditAccount: p.creditAccount, total: p.total, status: 'PAID' },
   });
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }).catch(() => {});
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });

@@ -4,7 +4,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
-import { computeShip } from '@/lib/orders';
+import { computeShip, computePricing } from '@/lib/orders';
+import { getSettings as readSettings } from '@/lib/settings';
 import { geocode } from '@/lib/geo';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
@@ -106,27 +107,32 @@ export async function markRequestPaid(requestId, quoteId) {
   const s = await getSession(); if (!s) return { error: 'No autorizado' };
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId } });
   if (!q) return { error: 'Cotización no encontrada' };
-  const part = num(q.price) || 0; const commission = Math.round(part * 0.05); const ship = await computeShip(requestId, q.storeId); const total = part + commission + ship;
+  const part = num(q.price) || 0;
+  const ship = await computeShip(requestId, q.storeId);
+  const p = computePricing(part, ship, await readSettings());
+  const orderData = { quoteId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: p.ship, mpFeeAmount: p.mpFeeAmount, total: p.total, status: 'PAID' };
   await prisma.order.upsert({
     where: { requestId },
-    update: { quoteId, storeId: q.storeId, partAmount: part, commissionAmount: commission, freightAmount: ship, total, status: 'PAID' },
-    create: { requestId, quoteId, mechanicId: s.id, storeId: q.storeId, partAmount: part, commissionAmount: commission, freightAmount: ship, total, status: 'PAID' },
+    update: orderData,
+    create: { requestId, mechanicId: s.id, ...orderData },
   });
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
   return { ok: true };
 }
 
 // ---- Mercado Pago: crea el link de pago (cobro centralizado a la cuenta de Jorge) ----
-export async function createMpCheckout(requestId, quoteId) {
+export async function createMpCheckout(requestId, quoteId, opts = {}) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
   if (!q || q.request.mechanicId !== s.id) return { error: 'No autorizado' };
 
   const part = num(q.price) || 0;
   const ship = await computeShip(requestId, q.storeId);
-  const total = part + Math.round(part * 0.05) + ship; // repuesto + comisión 5% + envío
+  const creditAccount = !!opts.creditAccount;
+  const p = computePricing(part, ship, await readSettings(), creditAccount);
   // Monto de prueba: si MP_TEST_AMOUNT está seteado, cobra eso (ej: 10) en vez del total real.
-  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : total;
+  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : p.total;
+  const orderRef = creditAccount ? `${requestId}::${quoteId}::cc` : `${requestId}::${quoteId}`;
 
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
@@ -135,8 +141,8 @@ export async function createMpCheckout(requestId, quoteId) {
 
   try {
     const { link } = await createPaymentLink({
-      orderRef: `${requestId}::${quoteId}`,
-      title: `Repuesto · pedido #${q.request.code}`,
+      orderRef,
+      title: creditAccount ? `Comisión + envío · pedido #${q.request.code}` : `Repuesto · pedido #${q.request.code}`,
       amount,
       backUrl: `${appUrl}/api/mp/return`,
       notificationUrl: `${appUrl}/api/mp/webhook`,
@@ -145,6 +151,16 @@ export async function createMpCheckout(requestId, quoteId) {
   } catch (e) {
     return { error: e?.message || 'No se pudo generar el link de pago.' };
   }
+}
+
+// Desglose para mostrar en la pantalla de pago (mismo cálculo que el checkout).
+export async function getOrderBreakdown(requestId, quoteId, opts = {}) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return null;
+  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
+  if (!q || q.request.mechanicId !== s.id) return null;
+  const part = num(q.price) || 0;
+  const ship = await computeShip(requestId, q.storeId);
+  return computePricing(part, ship, await readSettings(), !!opts.creditAccount);
 }
 
 // ---- Comercio (vendedor) ----
@@ -264,6 +280,22 @@ export async function saveShippingTariffs(rows) {
   if (clean.length) await prisma.shippingTariff.createMany({ data: clean, skipDuplicates: true });
   return { ok: true, count: clean.length };
 }
+// ---- Comisión y recargo MP (backoffice) ----
+export async function getBusinessSettings() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  return readSettings();
+}
+export async function saveBusinessSettings(input) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const entries = [
+    ['commissionPct', String(Number(input.commissionPct) || 0)],
+    ['mpFeePct', String(Number(input.mpFeePct) || 0)],
+    ['mpFeeEnabled', input.mpFeeEnabled ? 'true' : 'false'],
+  ];
+  for (const [key, value] of entries) await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
+  return { ok: true };
+}
+
 export async function geocodeAddress(address) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   return geocode(address);

@@ -7,6 +7,7 @@ vi.mock('@/lib/db', () => ({
     storeProfile: { findUnique: vi.fn() },
     mechanicProfile: { findUnique: vi.fn() },
     shippingTariff: { findMany: vi.fn() },
+    setting: { findMany: vi.fn() },
     order: { upsert: vi.fn() },
   },
 }));
@@ -33,6 +34,7 @@ describe('confirmPaidByRef', () => {
     prisma.storeProfile.findUnique.mockResolvedValue({ lat: null, lng: null });
     prisma.mechanicProfile.findUnique.mockResolvedValue({ lat: null, lng: null });
     prisma.shippingTariff.findMany.mockResolvedValue([]);
+    prisma.setting.findMany.mockResolvedValue([]); // usa defaults: comisión 5%, sin recargo
     prisma.order.upsert.mockResolvedValue({});
     prisma.requestQuote.update.mockResolvedValue({});
     prisma.request.update.mockResolvedValue({});

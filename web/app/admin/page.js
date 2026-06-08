@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
@@ -53,6 +53,9 @@ export default function Admin() {
 
         {/* Alta de usuarios */}
         <AltaUsuario onCreated={load} />
+
+        {/* Comisión y recargo */}
+        <Pricing />
 
         {/* Tarifas de envío */}
         <div className="card mb-16">
@@ -127,6 +130,29 @@ function Kpi({ label, value, icon, yellow }) {
     <div className="card stat-card">
       <div className="flex-between"><span className="stat-label">{label}</span><i className={`fa-solid ${icon} ${yellow ? 'text-yellow' : 'text-purple'}`}></i></div>
       <div className={`stat-value ${yellow ? 'text-yellow' : ''}`}>{value}</div>
+    </div>
+  );
+}
+
+function Pricing() {
+  const [s, setS] = useState(null);
+  useEffect(() => { getBusinessSettings().then(setS); }, []);
+  if (!s) return null;
+  const set = (k, v) => setS((p) => ({ ...p, [k]: v }));
+  async function save() { const r = await saveBusinessSettings(s); if (r?.ok) toast({ title: 'Configuración guardada', icon: 'fa-check', type: 'green' }); }
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Comisión y recargo</h2></div>
+      <div className="grid-2 mb-12">
+        <div className="field" style={{ marginBottom: 0 }}><label>Comisión de la plataforma (%)</label><input className="input" inputMode="decimal" value={s.commissionPct} onChange={(e) => set('commissionPct', e.target.value)} /></div>
+        <div className="field" style={{ marginBottom: 0 }}><label>Recargo Mercado Pago (%)</label><input className="input" inputMode="decimal" value={s.mpFeePct} onChange={(e) => set('mpFeePct', e.target.value)} /></div>
+      </div>
+      <label className="flex-center gap-8 mb-8" style={{ cursor: 'pointer' }}>
+        <input type="checkbox" checked={s.mpFeeEnabled} onChange={(e) => set('mpFeeEnabled', e.target.checked)} />
+        <span className="text-sm">Sumar el recargo de Mercado Pago al total que paga el cliente</span>
+      </label>
+      <p className="text-xs muted mb-12">La fee de MP varía por plazo de acreditación (al instante 6,39% · 18 días 3,44% · 35 días 1,51%) + IVA. Cargá el % que quieras trasladar al cliente.</p>
+      <button className="btn btn-yellow btn-sm" onClick={save}><i className="fa-solid fa-floppy-disk"></i> Guardar</button>
     </div>
   );
 }

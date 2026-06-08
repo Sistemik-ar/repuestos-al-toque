@@ -2,16 +2,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, toast } from '@/lib/ui';
-import { createMpCheckout } from '@/app/actions/data';
+import { createMpCheckout, getOrderBreakdown } from '@/app/actions/data';
 
 export default function Pago() {
   const [q, setQ] = useState(null);
+  const [bd, setBd] = useState(null);
   const [payMode, setPayMode] = useState('self');
   const [loading, setLoading] = useState(false);
   const [linkCliente, setLinkCliente] = useState('');
 
   useEffect(() => {
-    try { const s = JSON.parse(sessionStorage.getItem('rat_selectedQuote')); if (s) setQ(s); } catch {}
+    try { const s = JSON.parse(sessionStorage.getItem('rat_selectedQuote')); if (s) { setQ(s); getOrderBreakdown(s.requestId, s.id).then(setBd); } } catch {}
   }, []);
 
   if (!q) {
@@ -23,10 +24,12 @@ export default function Pago() {
     );
   }
 
-  const part = q.price;
-  const fee = Math.round(part * 0.05);
-  const ship = 3500;
-  const total = part + fee + ship;
+  const part = bd?.part ?? q.price;
+  const fee = bd?.commission ?? Math.round(q.price * 0.05);
+  const ship = bd?.ship ?? 5000;
+  const mpFee = bd?.mpFeeAmount ?? 0;
+  const commissionPct = bd?.commissionPct ?? 5;
+  const total = bd?.total ?? (part + fee + ship);
 
   async function pay() {
     setLoading(true);
@@ -71,8 +74,9 @@ export default function Pago() {
         <div className="section-title"><h2>Detalle</h2></div>
         <div className="card mb-16">
           <div className="flex-between mb-12"><span className="subtle">Repuesto ({q.partBrand})</span><span style={{ fontWeight: 700 }}>{money(part)}</span></div>
-          <div className="flex-between mb-12"><span className="subtle">Comisión RepuestosAlToque <span className="badge badge-purple" style={{ marginLeft: 4 }}>5%</span></span><span style={{ fontWeight: 700 }}>{money(fee)}</span></div>
+          <div className="flex-between mb-12"><span className="subtle">Comisión RepuestosAlToque <span className="badge badge-purple" style={{ marginLeft: 4 }}>{commissionPct}%</span></span><span style={{ fontWeight: 700 }}>{money(fee)}</span></div>
           <div className="flex-between mb-12"><span className="subtle">Envío <span className="text-xs muted">(empresa de fletes)</span></span><span style={{ fontWeight: 700 }}>{money(ship)}</span></div>
+          {mpFee > 0 && <div className="flex-between mb-12"><span className="subtle">Recargo Mercado Pago</span><span style={{ fontWeight: 700 }}>{money(mpFee)}</span></div>}
           <div className="divider"></div>
           <div className="flex-between"><span className="h-md">Total</span><span className="h-md text-yellow">{money(total)}</span></div>
         </div>
