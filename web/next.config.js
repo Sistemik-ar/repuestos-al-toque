@@ -6,8 +6,8 @@ const nextConfig = {
   // Los .html usan <base href="/demo/"> (inyectado por scripts/sync-demo.mjs) para los links.
   async rewrites() {
     return [
-      { source: '/demo', destination: '/demo/index.html' },
-      { source: '/demo/', destination: '/demo/index.html' },
+      { source: '/demo', destination: '/demo/login.html' },
+      { source: '/demo/', destination: '/demo/login.html' },
     ];
   },
 };
