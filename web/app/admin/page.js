@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
@@ -50,6 +50,9 @@ export default function Admin() {
           <Kpi label="Ingresos (comisión)" value={money(k.commission)} icon="fa-coins" yellow />
           <Kpi label="Usuarios" value={String(k.users)} icon="fa-users" />
         </div>
+
+        {/* Alta de usuarios */}
+        <AltaUsuario onCreated={load} />
 
         {/* Tarifas de envío */}
         <div className="card mb-16">
@@ -124,6 +127,101 @@ function Kpi({ label, value, icon, yellow }) {
     <div className="card stat-card">
       <div className="flex-between"><span className="stat-label">{label}</span><i className={`fa-solid ${icon} ${yellow ? 'text-yellow' : 'text-purple'}`}></i></div>
       <div className={`stat-value ${yellow ? 'text-yellow' : ''}`}>{value}</div>
+    </div>
+  );
+}
+
+const EMPTY = { role: 'STORE', email: '', name: '', phone: '', whatsapp: '', address: '', barrio: '', cuit: '', ivaCondition: 'RESPONSABLE_INSCRIPTO', vehicleType: 'MOTO' };
+
+function AltaUsuario({ onCreated }) {
+  const [f, setF] = useState(EMPTY);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(null); // {email, tempPassword, geocoded}
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const isStore = f.role === 'STORE';
+  const isMech = f.role === 'MECHANIC';
+  const isCourier = f.role === 'DELIVERY';
+
+  async function submit(e) {
+    e.preventDefault(); setError(''); setLoading(true);
+    const res = await createUser(f); setLoading(false);
+    if (res?.error) { setError(res.error); return; }
+    setDone({ email: f.email.trim().toLowerCase(), tempPassword: res.tempPassword, geocoded: res.geocoded });
+    setF(EMPTY); onCreated?.();
+  }
+
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Alta de usuario</h2><span className="text-xs muted">por invitación manual</span></div>
+
+      {done && (
+        <div className="float-notif mb-16" style={{ borderColor: 'rgba(34,197,94,0.35)', background: 'linear-gradient(135deg,rgba(34,197,94,0.12),rgba(31,41,55,0.5))' }}>
+          <i className="fa-solid fa-circle-check text-green"></i>
+          <div className="text-sm subtle">
+            <b>Usuario creado.</b> Pasale estas credenciales:
+            <div className="text-xs mt-4">Email: <b>{done.email}</b> · Contraseña temporal: <b className="text-yellow">{done.tempPassword}</b></div>
+            <div className="text-xs muted mt-4">{done.geocoded ? '📍 Dirección geocodificada (envío por distancia OK)' : '⚠️ No se pudo geocodificar la dirección (usará envío mínimo)'} · <button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${done.email} / ${done.tempPassword}`)}>copiar</button></div>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={submit}>
+        <div className="grid-2 mb-12">
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Rol</label>
+            <select className="select" value={f.role} onChange={(e) => set('role', e.target.value)}>
+              <option value="STORE">Casa de repuestos (vendedor)</option>
+              <option value="MECHANIC">Mecánico / Taller</option>
+              <option value="DELIVERY">Repartidor</option>
+            </select>
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>{isStore ? 'Nombre del comercio' : isMech ? 'Nombre del taller' : 'Nombre'}</label>
+            <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder={isStore ? 'Repuestos Centro' : isMech ? 'Taller Patagonia' : 'Diego R.'} />
+          </div>
+        </div>
+
+        <div className="grid-2 mb-12">
+          <div className="field" style={{ marginBottom: 0 }}><label>Email</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="cuenta@email.com" /></div>
+          <div className="field" style={{ marginBottom: 0 }}><label>WhatsApp</label><input className="input" value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+54 9 294 ..." /></div>
+        </div>
+
+        {(isStore || isMech) && (
+          <div className="grid-2 mb-12">
+            <div className="field" style={{ marginBottom: 0 }}><label>Dirección</label><input className="input" value={f.address} onChange={(e) => set('address', e.target.value)} placeholder="Av. Bustillo 1240" /></div>
+            <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} placeholder="Centro" /></div>
+          </div>
+        )}
+
+        {isStore && (
+          <div className="grid-2 mb-12">
+            <div className="field" style={{ marginBottom: 0 }}><label>CUIT</label><input className="input" inputMode="numeric" value={f.cuit} onChange={(e) => set('cuit', e.target.value)} placeholder="30-12345678-9" /></div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Condición IVA</label>
+              <select className="select" value={f.ivaCondition} onChange={(e) => set('ivaCondition', e.target.value)}>
+                <option value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</option>
+                <option value="MONOTRIBUTO">Monotributo</option>
+                <option value="EXENTO">Exento</option>
+                <option value="CONSUMIDOR_FINAL">Consumidor Final</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {isCourier && (
+          <div className="field mb-12" style={{ marginBottom: 12 }}>
+            <label>Tipo de vehículo</label>
+            <select className="select" value={f.vehicleType} onChange={(e) => set('vehicleType', e.target.value)}>
+              <option value="MOTO">Moto</option><option value="AUTO">Auto</option><option value="UTILITARIO">Utilitario</option>
+            </select>
+          </div>
+        )}
+
+        {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
+        <button className="btn btn-primary" type="submit" disabled={loading || !f.email}>{loading ? <span className="spinner"></span> : <><i className="fa-solid fa-user-plus"></i> Crear usuario</>}</button>
+        <span className="text-xs muted" style={{ marginLeft: 12 }}>Se genera una contraseña temporal para compartir.</span>
+      </form>
     </div>
   );
 }

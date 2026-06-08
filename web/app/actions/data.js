@@ -1,5 +1,6 @@
 'use server';
 import { headers } from 'next/headers';
+import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
@@ -208,6 +209,42 @@ export async function getAdminData() {
     recent: recent.map((r) => ({ id: r.id, code: r.code, label: r.description || r.category?.name || 'Repuesto', vehicle: `${r.brand || ''} ${r.model || ''}`.trim(), status: r.status, total: r.order ? num(r.order.total) : null })),
   };
 }
+// Alta de usuario desde el backoffice (admin). Crea cuenta + perfil + geocodifica dirección.
+export async function createUser(input) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const email = String(input.email || '').trim().toLowerCase();
+  const role = input.role;
+  if (!email || !role) return { error: 'Email y rol son obligatorios.' };
+  if (!['MECHANIC', 'STORE', 'DELIVERY', 'ADMIN'].includes(role)) return { error: 'Rol inválido.' };
+
+  const exists = await prisma.user.findUnique({ where: { email } });
+  if (exists) return { error: 'Ya existe un usuario con ese email.' };
+
+  const tempPassword = Math.random().toString(36).slice(2, 10);
+  const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+  let coords = null;
+  if ((role === 'MECHANIC' || role === 'STORE') && input.address) {
+    coords = await geocode(`${input.address} ${input.barrio || ''}`.trim());
+  }
+
+  try {
+    const user = await prisma.user.create({
+      data: { email, name: input.name || null, role, status: 'ACTIVE', passwordHash, phone: input.phone || null, whatsapp: input.whatsapp || null, createdById: s.id },
+    });
+    if (role === 'MECHANIC') {
+      await prisma.mechanicProfile.create({ data: { userId: user.id, workshopName: input.name || null, barrio: input.barrio || null, address: input.address || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null } });
+    } else if (role === 'STORE') {
+      await prisma.storeProfile.create({ data: { userId: user.id, tradeName: input.name || input.tradeName || 'Comercio', legalName: input.legalName || null, cuit: input.cuit || null, ivaCondition: input.ivaCondition || null, address: input.address || null, barrio: input.barrio || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null } });
+    } else if (role === 'DELIVERY') {
+      await prisma.deliveryProfile.create({ data: { userId: user.id, vehicleType: input.vehicleType || null } });
+    }
+    return { ok: true, tempPassword, geocoded: !!coords };
+  } catch (e) {
+    return { error: e?.code === 'P2002' ? 'Datos duplicados (CUIT o email ya existen).' : 'No se pudo crear el usuario.' };
+  }
+}
+
 export async function setUserStatus(userId, status) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
   await prisma.user.update({ where: { id: userId }, data: { status } });
