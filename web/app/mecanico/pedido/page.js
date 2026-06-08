@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
-import { addRequest, getClientId } from '@/lib/store';
+import { createRequest } from '@/app/actions/data';
+import { uploadPhoto } from '@/lib/upload';
 
 const years = [];
 for (let y = 2026; y >= 1990; y--) years.push(String(y));
@@ -13,9 +14,25 @@ const labels = ['Vehículo', 'Categoría', 'Descripción', 'Urgencia', 'Confirma
 export default function Pedido() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photo: false, invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
+  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
   const [searching, setSearching] = useState(false);
   const [prog, setProg] = useState(5);
+  const [uploading, setUploading] = useState(false);
+
+  async function onPickPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadPhoto(file, 'pedidos');
+      setSt((s) => ({ ...s, photoUrls: [...s.photoUrls, url] }));
+      toast({ title: 'Foto subida', icon: 'fa-image', type: 'green' });
+    } catch (err) {
+      toast({ title: 'No se pudo subir la foto', sub: String(err?.message || err), icon: 'fa-triangle-exclamation', type: 'yellow' });
+    }
+    setUploading(false);
+  }
 
   const models = st.brand && data.models[st.brand] ? data.models[st.brand] : [];
   const needsOther = st.brand && (models.length === 0 || st.model === 'Otro');
@@ -40,13 +57,14 @@ export default function Pedido() {
   }
 
   async function submit() {
-    const payload = { ...st, model: needsOther ? st.modelOther : st.model, clientId: getClientId(), mechanic: 'Taller Patagonia' };
+    const payload = { ...st, model: needsOther ? st.modelOther : st.model };
     setSearching(true);
-    const reqId = await addRequest(payload); // compartido: lo ven los vendedores
+    const res = await createRequest(payload);
+    if (res?.error) { setSearching(false); toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
     let p = 5;
     const id = setInterval(() => {
       p += Math.random() * 22; if (p > 100) p = 100; setProg(p);
-      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones?id=' + reqId), 400); }
+      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones?id=' + res.id), 400); }
     }, 280);
   }
 
@@ -139,16 +157,20 @@ export default function Pedido() {
             </div>
             <div className="field">
               <label>Foto <span className="muted">(opcional)</span></label>
-              <div className="upload-area" onClick={() => { set({ photo: true }); toast({ title: 'Foto agregada', icon: 'fa-image', type: 'green' }); }}>
-                <i className="fa-solid fa-camera" style={{ fontSize: 24 }}></i>
-                <div className="text-sm mt-8" style={{ fontWeight: 600 }}>Agregar foto</div>
+              <input id="reqPhoto" type="file" accept="image/*" hidden onChange={onPickPhoto} />
+              <label htmlFor="reqPhoto" className="upload-area" style={{ display: 'block', cursor: 'pointer' }}>
+                <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`} style={{ fontSize: 24 }}></i>
+                <div className="text-sm mt-8" style={{ fontWeight: 600 }}>{uploading ? 'Subiendo…' : 'Agregar foto'}</div>
                 <div className="text-xs">Sacá foto de la pieza o el número de parte</div>
-              </div>
-              {st.photo && (
-                <div className="float-notif mt-12">
-                  <div className="store-avatar" style={{ width: 38, height: 38, background: 'rgba(34,197,94,0.18)', color: '#4ADE80' }}><i className="fa-solid fa-image"></i></div>
-                  <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 700 }}>foto_pieza.jpg</div><div className="text-xs muted">Cargada · 1.2 MB</div></div>
-                  <i className="fa-solid fa-check text-green"></i>
+              </label>
+              {st.photoUrls.length > 0 && (
+                <div className="flex gap-8 mt-12" style={{ flexWrap: 'wrap' }}>
+                  {st.photoUrls.map((url, i) => (
+                    <div key={i} style={{ position: 'relative' }}>
+                      <img src={url} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />
+                      <button onClick={() => set({ photoUrls: st.photoUrls.filter((_, j) => j !== i) })} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--red)', color: '#fff', cursor: 'pointer', fontSize: 11 }}>✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, ping, toast } from '@/lib/ui';
-import { setRequestStatus } from '@/lib/store';
+import { markRequestPaid } from '@/app/actions/data';
 
 export default function Pago() {
   const [q, setQ] = useState(null);
@@ -45,12 +45,12 @@ export default function Pago() {
       return;
     }
     setPhase('processing');
-    setTimeout(() => {
+    setTimeout(async () => {
+      if (q.requestId && q.id) await markRequestPaid(q.requestId, q.id);
       setPhase('done');
-      if (q.requestId) setRequestStatus(q.requestId, 'paid');
       ping();
-      toast({ title: 'Pago aprobado', sub: 'Mercado Pago reparte automáticamente', icon: 'fa-circle-check', type: 'green' });
-    }, 2200);
+      toast({ title: 'Pago aprobado', sub: 'Pedido confirmado', icon: 'fa-circle-check', type: 'green' });
+    }, 2000);
   }
 
   return (
