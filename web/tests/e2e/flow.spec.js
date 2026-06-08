@@ -14,24 +14,25 @@ test('pedido → cotización → cierre de ventana → elegir → pago (link MP)
   const m = await mc.newPage();
   await login(m, 'mecanico@repuestosaltoque.com.ar');
   await expect(m).toHaveURL(/\/mecanico/);
+  const desc = `Flujo E2E ${Date.now()}`;
   await m.goto('/mecanico/pedido');
   await m.locator('button:has-text("Toyota Hilux")').first().click(); // vehículo rápido
   await m.getByRole('button', { name: /Continuar/i }).click(); // a categoría
   await m.locator('text=Frenos').first().click(); // categoría -> paso 3
-  await m.locator('textarea').first().fill('Pastillas de freno E2E');
+  await m.locator('textarea').first().fill(desc);
   await m.getByRole('button', { name: /Continuar/i }).click(); // a urgencia
   await m.getByRole('button', { name: /Continuar/i }).click(); // a confirmar
   await m.getByRole('button', { name: /Enviar pedido/i }).click();
   await expect(m).toHaveURL(/\/mecanico\/cotizaciones\?id=/, { timeout: 15000 });
-  const reqUrl = m.url();
-  const reqId = new URL(reqUrl).searchParams.get('id');
 
-  // 2) Vendedor cotiza ese pedido
+  // 2) Vendedor cotiza ESE pedido (lo ubica por su descripción única)
   const sc = await browser.newContext();
   const s = await sc.newPage();
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   await expect(s).toHaveURL(/\/comercio/);
-  await s.getByRole('button', { name: /Cotizar/i }).first().click();
+  const card = s.locator('.card', { hasText: desc });
+  await expect(card).toBeVisible({ timeout: 15000 });
+  await card.getByRole('button', { name: /Cotizar/i }).click();
   await s.locator('input[inputmode="numeric"]').first().fill('39900');
   await s.getByRole('button', { name: /Enviar Cotización/i }).click();
 

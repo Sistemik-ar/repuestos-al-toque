@@ -46,23 +46,32 @@ export async function getMe() {
 export async function createRequest(input) {
   const s = await getSession();
   if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  if (!String(input.desc || '').trim()) return { error: 'Describí el repuesto que necesitás.' };
   let categoryId = null;
   if (input.cat) { const c = await prisma.category.findUnique({ where: { slug: input.cat } }); categoryId = c?.id ?? null; }
-  const code = String(1042 + (await prisma.request.count()));
-  const r = await prisma.request.create({
-    data: {
-      code, mechanicId: s.id,
-      brand: input.brand || null, model: input.model || null, year: input.year ? parseInt(input.year, 10) : null, vin: input.vin || null,
-      categoryId, description: input.desc || null,
-      urgency: URGENCY[input.urgency] || 'AHORA',
-      photoUrls: input.photoUrls || [],
-      invoiceType: input.invoiceType === 'factura_a' ? 'FACTURA_A' : 'CONSUMIDOR_FINAL',
-      invEmisorName: input.emisorRazon || null, invEmisorCuit: input.emisorCuit || null,
-      invBuyerName: input.solicRazon || null, invBuyerCuit: input.solicCuit || null,
-      status: 'OPEN', windowEndsAt: new Date(Date.now() + 10 * 60 * 1000),
-    },
-  });
-  return { id: r.id, code: r.code };
+  const data = {
+    mechanicId: s.id,
+    brand: input.brand || null, model: input.model || null, year: input.year ? parseInt(input.year, 10) : null, vin: input.vin || null,
+    categoryId, description: input.desc || null,
+    urgency: URGENCY[input.urgency] || 'AHORA',
+    photoUrls: input.photoUrls || [],
+    invoiceType: input.invoiceType === 'factura_a' ? 'FACTURA_A' : 'CONSUMIDOR_FINAL',
+    invEmisorName: input.emisorRazon || null, invEmisorCuit: input.emisorCuit || null,
+    invBuyerName: input.solicRazon || null, invBuyerCuit: input.solicCuit || null,
+    status: 'OPEN', windowEndsAt: new Date(Date.now() + 10 * 60 * 1000),
+  };
+  // código legible + reintento por si dos pedidos se crean a la vez (evita colisión del unique)
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const n = await prisma.request.count();
+    const code = String(1042 + n + (attempt ? Math.floor(Math.random() * 5000) : 0));
+    try {
+      const r = await prisma.request.create({ data: { ...data, code } });
+      return { id: r.id, code: r.code };
+    } catch (e) {
+      if (e?.code !== 'P2002') throw e; // solo reintenta si fue colisión de code
+    }
+  }
+  return { error: 'No se pudo generar el pedido, reintentá.' };
 }
 
 export async function getMyRequests() {
@@ -186,6 +195,11 @@ export async function getStoreSales() {
 
 export async function createQuote(requestId, input) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true } });
+  if (!req) return { error: 'Solicitud no encontrada' };
+  if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
+  const dup = await prisma.requestQuote.findFirst({ where: { requestId, storeId: s.id } });
+  if (dup) return { error: 'Ya cotizaste esta solicitud' };
   const store = await prisma.storeProfile.findUnique({ where: { userId: s.id } });
   await prisma.requestQuote.create({
     data: {

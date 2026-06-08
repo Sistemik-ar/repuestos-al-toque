@@ -39,8 +39,11 @@ export default function Pedido() {
   const set = (patch) => setSt((s) => ({ ...s, ...patch }));
 
   const cuitOk = (v) => /^\d{11}$/.test(String(v || '').replace(/\D/g, ''));
-  const step3Valid = st.invoiceType !== 'factura_a' ||
-    (st.emisorRazon.trim() && cuitOk(st.emisorCuit) && st.solicRazon.trim() && cuitOk(st.solicCuit));
+  const step1Valid = !!st.brand && !!(needsOther ? st.modelOther.trim() : st.model);
+  const step3Valid = !!st.desc.trim() &&
+    (st.invoiceType !== 'factura_a' ||
+      (st.emisorRazon.trim() && cuitOk(st.emisorCuit) && st.solicRazon.trim() && cuitOk(st.solicCuit)));
+  const stepOk = step === 1 ? step1Valid : step === 3 ? step3Valid : true;
 
   function quickVehicle(b, m, y) {
     set({ brand: b, model: m, year: y, modelOther: '' });
@@ -48,8 +51,10 @@ export default function Pedido() {
   }
 
   function next() {
-    if (step === 3 && !step3Valid) {
-      toast({ title: 'Completá los datos de Factura A', sub: 'Razón social y CUIT (11 dígitos) en ambos bloques', icon: 'fa-triangle-exclamation', type: 'yellow' });
+    if (!stepOk) {
+      if (step === 1) toast({ title: 'Elegí el vehículo', sub: 'Marca y modelo', icon: 'fa-car', type: 'yellow' });
+      else if (step === 3 && !st.desc.trim()) toast({ title: 'Describí el repuesto', sub: 'Contá qué pieza necesitás', icon: 'fa-pen', type: 'yellow' });
+      else toast({ title: 'Completá los datos de Factura A', sub: 'Razón social y CUIT (11 dígitos) en ambos bloques', icon: 'fa-triangle-exclamation', type: 'yellow' });
       return;
     }
     if (step < 5) { setStep(step + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }
@@ -223,7 +228,7 @@ export default function Pedido() {
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '14px 16px', background: 'linear-gradient(0deg,var(--bg-0),transparent)' }}>
         <div className="flex gap-12">
           {step > 1 && <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={() => setStep(step - 1)}><i className="fa-solid fa-arrow-left"></i></button>}
-          <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} disabled={step === 3 && !step3Valid} onClick={next}>
+          <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} disabled={!stepOk} onClick={next}>
             {step === 5 ? <><i className="fa-solid fa-paper-plane"></i> Enviar pedido</> : <>Continuar <i className="fa-solid fa-arrow-right"></i></>}
           </button>
         </div>

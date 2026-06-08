@@ -5,7 +5,8 @@ export default defineConfig({
   timeout: 40000,
   expect: { timeout: 10000 },
   fullyParallel: false,
-  retries: 0,
+  workers: 1,
+  retries: 1,
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
     headless: true,

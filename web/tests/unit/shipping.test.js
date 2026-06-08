@@ -25,3 +25,18 @@ describe('haversineKm', () => {
     expect(d).toBeLessThan(8);
   });
 });
+
+describe('shippingCostFromTariff — casos borde', () => {
+  it('bandas desordenadas: igual toma la correcta', () => {
+    const rows = [{ uptoKm: 7, price: 7800 }, { uptoKm: 1, price: 5000 }, { uptoKm: 4, price: 6500 }, { uptoKm: 2, price: 5500 }];
+    expect(shippingCostFromTariff(3, rows)).toBe(6500);
+  });
+  it('km exactamente en el límite usa esa banda', () => {
+    const rows = [{ uptoKm: 1, price: 5000 }, { uptoKm: 5, price: 9000 }];
+    expect(shippingCostFromTariff(5, rows)).toBe(9000);
+    expect(shippingCostFromTariff(5.1, rows)).toBe(9000);
+  });
+  it('km 0 respeta el mínimo aunque la banda sea menor', () => {
+    expect(shippingCostFromTariff(0, [{ uptoKm: 1, price: 4000 }])).toBe(5000);
+  });
+});
