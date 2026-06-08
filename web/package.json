@@ -2,7 +2,9 @@
   "name": "repuestos-al-toque-web",
   "version": "0.1.0",
   "private": true,
-  "prisma": { "seed": "node prisma/seed.mjs" },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
   "scripts": {
     "predev": "node scripts/sync-demo.mjs",
     "dev": "next dev -H 0.0.0.0",
@@ -15,12 +17,13 @@
     "db:seed": "node prisma/seed.mjs"
   },
   "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "bcryptjs": "^2.4.3",
+    "jose": "^6.2.3",
     "next": "14.2.5",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "@supabase/supabase-js": "^2.45.0",
-    "@prisma/client": "^5.18.0",
-    "bcryptjs": "^2.4.3"
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "prisma": "^5.18.0"

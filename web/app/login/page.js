@@ -2,19 +2,24 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { login, ROLE_HOME, DEMO_ACCOUNTS } from '@/lib/auth';
+import { ROLE_HOME, TEST_ACCOUNTS } from '@/lib/auth';
+import { loginAction } from '@/app/actions/auth';
 
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function submit(e) {
+  async function submit(e) {
     e?.preventDefault();
-    const s = login(email);
-    if (!s) { setError('Cuenta no encontrada. El alta es manual (por invitación).'); return; }
-    router.push(ROLE_HOME[s.role] || '/');
+    setError('');
+    setLoading(true);
+    const res = await loginAction(email, pass);
+    setLoading(false);
+    if (res?.error) { setError(res.error); return; }
+    router.push(ROLE_HOME[res.role] || '/');
   }
 
   return (
@@ -33,23 +38,27 @@ export default function Login() {
         <form onSubmit={submit}>
           <div className="field">
             <label>Email</label>
-            <input className="input" type="email" placeholder="tucuenta@email.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} />
+            <input className="input" type="email" autoComplete="email" placeholder="tucuenta@email.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} />
           </div>
           <div className="field">
             <label>Contraseña</label>
-            <input className="input" type="password" placeholder="••••••••" value={pass} onChange={(e) => setPass(e.target.value)} />
+            <input className="input" type="password" autoComplete="current-password" placeholder="••••••••" value={pass} onChange={(e) => setPass(e.target.value)} />
           </div>
           {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
-          <button className="btn btn-primary btn-block btn-lg" type="submit"><i className="fa-solid fa-right-to-bracket"></i> Ingresar</button>
+          <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={loading}>
+            {loading ? <span className="spinner"></span> : <><i className="fa-solid fa-right-to-bracket"></i> Ingresar</>}
+          </button>
         </form>
 
         <div className="float-notif mt-24">
-          <i className="fa-solid fa-circle-info text-purple"></i>
+          <i className="fa-solid fa-flask text-purple"></i>
           <div className="text-sm subtle">
-            <b>Autenticación real (Auth.js): pendiente.</b> Por ahora, cuentas de prueba (cualquier contraseña):
+            <b>Cuentas de prueba</b> (contraseña: <code>repuestos123</code>):
             <div className="text-xs muted mt-8" style={{ lineHeight: 1.7 }}>
-              {Object.entries(DEMO_ACCOUNTS).map(([mail, a]) => (
-                <div key={mail}><button type="button" className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => setEmail(mail)}>{mail}</button> → {a.role}</div>
+              {TEST_ACCOUNTS.map(([mail, label]) => (
+                <div key={mail}>
+                  <button type="button" className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => { setEmail(mail); setPass('repuestos123'); }}>{mail}</button> · {label}
+                </div>
               ))}
             </div>
           </div>
