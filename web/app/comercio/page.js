@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor } from '@/lib/ui';
-import { usePoll } from '@/lib/usePoll';
+import { usePoll, keep } from '@/lib/usePoll';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
@@ -20,8 +20,12 @@ export default function Comercio() {
   const badge = tierFor('store', 312);
 
   const load = async () => {
-    const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
-    setMe(m); setOpen(o); setSales(s);
+    try {
+      const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
+      setMe((p) => keep(p, m || null));
+      setOpen((p) => keep(p, o || []));
+      setSales((p) => keep(p, s || []));
+    } catch {} // si una action falla (red/DB), conservamos el último estado válido
   };
   usePoll(load, 4000);
 
@@ -69,6 +73,29 @@ export default function Comercio() {
         </div>
 
         <CreditRequestsStore />
+
+        {/* Por cobrar: quién le debe plata al vendedor */}
+        {sales.length > 0 && (() => {
+          const plataforma = sales.filter((r) => !r.creditAccount);
+          const cc = sales.filter((r) => r.creditAccount);
+          const sum = (xs) => xs.reduce((a, r) => a + (r.part || 0), 0);
+          return (
+            <div className="card mb-16">
+              <div className="section-title"><h2>Por cobrar</h2></div>
+              <div className="flex-between mb-8">
+                <span className="text-sm subtle"><i className="fa-solid fa-building-columns text-purple"></i> Te liquida RepuestosAlToque</span>
+                <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(plataforma).toLocaleString('es-AR')} <span className="text-xs muted">({plataforma.length} venta{plataforma.length === 1 ? '' : 's'})</span></span>
+              </div>
+              {cc.length > 0 && (
+                <div className="flex-between">
+                  <span className="text-sm subtle"><i className="fa-solid fa-id-card-clip text-yellow"></i> En cuenta corriente (te debe el taller)</span>
+                  <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(cc).toLocaleString('es-AR')} <span className="text-xs muted">({cc.length})</span></span>
+                </div>
+              )}
+              <div className="text-xs muted mt-8">Liquidación semanal de las ventas cobradas por la plataforma.</div>
+            </div>
+          );
+        })()}
 
         <div className="pill-tabs mb-16">
           <button className={tab === 'pend' ? 'active' : ''} onClick={() => setTab('pend')}>Pendientes <span className="badge badge-yellow" style={{ marginLeft: 4 }}>{pend.length}</span></button>
@@ -120,7 +147,7 @@ export default function Comercio() {
       </div>
 
       {modal && <CotizarModal lead={modal} label={label(modal)} veh={veh(modal)} onClose={() => setModal(null)} onSend={sendQuote} />}
-      {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} /></div>}
+      {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '92vw', maxHeight: '85vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 12 }} /></div>}
     </div>
   );
 }
@@ -159,11 +186,17 @@ function EntregaCard({ r, label, veh, onChanged }) {
 
 function CreditRequestsStore() {
   const [rows, setRows] = useState([]);
-  const load = async () => setRows(await getStoreCreditRequests());
+  const [busy, setBusy] = useState(null);
+  const load = async () => { try { const r = await getStoreCreditRequests(); setRows((p) => keep(p, r || [])); } catch {} };
   usePoll(load, 6000);
-  if (rows.length === 0) return null;
+  if (!rows || rows.length === 0) return null;
   const pend = rows.filter((r) => r.storeStatus === 'PENDING');
-  async function act(r, approve) { await storeActOnCredit(r.id, approve); toast({ title: approve ? 'Cuenta corriente aprobada' : 'Solicitud rechazada', icon: approve ? 'fa-check' : 'fa-ban', type: approve ? 'green' : 'purple' }); load(); }
+  async function act(r, approve) {
+    setBusy(r.id);
+    await storeActOnCredit(r.id, approve);
+    toast({ title: approve ? 'Cuenta corriente aprobada' : 'Solicitud rechazada', icon: approve ? 'fa-check' : 'fa-ban', type: approve ? 'green' : 'purple' });
+    await load(); setBusy(null);
+  }
   return (
     <div className="card mb-16">
       <div className="section-title"><h2>Solicitudes de Cuenta Corriente</h2>{pend.length > 0 && <span className="badge badge-yellow">{pend.length}</span>}</div>
@@ -171,7 +204,7 @@ function CreditRequestsStore() {
         <div className="flex-between mb-12" key={r.id}>
           <div className="flex-center gap-12"><div className="store-avatar"><i className="fa-solid fa-screwdriver-wrench"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{r.mechanicName}</div><div className="text-xs muted">Solicita operar con cuenta corriente</div></div></div>
           {r.storeStatus === 'PENDING'
-            ? <div className="flex gap-8"><button className="btn btn-success btn-sm" onClick={() => act(r, true)}>Aprobar</button><button className="btn btn-ghost btn-sm" onClick={() => act(r, false)}>Rechazar</button></div>
+            ? <div className="flex gap-8"><button className="btn btn-success btn-sm" disabled={busy === r.id} onClick={() => act(r, true)}>{busy === r.id ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : 'Aprobar'}</button><button className="btn btn-ghost btn-sm" disabled={busy === r.id} onClick={() => act(r, false)}>Rechazar</button></div>
             : <span className={`badge ${r.storeStatus === 'APPROVED' ? 'badge-green' : 'badge-red'}`}>{r.storeStatus === 'APPROVED' ? 'Aprobada' : 'Rechazada'}</span>}
         </div>
       ))}

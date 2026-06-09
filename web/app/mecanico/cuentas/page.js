@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from '@/lib/ui';
-import { usePoll } from '@/lib/usePoll';
+import { usePoll, keep } from '@/lib/usePoll';
 import { getStoresForCredit, requestCreditAccount } from '@/app/actions/data';
 
 const BADGE = {
@@ -15,7 +15,7 @@ const BADGE = {
 
 export default function Cuentas() {
   const [stores, setStores] = useState([]);
-  const load = async () => setStores(await getStoresForCredit());
+  const load = async () => { try { const d = await getStoresForCredit(); setStores((p) => keep(p, d || [])); } catch {} };
   usePoll(load, 6000);
 
   async function solicitar(st) {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import { tierFor } from '@/lib/ui';
-import { usePoll } from '@/lib/usePoll';
+import { usePoll, keep } from '@/lib/usePoll';
 import { getMe, getMyRequests } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -15,8 +15,10 @@ export default function MecanicoDashboard() {
   const [requests, setRequests] = useState([]);
 
   const load = async () => {
-    const [m, rs] = await Promise.all([getMe(), getMyRequests()]);
-    setMe(m); setRequests(rs);
+    try {
+      const [m, rs] = await Promise.all([getMe(), getMyRequests()]);
+      setMe((p) => keep(p, m || null)); setRequests((p) => keep(p, rs || []));
+    } catch {}
   };
   usePoll(load, 4000);
 

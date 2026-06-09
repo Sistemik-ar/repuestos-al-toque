@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
-import { usePoll } from '@/lib/usePoll';
+import { usePoll, keep } from '@/lib/usePoll';
 import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -17,7 +17,7 @@ export default function Admin() {
 
   // el dashboard se refresca solo; las tarifas NO (para no pisar lo que estás editando):
   // se cargan una vez al entrar y se recargan después de guardar
-  const load = async () => setD(await getAdminData());
+  const load = async () => { try { const a = await getAdminData(); setD((p) => keep(p, a || null)); } catch {} };
   usePoll(load, 6000);
   useEffect(() => { getShippingTariffs().then(setTariffs); }, []);
 
@@ -149,7 +149,7 @@ const CC_STATE = { PENDING: ['badge-yellow', 'Pendiente'], ACTIVE: ['badge-green
 
 function CreditRequests() {
   const [rows, setRows] = useState([]);
-  const load = async () => setRows(await getCreditRequests());
+  const load = async () => { try { const r = await getCreditRequests(); setRows((p) => keep(p, r || [])); } catch {} };
   usePoll(load, 6000);
 
   async function approve(r) { await adminActOnCredit(r.id, true, null); toast({ title: 'Vinculación validada', icon: 'fa-check', type: 'green' }); load(); }

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, toast } from '@/lib/ui';
-import { usePoll } from '@/lib/usePoll';
+import { usePoll, keep } from '@/lib/usePoll';
 import { getRequestDetail, rateOrder, getMyRatingsForOrder } from '@/app/actions/data';
 
 const STEPS = [
@@ -20,7 +20,7 @@ export default function Detalle() {
   const [zoom, setZoom] = useState(null);
 
   useEffect(() => { setId(new URLSearchParams(window.location.search).get('id')); }, []);
-  usePoll(async () => { if (id) setR(await getRequestDetail(id)); }, 5000);
+  usePoll(async () => { if (id) { try { const d = await getRequestDetail(id); setR((p) => keep(p, d)); } catch {} } }, 5000);
   useEffect(() => { if (id) getRequestDetail(id).then(setR); }, [id]);
 
   const veh = r ? `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim() : '';
@@ -113,7 +113,7 @@ export default function Detalle() {
         )}
       </div>
 
-      {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} /></div>}
+      {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '92vw', maxHeight: '85vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 12 }} /></div>}
     </div>
   );
 }

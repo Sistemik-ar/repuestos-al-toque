@@ -213,7 +213,7 @@ export async function getOpenRequestsForStore() {
 export async function getStoreSales() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
   const orders = await prisma.order.findMany({ where: { storeId: s.id, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
-  return orders.map((o) => ({ orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
+  return orders.map((o) => ({ orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
 }
 
 export async function createQuote(requestId, input) {

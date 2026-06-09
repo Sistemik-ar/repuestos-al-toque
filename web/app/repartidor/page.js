@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
-import { usePoll } from '@/lib/usePoll';
+import { usePoll, keep } from '@/lib/usePoll';
 import { getMyDeliveries, markDelivered, claimDelivery } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -13,7 +13,7 @@ export default function Repartidor() {
   const router = useRouter();
   const [items, setItems] = useState([]);
 
-  const load = async () => setItems(await getMyDeliveries());
+  const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); } catch {} };
   usePoll(load, 5000);
 
   const disponibles = items.filter((d) => !d.mine);
