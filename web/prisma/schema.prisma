@@ -311,6 +311,7 @@ model Order {
   @@index([mechanicId])
   @@index([storeId])
   @@index([shipmentId])
+  @@index([status])
   @@map("orders")
 }
 

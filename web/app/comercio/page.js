@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor } from '@/lib/ui';
+import { usePoll } from '@/lib/usePoll';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
@@ -22,7 +23,7 @@ export default function Comercio() {
     const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
     setMe(m); setOpen(o); setSales(s);
   };
-  useEffect(() => { load(); const t = setInterval(load, 4000); return () => clearInterval(t); }, []);
+  usePoll(load, 4000);
 
   const pend = open.filter((r) => r.myCount === 0 && !dismissed.includes(r.id));
   const cot = open.filter((r) => r.myCount > 0);
@@ -140,7 +141,7 @@ function EntregaCard({ r, label, veh }) {
 function CreditRequestsStore() {
   const [rows, setRows] = useState([]);
   const load = async () => setRows(await getStoreCreditRequests());
-  useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []);
+  usePoll(load, 6000);
   if (rows.length === 0) return null;
   const pend = rows.filter((r) => r.storeStatus === 'PENDING');
   async function act(r, approve) { await storeActOnCredit(r.id, approve); toast({ title: approve ? 'Cuenta corriente aprobada' : 'Solicitud rechazada', icon: approve ? 'fa-check' : 'fa-ban', type: approve ? 'green' : 'purple' }); load(); }

@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from '@/lib/ui';
+import { usePoll } from '@/lib/usePoll';
 import { getStoresForCredit, requestCreditAccount } from '@/app/actions/data';
 
 const BADGE = {
@@ -15,7 +16,7 @@ const BADGE = {
 export default function Cuentas() {
   const [stores, setStores] = useState([]);
   const load = async () => setStores(await getStoresForCredit());
-  useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []);
+  usePoll(load, 6000);
 
   async function solicitar(st) {
     const res = await requestCreditAccount(st.storeId);

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
+import { usePoll } from '@/lib/usePoll';
 import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -15,7 +16,7 @@ export default function Admin() {
   const [tariffs, setTariffs] = useState([]);
 
   const load = async () => { const [a, t] = await Promise.all([getAdminData(), getShippingTariffs()]); setD(a); setTariffs(t); };
-  useEffect(() => { load(); const i = setInterval(load, 6000); return () => clearInterval(i); }, []);
+  usePoll(load, 6000);
 
   async function logout() { await logoutAction(); router.push('/login'); }
   async function toggleUser(u) {
@@ -143,7 +144,7 @@ const CC_STATE = { PENDING: ['badge-yellow', 'Pendiente'], ACTIVE: ['badge-green
 function CreditRequests() {
   const [rows, setRows] = useState([]);
   const load = async () => setRows(await getCreditRequests());
-  useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []);
+  usePoll(load, 6000);
 
   async function approve(r) { await adminActOnCredit(r.id, true, null); toast({ title: 'Vinculación validada', icon: 'fa-check', type: 'green' }); load(); }
   async function reject(r) { const note = window.prompt('Observación interna (opcional):') || null; await adminActOnCredit(r.id, false, note); toast({ title: 'Rechazada', icon: 'fa-ban', type: 'purple' }); load(); }

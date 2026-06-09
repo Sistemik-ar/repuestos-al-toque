@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import { tierFor } from '@/lib/ui';
+import { usePoll } from '@/lib/usePoll';
 import { getMe, getMyRequests } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -13,16 +14,11 @@ export default function MecanicoDashboard() {
   const [me, setMe] = useState(null);
   const [requests, setRequests] = useState([]);
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      const [m, rs] = await Promise.all([getMe(), getMyRequests()]);
-      if (alive) { setMe(m); setRequests(rs); }
-    };
-    load();
-    const t = setInterval(load, 4000);
-    return () => { alive = false; clearInterval(t); };
-  }, []);
+  const load = async () => {
+    const [m, rs] = await Promise.all([getMe(), getMyRequests()]);
+    setMe(m); setRequests(rs);
+  };
+  usePoll(load, 4000);
 
   const activos = requests.filter((r) => ['OPEN', 'QUOTED', 'CLOSED'].includes(r.status));
   const coordinar = requests.filter((r) => r.status === 'PAID');

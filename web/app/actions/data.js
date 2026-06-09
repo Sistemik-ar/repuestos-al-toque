@@ -7,6 +7,7 @@ import { createPaymentLink } from '@/lib/mercadopago';
 import { computeShip, computePricing } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode } from '@/lib/geo';
+import { creditStatus, creditActive } from '@/lib/credit';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
@@ -140,7 +141,8 @@ export async function createMpCheckout(requestId, quoteId, opts = {}) {
 
   const part = num(q.price) || 0;
   const ship = await computeShip(requestId, q.storeId);
-  const creditAccount = !!opts.creditAccount;
+  // verificación server-side: solo se honra cuenta corriente si existe una CC ACTIVA real
+  const creditAccount = !!opts.creditAccount && (await ccActiveBetween(s.id, q.storeId));
   const p = computePricing(part, ship, await readSettings(), creditAccount);
   // Monto de prueba: si MP_TEST_AMOUNT está seteado, cobra eso (ej: 10) en vez del total real.
   const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : p.total;
@@ -172,7 +174,13 @@ export async function getOrderBreakdown(requestId, quoteId, opts = {}) {
   if (!q || q.request.mechanicId !== s.id) return null;
   const part = num(q.price) || 0;
   const ship = await computeShip(requestId, q.storeId);
-  return computePricing(part, ship, await readSettings(), !!opts.creditAccount);
+  const creditAccount = !!opts.creditAccount && (await ccActiveBetween(s.id, q.storeId));
+  return computePricing(part, ship, await readSettings(), creditAccount);
+}
+
+async function ccActiveBetween(mechanicId, storeId) {
+  const cc = await prisma.creditAccount.findFirst({ where: { mechanicId, storeId, active: true }, select: { id: true } });
+  return !!cc;
 }
 
 // ---- Comercio (vendedor) ----
@@ -340,20 +348,13 @@ export async function geocodeAddress(address) {
 }
 
 // ================= Cuenta Corriente =================
-function estadoCC(c) {
-  if (c.disabledAt) return 'DISABLED';
-  if (c.adminStatus === 'REJECTED' || c.storeStatus === 'REJECTED') return 'REJECTED';
-  if (c.active) return 'ACTIVE';
-  return 'PENDING';
-}
-
 // --- Mecánico ---
 export async function getMyCreditAccounts() {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return [];
   const ccs = await prisma.creditAccount.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' } });
   const stores = await prisma.storeProfile.findMany({ where: { userId: { in: ccs.map((c) => c.storeId) } }, select: { userId: true, tradeName: true } });
   const nameOf = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
-  return ccs.map((c) => ({ id: c.id, storeName: nameOf[c.storeId] || 'Comercio', status: estadoCC(c) }));
+  return ccs.map((c) => ({ id: c.id, storeName: nameOf[c.storeId] || 'Comercio', status: creditStatus(c) }));
 }
 
 // Comercios disponibles para solicitar CC + estado actual con este mecánico.
@@ -362,7 +363,7 @@ export async function getStoresForCredit() {
   const stores = await prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, barrio: true } });
   const ccs = await prisma.creditAccount.findMany({ where: { mechanicId: s.id } });
   const byStore = Object.fromEntries(ccs.map((c) => [c.storeId, c]));
-  return stores.map((st) => ({ storeId: st.userId, name: st.tradeName, barrio: st.barrio, status: byStore[st.userId] ? estadoCC(byStore[st.userId]) : 'NONE' }));
+  return stores.map((st) => ({ storeId: st.userId, name: st.tradeName, barrio: st.barrio, status: byStore[st.userId] ? creditStatus(byStore[st.userId]) : 'NONE' }));
 }
 
 export async function requestCreditAccount(storeId) {
@@ -383,7 +384,7 @@ export async function getStoreCreditRequests() {
   const ccs = await prisma.creditAccount.findMany({ where: { storeId: s.id }, orderBy: { createdAt: 'desc' } });
   const mechs = await prisma.mechanicProfile.findMany({ where: { userId: { in: ccs.map((c) => c.mechanicId) } }, select: { userId: true, workshopName: true } });
   const nameOf = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
-  return ccs.map((c) => ({ id: c.id, mechanicName: nameOf[c.mechanicId] || 'Taller', storeStatus: c.storeStatus, status: estadoCC(c) }));
+  return ccs.map((c) => ({ id: c.id, mechanicName: nameOf[c.mechanicId] || 'Taller', storeStatus: c.storeStatus, status: creditStatus(c) }));
 }
 
 export async function storeActOnCredit(id, approve) {
@@ -391,7 +392,7 @@ export async function storeActOnCredit(id, approve) {
   const cc = await prisma.creditAccount.findUnique({ where: { id } });
   if (!cc || cc.storeId !== s.id) return { error: 'No autorizado' };
   const storeStatus = approve ? 'APPROVED' : 'REJECTED';
-  const active = storeStatus === 'APPROVED' && cc.adminStatus === 'APPROVED' && !cc.disabledAt;
+  const active = creditActive(cc.adminStatus, storeStatus, cc.disabledAt);
   await prisma.creditAccount.update({ where: { id }, data: { storeStatus, storeActedAt: new Date(), active } });
   return { ok: true };
 }
@@ -406,7 +407,7 @@ export async function getCreditRequests() {
   ]);
   const mName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
   const sName = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
-  return ccs.map((c) => ({ id: c.id, mechanicName: mName[c.mechanicId] || 'Taller', storeName: sName[c.storeId] || 'Comercio', adminStatus: c.adminStatus, storeStatus: c.storeStatus, adminNote: c.adminNote, status: estadoCC(c) }));
+  return ccs.map((c) => ({ id: c.id, mechanicName: mName[c.mechanicId] || 'Taller', storeName: sName[c.storeId] || 'Comercio', adminStatus: c.adminStatus, storeStatus: c.storeStatus, adminNote: c.adminNote, status: creditStatus(c) }));
 }
 
 export async function adminActOnCredit(id, approve, note) {
@@ -414,7 +415,7 @@ export async function adminActOnCredit(id, approve, note) {
   const cc = await prisma.creditAccount.findUnique({ where: { id } });
   if (!cc) return { error: 'No encontrado' };
   const adminStatus = approve ? 'APPROVED' : 'REJECTED';
-  const active = adminStatus === 'APPROVED' && cc.storeStatus === 'APPROVED' && !cc.disabledAt;
+  const active = creditActive(adminStatus, cc.storeStatus, cc.disabledAt);
   await prisma.creditAccount.update({ where: { id }, data: { adminStatus, adminNote: note || null, adminActedAt: new Date(), active } });
   return { ok: true };
 }

@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
+import { usePoll } from '@/lib/usePoll';
 import { getMyDeliveries, markDelivered, markPickedUp } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -13,7 +14,7 @@ export default function Repartidor() {
   const [items, setItems] = useState([]);
 
   const load = async () => setItems(await getMyDeliveries());
-  useEffect(() => { load(); const i = setInterval(load, 5000); return () => clearInterval(i); }, []);
+  usePoll(load, 5000);
 
   const pend = items.filter((d) => d.status !== 'DELIVERED');
   const label = (r) => r.desc || r.catLabel || 'Repuesto';

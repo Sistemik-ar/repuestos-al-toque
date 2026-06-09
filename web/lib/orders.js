@@ -50,11 +50,16 @@ export async function confirmPaidByRef(ref) {
   const settings = await getSettings();
   const p = computePricing(part, ship, settings, creditAccount);
 
-  await prisma.order.upsert({
-    where: { requestId },
-    update: { status: 'PAID' },
-    create: { requestId, quoteId, mechanicId: q.request.mechanicId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: p.ship, mpFeeAmount: p.mpFeeAmount, creditAccount: p.creditAccount, total: p.total, status: 'PAID' },
-  });
+  try {
+    await prisma.order.upsert({
+      where: { requestId },
+      update: { status: 'PAID' },
+      create: { requestId, quoteId, mechanicId: q.request.mechanicId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: p.ship, mpFeeAmount: p.mpFeeAmount, creditAccount: p.creditAccount, total: p.total, status: 'PAID' },
+    });
+  } catch (e) {
+    // el webhook y la vuelta del navegador pueden confirmar a la vez -> la orden ya existe
+    if (e?.code !== 'P2002') throw e;
+  }
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }).catch(() => {});
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
   return true;
