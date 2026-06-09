@@ -6,7 +6,7 @@ import { getSession } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
 import { computeShip, computePricing } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
-import { geocode } from '@/lib/geo';
+import { geocode, inBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
@@ -89,6 +89,21 @@ export async function getRequestForMechanic(id) {
   const cc = await prisma.creditAccount.findMany({ where: { mechanicId: s.id, active: true }, select: { storeId: true } });
   const ccSet = new Set(cc.map((c) => c.storeId));
   return { ...reqBase(r), quotes: r.quotes.map((q) => quotePublic(q, ccSet.has(q.storeId))) };
+}
+
+// Detalle completo de un pedido del mecánico (estado, oferta elegida, totales, envío).
+export async function getRequestDetail(id) {
+  const s = await getSession(); if (!s) return null;
+  const r = await prisma.request.findUnique({ where: { id }, include: { category: true, quotes: true, order: true } });
+  if (!r || r.mechanicId !== s.id) return null;
+  const sel = r.quotes.find((q) => q.status === 'SELECTED') || null;
+  const o = r.order;
+  return {
+    ...reqBase(r),
+    quotesCount: r.quotes.length,
+    selected: sel ? quotePublic(sel) : null,
+    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, hasDelivery: !!o.deliveryId } : null,
+  };
 }
 
 export async function acceptQuote(quoteId) {
@@ -228,7 +243,12 @@ export async function createQuote(requestId, input) {
 // ---- Repartidor ----
 export async function getMyDeliveries() {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return [];
-  const orders = await prisma.order.findMany({ where: { status: { in: ['PAID', 'SHIPPED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
+  // disponibles (sin repartidor asignado) + las mías en curso
+  const orders = await prisma.order.findMany({
+    where: { OR: [{ status: 'PAID', deliveryId: null }, { deliveryId: s.id, status: { in: ['PAID', 'SHIPPED'] } }] },
+    orderBy: { createdAt: 'desc' },
+    include: { request: { include: { category: true } } },
+  });
   const storeIds = [...new Set(orders.map((o) => o.storeId))];
   const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
   const [stores, mechs] = await Promise.all([
@@ -238,19 +258,35 @@ export async function getMyDeliveries() {
   const sMap = Object.fromEntries(stores.map((x) => [x.userId, x]));
   const mMap = Object.fromEntries(mechs.map((x) => [x.userId, x]));
   return orders.map((o) => ({
-    orderId: o.id, status: o.status, ...reqBase(o.request),
+    orderId: o.id, status: o.status, mine: o.deliveryId === s.id, freight: num(o.freightAmount), ...reqBase(o.request),
     pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio } : null,
     dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio } : null,
   }));
 }
+
+// Tomar pedido — claim ATÓMICO: el updateMany con deliveryId:null garantiza que
+// solo UN repartidor puede quedárselo aunque varios toquen el botón a la vez.
+export async function claimDelivery(orderId) {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
+  const r = await prisma.order.updateMany({ where: { id: orderId, deliveryId: null, status: 'PAID' }, data: { deliveryId: s.id } });
+  if (r.count === 0) return { error: 'Otro repartidor ya tomó este pedido' };
+  return { ok: true };
+}
+
 export async function markPickedUp(orderId) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  await prisma.order.update({ where: { id: orderId }, data: { status: 'SHIPPED' } });
+  const r = await prisma.order.updateMany({ where: { id: orderId, deliveryId: s.id, status: 'PAID' }, data: { status: 'SHIPPED' } });
+  if (r.count === 0) return { error: 'Este pedido no está asignado a vos' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { requestId: true } });
+  if (o) await prisma.request.update({ where: { id: o.requestId }, data: { status: 'SHIPPED' } }).catch(() => {});
   return { ok: true };
 }
 export async function markDelivered(orderId) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  await prisma.order.update({ where: { id: orderId }, data: { status: 'DELIVERED' } });
+  const r = await prisma.order.updateMany({ where: { id: orderId, deliveryId: s.id, status: 'SHIPPED' }, data: { status: 'DELIVERED' } });
+  if (r.count === 0) return { error: 'Tenés que retirar el pedido primero' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { requestId: true } });
+  if (o) await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
   return { ok: true };
 }
 
@@ -285,9 +321,14 @@ export async function createUser(input) {
   const tempPassword = Math.random().toString(36).slice(2, 10);
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
+  // Validación de dirección: tiene que existir (geocodificable) y estar en Bariloche.
+  // Sin dirección válida no se puede calcular el costo de envío por distancia.
   let coords = null;
-  if ((role === 'MECHANIC' || role === 'STORE') && input.address) {
+  if (role === 'MECHANIC' || role === 'STORE') {
+    if (!String(input.address || '').trim()) return { error: 'La dirección es obligatoria para mecánicos y comercios.' };
     coords = await geocode(`${input.address} ${input.barrio || ''}`.trim());
+    if (!coords) return { error: 'No encontramos esa dirección. Revisá calle y número (ej: "Av. Bustillo 1240").' };
+    if (!inBariloche(coords)) return { error: `Esa dirección no está en Bariloche (encontramos: ${coords.label?.slice(0, 80)}…). Revisala.` };
   }
 
   try {
@@ -301,7 +342,7 @@ export async function createUser(input) {
     } else if (role === 'DELIVERY') {
       await prisma.deliveryProfile.create({ data: { userId: user.id, vehicleType: input.vehicleType || null } });
     }
-    return { ok: true, tempPassword, geocoded: !!coords };
+    return { ok: true, tempPassword, geocoded: !!coords, geocodedLabel: coords?.label || null };
   } catch (e) {
     return { error: e?.code === 'P2002' ? 'Datos duplicados (CUIT o email ya existen).' : 'No se pudo crear el usuario.' };
   }

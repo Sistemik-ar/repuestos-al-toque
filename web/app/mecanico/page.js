@@ -21,7 +21,8 @@ export default function MecanicoDashboard() {
   usePoll(load, 4000);
 
   const activos = requests.filter((r) => ['OPEN', 'QUOTED', 'CLOSED'].includes(r.status));
-  const coordinar = requests.filter((r) => r.status === 'PAID');
+  const coordinar = requests.filter((r) => ['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status));
+  const SHIP_BADGE = { PAID: ['badge-yellow', 'fa-clock', 'Esperando flete'], SHIPPED: ['badge-yellow', 'fa-truck-fast', 'En camino'], DELIVERED: ['badge-green', 'fa-box-open', 'Entregado'] };
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim() || 'Vehículo';
   const initials = (me?.name || 'TP').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -80,7 +81,7 @@ export default function MecanicoDashboard() {
           {activos.length === 0 ? (
             <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-list"></i></div><div className="text-sm">Todavía no tenés pedidos</div><div className="text-xs">Tocá “Solicitar Repuesto” para crear el primero</div></div>
           ) : <div className="cards-grid">{activos.map((r) => (
-            <Link key={r.id} href={`/mecanico/cotizaciones?id=${r.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
+            <Link key={r.id} href={`/mecanico/detalle?id=${r.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
               <div className="flex-between mb-8">
                 <div className="flex-center">
                   <div className="store-avatar" style={{ width: 38, height: 38 }}><i className="fa-solid fa-box"></i></div>
@@ -99,12 +100,15 @@ export default function MecanicoDashboard() {
         {coordinar.length > 0 && (
           <div className="section">
             <div className="section-title"><h2>A coordinar</h2></div>
-            <div className="cards-grid">{coordinar.map((r) => (
-              <div className="card mb-12" key={r.id}>
-                <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)} · #{r.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
-                <div className="flex-between"><span className="text-xs muted">Te llega con el remito vía la empresa de envíos</span><span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> En camino</span></div>
-              </div>
-            ))}</div>
+            <div className="cards-grid">{coordinar.map((r) => {
+              const [cls, icon, txt] = SHIP_BADGE[r.status] || SHIP_BADGE.PAID;
+              return (
+                <Link key={r.id} href={`/mecanico/detalle?id=${r.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
+                  <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)} · #{r.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
+                  <div className="flex-between"><span className={`badge ${cls}`}><i className={`fa-solid ${icon}`}></i> {txt}</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver detalle →</span></div>
+                </Link>
+              );
+            })}</div>
           </div>
         )}
       </div>

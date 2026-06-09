@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
 import { usePoll } from '@/lib/usePoll';
-import { getMyDeliveries, markDelivered, markPickedUp } from '@/app/actions/data';
+import { getMyDeliveries, markDelivered, markPickedUp, claimDelivery } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
@@ -16,11 +16,17 @@ export default function Repartidor() {
   const load = async () => setItems(await getMyDeliveries());
   usePoll(load, 5000);
 
-  const pend = items.filter((d) => d.status !== 'DELIVERED');
+  const disponibles = items.filter((d) => !d.mine);
+  const mias = items.filter((d) => d.mine);
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
 
-  async function retirar(o) { await markPickedUp(o.orderId); toast({ title: 'Retiraste el pedido', sub: 'En camino al taller', icon: 'fa-box', type: 'green' }); load(); }
-  async function entregar(o) { await markDelivered(o.orderId); toast({ title: 'Entregado', icon: 'fa-check', type: 'green' }); load(); }
+  async function tomar(o) {
+    const res = await claimDelivery(o.orderId);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); load(); return; }
+    toast({ title: 'Pedido tomado', sub: 'Andá a retirarlo al comercio', icon: 'fa-hand', type: 'green' }); load();
+  }
+  async function retirar(o) { const r = await markPickedUp(o.orderId); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); else toast({ title: 'Retiraste el pedido', sub: 'En camino al taller', icon: 'fa-box', type: 'green' }); load(); }
+  async function entregar(o) { const r = await markDelivered(o.orderId); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); else toast({ title: 'Entregado', icon: 'fa-check', type: 'green' }); load(); }
   async function logout() { await logoutAction(); router.push('/login'); }
 
   return (
@@ -37,27 +43,45 @@ export default function Repartidor() {
         <div className="mb-16"><div className="eyebrow">Empresa de fletes</div><h1 className="h-lg">Entregas</h1><p className="text-sm muted">Retiros y entregas asignadas</p></div>
 
         <div className="grid-3 mb-16">
-          <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-green">{pend.length}</div><div className="stat-label">Pendientes</div></div>
+          <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-yellow">{disponibles.length}</div><div className="stat-label">Disponibles</div></div>
+          <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-green">{mias.length}</div><div className="stat-label">Mis entregas</div></div>
           <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value">{items.length}</div><div className="stat-label">Total</div></div>
-          <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-yellow">{items.length - pend.length}</div><div className="stat-label">Entregadas</div></div>
         </div>
 
-        <div className="section-title"><h2>Para retirar y entregar</h2></div>
-        {pend.length === 0 ? (
-          <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-truck-fast"></i></div><div className="text-sm">No hay entregas pendientes</div><div className="text-xs">Aparecen cuando se concreta una venta</div></div>
-        ) : <div className="cards-grid">{pend.map((o) => (
+        {/* Pedidos disponibles para tomar */}
+        <div className="section-title"><h2>Pedidos disponibles</h2><span className="text-xs muted">primero en tomar, se lo lleva</span></div>
+        {disponibles.length === 0 ? (
+          <div className="empty-state" style={{ padding: 24 }}><div className="text-sm muted">No hay pedidos esperando flete</div></div>
+        ) : <div className="cards-grid mb-16">{disponibles.map((o) => (
           <div className="card mb-12" key={o.orderId}>
             <div className="flex-between mb-12">
-              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(o)}</div><div className="text-xs muted">Pedido #{o.code}</div></div></div>
-              <span className="badge badge-yellow">{o.status === 'SHIPPED' ? 'En camino' : 'A retirar'}</span>
+              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(250,204,21,0.16)', color: '#FACC15' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(o)}</div><div className="text-xs muted">Pedido #{o.code}</div></div></div>
+              {o.freight ? <span className="badge badge-green">{'$' + o.freight.toLocaleString('es-AR')}</span> : null}
             </div>
-
             <div className="card mb-12" style={{ background: 'var(--bg-1)', padding: 12 }}>
               <Punto icon="fa-store" color="#FACC15" titulo="Retiro" lugar={o.pickup?.name} dir={o.pickup?.address} barrio={o.pickup?.barrio} maps={mapsUrl(o.pickup)} />
               <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
               <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
             </div>
+            <button className="btn btn-yellow btn-block" onClick={() => tomar(o)}><i className="fa-solid fa-hand"></i> Tomar pedido</button>
+          </div>
+        ))}</div>}
 
+        {/* Mis entregas en curso */}
+        <div className="section-title"><h2>Mis entregas</h2></div>
+        {mias.length === 0 ? (
+          <div className="empty-state" style={{ padding: 24 }}><div className="text-sm muted">Todavía no tomaste ningún pedido</div></div>
+        ) : <div className="cards-grid">{mias.map((o) => (
+          <div className="card mb-12" key={o.orderId}>
+            <div className="flex-between mb-12">
+              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(o)}</div><div className="text-xs muted">Pedido #{o.code}</div></div></div>
+              <span className="badge badge-yellow">{o.status === 'SHIPPED' ? 'En camino' : 'A retirar'}</span>
+            </div>
+            <div className="card mb-12" style={{ background: 'var(--bg-1)', padding: 12 }}>
+              <Punto icon="fa-store" color="#FACC15" titulo="Retiro" lugar={o.pickup?.name} dir={o.pickup?.address} barrio={o.pickup?.barrio} maps={mapsUrl(o.pickup)} />
+              <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
+              <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
+            </div>
             {o.status === 'PAID'
               ? <button className="btn btn-yellow btn-block" onClick={() => retirar(o)}><i className="fa-solid fa-box"></i> Retiré el pedido</button>
               : <button className="btn btn-success btn-block" onClick={() => entregar(o)}><i className="fa-solid fa-check"></i> Marcar entregado</button>}

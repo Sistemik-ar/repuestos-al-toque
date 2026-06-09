@@ -1,6 +1,7 @@
 // Lógica de órdenes/envío (server-only). NO es server action.
 import { prisma } from '@/lib/db';
 import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
+import { drivingKm } from '@/lib/geo';
 import { getSettings } from '@/lib/settings';
 
 const num = (d) => (d == null ? 0 : Number(d));
@@ -28,7 +29,10 @@ export async function computeShip(requestId, storeId) {
     const mech = reqRow ? await prisma.mechanicProfile.findUnique({ where: { userId: reqRow.mechanicId }, select: { lat: true, lng: true } }) : null;
     let km = null;
     if (mech?.lat && mech?.lng && store?.lat && store?.lng) {
-      km = haversineKm({ lat: Number(store.lat), lng: Number(store.lng) }, { lat: Number(mech.lat), lng: Number(mech.lng) }) * 1.3;
+      const a = { lat: Number(store.lat), lng: Number(store.lng) };
+      const b = { lat: Number(mech.lat), lng: Number(mech.lng) };
+      // distancia de manejo real (OSRM); si el servicio falla, estima con línea recta +30%
+      km = (await drivingKm(a, b)) ?? haversineKm(a, b) * 1.3;
     }
     return shippingCostFromTariff(km, tariffs.map((t) => ({ uptoKm: t.uptoKm, price: Number(t.price) })));
   } catch {

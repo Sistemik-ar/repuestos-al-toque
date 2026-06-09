@@ -15,8 +15,11 @@ export default function Admin() {
   const [d, setD] = useState(null);
   const [tariffs, setTariffs] = useState([]);
 
-  const load = async () => { const [a, t] = await Promise.all([getAdminData(), getShippingTariffs()]); setD(a); setTariffs(t); };
+  // el dashboard se refresca solo; las tarifas NO (para no pisar lo que estás editando):
+  // se cargan una vez al entrar y se recargan después de guardar
+  const load = async () => setD(await getAdminData());
   usePoll(load, 6000);
+  useEffect(() => { getShippingTariffs().then(setTariffs); }, []);
 
   async function logout() { await logoutAction(); router.push('/login'); }
   async function toggleUser(u) {
@@ -28,7 +31,10 @@ export default function Admin() {
   function setRow(i, k, v) { setTariffs((t) => t.map((r, j) => (j === i ? { ...r, [k]: v } : r))); }
   function addRow() { setTariffs((t) => [...t, { uptoKm: '', price: '' }]); }
   function delRow(i) { setTariffs((t) => t.filter((_, j) => j !== i)); }
-  async function saveT() { const res = await saveShippingTariffs(tariffs); if (res?.ok) { toast({ title: 'Tarifas guardadas', sub: `${res.count} bandas · mínimo $5.000`, icon: 'fa-check', type: 'green' }); load(); } }
+  async function saveT() {
+    const res = await saveShippingTariffs(tariffs);
+    if (res?.ok) { toast({ title: 'Tarifas guardadas', sub: `${res.count} bandas · mínimo $5.000`, icon: 'fa-check', type: 'green' }); setTariffs(await getShippingTariffs()); }
+  }
 
   const k = d?.kpis || { users: 0, requests: 0, paid: 0, commission: 0 };
 
@@ -223,7 +229,7 @@ function AltaUsuario({ onCreated }) {
     e.preventDefault(); setError(''); setLoading(true);
     const res = await createUser(f); setLoading(false);
     if (res?.error) { setError(res.error); return; }
-    setDone({ email: f.email.trim().toLowerCase(), tempPassword: res.tempPassword, geocoded: res.geocoded });
+    setDone({ email: f.email.trim().toLowerCase(), tempPassword: res.tempPassword, geocoded: res.geocoded, geocodedLabel: res.geocodedLabel });
     setF(EMPTY); onCreated?.();
   }
 
@@ -237,7 +243,7 @@ function AltaUsuario({ onCreated }) {
           <div className="text-sm subtle">
             <b>Usuario creado.</b> Pasale estas credenciales:
             <div className="text-xs mt-4">Email: <b>{done.email}</b> · Contraseña temporal: <b className="text-yellow">{done.tempPassword}</b></div>
-            <div className="text-xs muted mt-4">{done.geocoded ? '📍 Dirección geocodificada (envío por distancia OK)' : '⚠️ No se pudo geocodificar la dirección (usará envío mínimo)'} · <button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${done.email} / ${done.tempPassword}`)}>copiar</button></div>
+            <div className="text-xs muted mt-4">{done.geocoded ? `📍 Dirección validada en Bariloche${done.geocodedLabel ? ': ' + done.geocodedLabel.split(',').slice(0, 3).join(',') : ''}` : 'Sin dirección (repartidor/admin)'} · <button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${done.email} / ${done.tempPassword}`)}>copiar</button></div>
           </div>
         </div>
       )}
