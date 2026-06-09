@@ -213,7 +213,7 @@ function Pricing() {
   );
 }
 
-const EMPTY = { role: 'STORE', email: '', name: '', phone: '', whatsapp: '', address: '', barrio: '', cuit: '', ivaCondition: 'RESPONSABLE_INSCRIPTO', vehicleType: 'MOTO' };
+const EMPTY = { role: 'STORE', email: '', name: '', phone: '', whatsapp: '', address: '', barrio: '', cuit: '', ivaCondition: 'RESPONSABLE_INSCRIPTO', vehicleType: 'MOTO', dni: '', licenseNumber: '', insurance: '', plate: '' };
 
 function AltaUsuario({ onCreated }) {
   const [f, setF] = useState(EMPTY);
@@ -292,12 +292,26 @@ function AltaUsuario({ onCreated }) {
         )}
 
         {isCourier && (
-          <div className="field mb-12" style={{ marginBottom: 12 }}>
-            <label>Tipo de vehículo</label>
-            <select className="select" value={f.vehicleType} onChange={(e) => set('vehicleType', e.target.value)}>
-              <option value="MOTO">Moto</option><option value="AUTO">Auto</option><option value="UTILITARIO">Utilitario</option>
-            </select>
-          </div>
+          <>
+            <div className="grid-2 mb-12">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Tipo de vehículo</label>
+                <select className="select" value={f.vehicleType} onChange={(e) => set('vehicleType', e.target.value)}>
+                  <option value="MOTO">Moto</option><option value="AUTO">Auto</option><option value="UTILITARIO">Utilitario</option>
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Patente</label><input className="input" value={f.plate} onChange={(e) => set('plate', e.target.value)} placeholder="AB 123 CD" /></div>
+            </div>
+            <div className="grid-2 mb-12">
+              <div className="field" style={{ marginBottom: 0 }}><label>DNI *</label><input className="input" inputMode="numeric" value={f.dni} onChange={(e) => set('dni', e.target.value)} placeholder="30111222" /></div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Licencia de conducir *</label><input className="input" value={f.licenseNumber} onChange={(e) => set('licenseNumber', e.target.value)} placeholder="Nro de licencia" /></div>
+            </div>
+            <div className="field mb-12" style={{ marginBottom: 12 }}>
+              <label>Seguro (aseguradora y póliza) *</label>
+              <input className="input" value={f.insurance} onChange={(e) => set('insurance', e.target.value)} placeholder="Ej: Rivadavia · póliza 12345" />
+              <div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Sin DNI + licencia + seguro, el repartidor queda deshabilitado para tomar pedidos.</div>
+            </div>
+          </>
         )}
 
         {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}

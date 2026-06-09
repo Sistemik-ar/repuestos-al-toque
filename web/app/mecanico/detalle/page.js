@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { money } from '@/lib/ui';
+import { money, toast } from '@/lib/ui';
 import { usePoll } from '@/lib/usePoll';
-import { getRequestDetail } from '@/app/actions/data';
+import { getRequestDetail, rateOrder, getMyRatingsForOrder } from '@/app/actions/data';
 
 const STEPS = [
   { key: 'OPEN', label: 'Pedido creado', icon: 'fa-clipboard-list' },
@@ -91,6 +91,18 @@ export default function Detalle() {
               </div>
             )}
 
+            {/* PIN de entrega: el mecánico se lo da al repartidor cuando recibe la pieza */}
+            {r.order?.deliveryPin && r.order.hasDelivery && (
+              <div className="card glow mb-16" style={{ textAlign: 'center', borderColor: 'rgba(250,204,21,0.4)' }}>
+                <div className="text-xs muted mb-4">Tu PIN de entrega</div>
+                <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{r.order.deliveryPin}</div>
+                <div className="text-xs muted mt-4">Dáselo al repartidor <b>solo cuando recibas la pieza</b> — con eso confirma la entrega</div>
+              </div>
+            )}
+
+            {/* Calificaciones al cerrar el ciclo */}
+            {r.status === 'DELIVERED' && <RatingSection requestId={r.id} />}
+
             {/* Acciones según estado */}
             {['OPEN', 'QUOTED', 'CLOSED'].includes(r.status) && (
               <Link href={`/mecanico/cotizaciones?id=${r.id}`} className="btn btn-primary btn-block btn-lg"><i className="fa-solid fa-tags"></i> Ver cotizaciones {r.quotesCount > 0 ? `(${r.quotesCount})` : ''}</Link>
@@ -106,4 +118,50 @@ export default function Detalle() {
 
 function Row({ k, v }) {
   return <div className="flex-between mb-8"><span className="text-sm muted">{k}</span><span className="text-sm" style={{ fontWeight: 700, textAlign: 'right' }}>{v}</span></div>;
+}
+
+function Estrellas({ value, onChange }) {
+  return (
+    <div className="flex gap-8">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" onClick={() => onChange(n)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: n <= value ? 'var(--yellow)' : 'var(--bg-3)' }}>
+          <i className="fa-solid fa-star"></i>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RatingSection({ requestId }) {
+  const [seller, setSeller] = useState(0);
+  const [product, setProduct] = useState(0);
+  const [delivery, setDelivery] = useState(0);
+  const [comment, setComment] = useState('');
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    getMyRatingsForOrder(requestId).then((prev) => {
+      if (prev && Object.keys(prev).length) {
+        setSeller(prev.SELLER || 0); setProduct(prev.PRODUCT || 0); setDelivery(prev.DELIVERY || 0); setSent(true);
+      }
+    });
+  }, [requestId]);
+
+  async function enviar() {
+    const res = await rateOrder(requestId, { seller, product, delivery, comment });
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    setSent(true);
+    toast({ title: '¡Gracias por calificar!', sub: 'Tu opinión mejora el ranking', icon: 'fa-star', type: 'green' });
+  }
+
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Calificá tu experiencia</h2>{sent && <span className="badge badge-green"><i className="fa-solid fa-check"></i> Enviada</span>}</div>
+      <div className="flex-between mb-12"><span className="text-sm">Vendedor</span><Estrellas value={seller} onChange={setSeller} /></div>
+      <div className="flex-between mb-12"><span className="text-sm">Producto</span><Estrellas value={product} onChange={setProduct} /></div>
+      <div className="flex-between mb-12"><span className="text-sm">Delivery</span><Estrellas value={delivery} onChange={setDelivery} /></div>
+      <div className="field"><textarea className="textarea" placeholder="Comentario (opcional)" value={comment} onChange={(e) => setComment(e.target.value)}></textarea></div>
+      <button className="btn btn-yellow btn-block" disabled={!seller && !product && !delivery} onClick={enviar}><i className="fa-solid fa-star"></i> {sent ? 'Actualizar calificación' : 'Enviar calificación'}</button>
+    </div>
+  );
 }

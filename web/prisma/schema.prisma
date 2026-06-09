@@ -175,6 +175,11 @@ model DeliveryProfile {
   vehicleType      PackageSize?    @map("vehicle_type")
   plate            String?
   zones            Json?
+  // Requisitos de habilitación (estilo Uber): sin docsOk no puede tomar pedidos
+  dni              String?
+  licenseNumber    String?         @map("license_number")
+  insurance        String? // aseguradora / nro de póliza
+  docsOk           Boolean         @default(false) @map("docs_ok")
 
   @@map("delivery_profiles")
 }
@@ -302,6 +307,10 @@ model Order {
   payer            String       @default("client")
   status           OrderStatus  @default(PAID)
   deliveryId       String?      @map("delivery_id") // repartidor que tomó el pedido
+  pickupPin        String?      @map("pickup_pin") // lo muestra el repartidor, lo verifica el vendedor
+  deliveryPin      String?      @map("delivery_pin") // lo tiene el mecánico, lo ingresa el repartidor
+  pickedAt         DateTime?    @map("picked_at")
+  deliveredAt      DateTime?    @map("delivered_at")
   shipmentId       String?      @map("shipment_id")
   shipment         Shipment?    @relation(fields: [shipmentId], references: [id])
   createdAt        DateTime     @default(now()) @map("created_at")
@@ -338,10 +347,12 @@ model Rating {
   order     Order    @relation(fields: [orderId], references: [id])
   fromId    String   @map("from_id")
   toId      String   @map("to_id")
+  kind      String? // SELLER | PRODUCT | DELIVERY
   stars     Int
   comment   String?
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@unique([orderId, fromId, kind])
   @@index([toId])
   @@map("ratings")
 }

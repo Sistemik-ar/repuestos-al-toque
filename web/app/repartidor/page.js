@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
 import { usePoll } from '@/lib/usePoll';
-import { getMyDeliveries, markDelivered, markPickedUp, claimDelivery } from '@/app/actions/data';
+import { getMyDeliveries, markDelivered, claimDelivery } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
@@ -25,8 +25,12 @@ export default function Repartidor() {
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); load(); return; }
     toast({ title: 'Pedido tomado', sub: 'Andá a retirarlo al comercio', icon: 'fa-hand', type: 'green' }); load();
   }
-  async function retirar(o) { const r = await markPickedUp(o.orderId); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); else toast({ title: 'Retiraste el pedido', sub: 'En camino al taller', icon: 'fa-box', type: 'green' }); load(); }
-  async function entregar(o) { const r = await markDelivered(o.orderId); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); else toast({ title: 'Entregado', icon: 'fa-check', type: 'green' }); load(); }
+  async function entregar(o, pin) {
+    const r = await markDelivered(o.orderId, pin);
+    if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
+    else toast({ title: 'Entrega confirmada 🎉', sub: 'Ciclo completado', icon: 'fa-check', type: 'green' });
+    load();
+  }
   async function logout() { await logoutAction(); router.push('/login'); }
 
   return (
@@ -82,9 +86,15 @@ export default function Repartidor() {
               <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
               <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
             </div>
-            {o.status === 'PAID'
-              ? <button className="btn btn-yellow btn-block" onClick={() => retirar(o)}><i className="fa-solid fa-box"></i> Retiré el pedido</button>
-              : <button className="btn btn-success btn-block" onClick={() => entregar(o)}><i className="fa-solid fa-check"></i> Marcar entregado</button>}
+            {o.status === 'PAID' ? (
+              <div className="card" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.35)', textAlign: 'center', padding: 14 }}>
+                <div className="text-xs muted mb-4">Mostrale este PIN al vendedor al retirar</div>
+                <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{o.pickupPin || '— — — —'}</div>
+                <div className="text-xs muted mt-4">El vendedor lo ingresa para confirmar que te llevás la pieza</div>
+              </div>
+            ) : (
+              <EntregaPin onConfirm={(pin) => entregar(o, pin)} />
+            )}
           </div>
         ))}</div>}
       </div>
@@ -95,6 +105,19 @@ export default function Repartidor() {
         <Link href="/"><i className="fa-solid fa-coins"></i>Ganancias</Link>
         <button onClick={logout} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--text-2)', fontSize: '10.5px', fontWeight: 600, cursor: 'pointer' }}><i className="fa-solid fa-right-from-bracket"></i>Salir</button>
       </nav>
+    </div>
+  );
+}
+
+function EntregaPin({ onConfirm }) {
+  const [pin, setPin] = useState('');
+  return (
+    <div>
+      <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Pedile el PIN de entrega al mecánico</div>
+      <div className="flex gap-12">
+        <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
+        <button className="btn btn-success btn-block" disabled={pin.length !== 4} onClick={() => { onConfirm(pin); setPin(''); }}><i className="fa-solid fa-check"></i> Confirmar entrega</button>
+      </div>
     </div>
   );
 }

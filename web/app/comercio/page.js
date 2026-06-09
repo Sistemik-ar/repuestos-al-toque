@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor } from '@/lib/ui';
 import { usePoll } from '@/lib/usePoll';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 
@@ -116,7 +116,7 @@ export default function Comercio() {
 
         {tab === 'ent' && (sales.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box"></i></div><div className="text-sm">Sin ventas concretadas todavía</div></div>
-        ) : <div className="cards-grid">{sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} />)}</div>)}
+        ) : <div className="cards-grid">{sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} onChanged={load} />)}</div>)}
       </div>
 
       {modal && <CotizarModal lead={modal} label={label(modal)} veh={veh(modal)} onClose={() => setModal(null)} onSend={sendQuote} />}
@@ -125,15 +125,33 @@ export default function Comercio() {
   );
 }
 
-function EntregaCard({ r, label, veh }) {
-  const [salio, setSalio] = useState(false);
+function EntregaCard({ r, label, veh, onChanged }) {
+  const [pin, setPin] = useState('');
+  async function confirmar() {
+    const res = await storeConfirmPickup(r.orderId, pin);
+    setPin('');
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: 'Retiro confirmado', sub: 'La pieza va en camino al taller', icon: 'fa-truck-fast', type: 'green' });
+    onChanged?.();
+  }
   return (
     <div className="card mb-12">
       <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
-      <div className="flex-between">
+      <div className="flex-between mb-12">
         <span className="text-sm muted">Venta <b className="text-green">{r.part ? '$' + r.part.toLocaleString('es-AR') : ''}</b></span>
-        {salio ? <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retira el flete</span> : <button className="btn btn-yellow btn-sm" onClick={() => { setSalio(true); toast({ title: 'Pedido listo', sub: 'Avisamos a la empresa de envíos', icon: 'fa-box', type: 'green' }); }}><i className="fa-solid fa-box"></i> Salió el pedido</button>}
+        {r.orderStatus === 'SHIPPED' && <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retirado · en camino</span>}
+        {r.orderStatus === 'DELIVERED' && <span className="badge badge-green"><i className="fa-solid fa-box-open"></i> Entregado</span>}
+        {r.orderStatus === 'PAID' && !r.hasDelivery && <span className="badge badge-gray"><i className="fa-solid fa-clock"></i> Esperando repartidor</span>}
       </div>
+      {r.orderStatus === 'PAID' && r.hasDelivery && (
+        <div>
+          <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Cuando venga el repartidor, pedile su PIN y confirmá el retiro</div>
+          <div className="flex gap-12">
+            <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
+            <button className="btn btn-yellow btn-block" disabled={pin.length !== 4} onClick={confirmar}><i className="fa-solid fa-box"></i> Confirmar retiro</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

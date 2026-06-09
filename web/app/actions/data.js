@@ -102,7 +102,7 @@ export async function getRequestDetail(id) {
     ...reqBase(r),
     quotesCount: r.quotes.length,
     selected: sel ? quotePublic(sel) : null,
-    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, hasDelivery: !!o.deliveryId } : null,
+    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, hasDelivery: !!o.deliveryId, deliveryPin: ['PAID', 'SHIPPED'].includes(o.status) ? o.deliveryPin : null } : null,
   };
 }
 
@@ -212,8 +212,8 @@ export async function getOpenRequestsForStore() {
 
 export async function getStoreSales() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
-  const orders = await prisma.order.findMany({ where: { storeId: s.id, status: 'PAID' }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
-  return orders.map((o) => ({ orderId: o.id, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
+  const orders = await prisma.order.findMany({ where: { storeId: s.id, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
+  return orders.map((o) => ({ orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
 }
 
 export async function createQuote(requestId, input) {
@@ -258,36 +258,91 @@ export async function getMyDeliveries() {
   const sMap = Object.fromEntries(stores.map((x) => [x.userId, x]));
   const mMap = Object.fromEntries(mechs.map((x) => [x.userId, x]));
   return orders.map((o) => ({
-    orderId: o.id, status: o.status, mine: o.deliveryId === s.id, freight: num(o.freightAmount), ...reqBase(o.request),
+    orderId: o.id, status: o.status, mine: o.deliveryId === s.id, freight: num(o.freightAmount),
+    // el PIN de retiro solo lo ve el repartidor asignado (se lo muestra al vendedor)
+    pickupPin: o.deliveryId === s.id ? o.pickupPin : null,
+    ...reqBase(o.request),
     pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio } : null,
     dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio } : null,
   }));
 }
 
+const newPin = () => String(Math.floor(1000 + Math.random() * 9000)); // 4 dígitos
+
 // Tomar pedido — claim ATÓMICO: el updateMany con deliveryId:null garantiza que
 // solo UN repartidor puede quedárselo aunque varios toquen el botón a la vez.
+// Genera los 2 PINs: retiro (verifica el vendedor) y entrega (verifica el mecánico).
 export async function claimDelivery(orderId) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const r = await prisma.order.updateMany({ where: { id: orderId, deliveryId: null, status: 'PAID' }, data: { deliveryId: s.id } });
+  const prof = await prisma.deliveryProfile.findUnique({ where: { userId: s.id }, select: { docsOk: true } });
+  if (!prof?.docsOk) return { error: 'Tu cuenta no está habilitada todavía (falta validar tu documentación)' };
+  const r = await prisma.order.updateMany({
+    where: { id: orderId, deliveryId: null, status: 'PAID' },
+    data: { deliveryId: s.id, pickupPin: newPin(), deliveryPin: newPin() },
+  });
   if (r.count === 0) return { error: 'Otro repartidor ya tomó este pedido' };
   return { ok: true };
 }
 
-export async function markPickedUp(orderId) {
-  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const r = await prisma.order.updateMany({ where: { id: orderId, deliveryId: s.id, status: 'PAID' }, data: { status: 'SHIPPED' } });
-  if (r.count === 0) return { error: 'Este pedido no está asignado a vos' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { requestId: true } });
-  if (o) await prisma.request.update({ where: { id: o.requestId }, data: { status: 'SHIPPED' } }).catch(() => {});
+// El VENDEDOR confirma que le entregó la pieza al repartidor, verificando el PIN de retiro
+// que le muestra el repartidor (garantiza que es el que tomó el pedido).
+export async function storeConfirmPickup(orderId, pin) {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { storeId: true, status: true, deliveryId: true, pickupPin: true, requestId: true } });
+  if (!o || o.storeId !== s.id) return { error: 'No autorizado' };
+  if (!o.deliveryId) return { error: 'Ningún repartidor tomó este pedido todavía' };
+  if (o.status !== 'PAID') return { error: 'Este pedido ya fue retirado' };
+  if (String(pin).trim() !== o.pickupPin) return { error: 'PIN incorrecto. Pedile el PIN al repartidor.' };
+  await prisma.order.update({ where: { id: orderId }, data: { status: 'SHIPPED', pickedAt: new Date() } });
+  await prisma.request.update({ where: { id: o.requestId }, data: { status: 'SHIPPED' } }).catch(() => {});
   return { ok: true };
 }
-export async function markDelivered(orderId) {
+
+// El REPARTIDOR confirma la entrega ingresando el PIN que le da el mecánico en mano.
+export async function markDelivered(orderId, pin) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const r = await prisma.order.updateMany({ where: { id: orderId, deliveryId: s.id, status: 'SHIPPED' }, data: { status: 'DELIVERED' } });
-  if (r.count === 0) return { error: 'Tenés que retirar el pedido primero' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { requestId: true } });
-  if (o) await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, status: true, deliveryPin: true, requestId: true } });
+  if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
+  if (o.status !== 'SHIPPED') return { error: 'Primero el vendedor tiene que confirmar el retiro' };
+  if (String(pin).trim() !== o.deliveryPin) return { error: 'PIN incorrecto. Pedíselo al mecánico.' };
+  await prisma.order.update({ where: { id: orderId }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
+  await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
   return { ok: true };
+}
+
+// ---- Calificaciones (mecánico → vendedor / producto / delivery, al cerrar el ciclo) ----
+export async function rateOrder(requestId, ratings) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const o = await prisma.order.findUnique({ where: { requestId }, select: { id: true, mechanicId: true, storeId: true, deliveryId: true, status: true } });
+  if (!o || o.mechanicId !== s.id) return { error: 'No autorizado' };
+  if (o.status !== 'DELIVERED') return { error: 'Podés calificar cuando recibas el pedido' };
+  const items = [
+    { kind: 'SELLER', toId: o.storeId, stars: ratings?.seller },
+    { kind: 'PRODUCT', toId: o.storeId, stars: ratings?.product },
+    { kind: 'DELIVERY', toId: o.deliveryId, stars: ratings?.delivery },
+  ].filter((x) => x.toId && Number(x.stars) >= 1);
+  for (const it of items) {
+    await prisma.rating.upsert({
+      where: { orderId_fromId_kind: { orderId: o.id, fromId: s.id, kind: it.kind } },
+      update: { stars: Math.min(5, Number(it.stars)), comment: ratings?.comment || null },
+      create: { orderId: o.id, fromId: s.id, toId: it.toId, kind: it.kind, stars: Math.min(5, Number(it.stars)), comment: ratings?.comment || null },
+    });
+  }
+  // actualizar promedio del vendedor (snapshot que ordena las cotizaciones)
+  const sellerRatings = await prisma.rating.findMany({ where: { toId: o.storeId, kind: { in: ['SELLER', 'PRODUCT'] } }, select: { stars: true } });
+  if (sellerRatings.length) {
+    const avg = sellerRatings.reduce((a, r) => a + r.stars, 0) / sellerRatings.length;
+    await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { ratingAvg: Math.round(avg * 10) / 10, ratingsCount: sellerRatings.length } }).catch(() => {});
+  }
+  return { ok: true };
+}
+
+export async function getMyRatingsForOrder(requestId) {
+  const s = await getSession(); if (!s) return null;
+  const o = await prisma.order.findUnique({ where: { requestId }, select: { id: true } });
+  if (!o) return null;
+  const rows = await prisma.rating.findMany({ where: { orderId: o.id, fromId: s.id } });
+  return Object.fromEntries(rows.map((r) => [r.kind, r.stars]));
 }
 
 // ---- Admin ----
@@ -340,7 +395,9 @@ export async function createUser(input) {
     } else if (role === 'STORE') {
       await prisma.storeProfile.create({ data: { userId: user.id, tradeName: input.name || input.tradeName || 'Comercio', legalName: input.legalName || null, cuit: input.cuit || null, ivaCondition: input.ivaCondition || null, address: input.address || null, barrio: input.barrio || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null } });
     } else if (role === 'DELIVERY') {
-      await prisma.deliveryProfile.create({ data: { userId: user.id, vehicleType: input.vehicleType || null } });
+      // Requisitos estilo Uber: DNI + licencia + seguro + patente. Sin docs completos no puede tomar pedidos.
+      const docsOk = !!(input.dni?.trim() && input.licenseNumber?.trim() && input.insurance?.trim());
+      await prisma.deliveryProfile.create({ data: { userId: user.id, vehicleType: input.vehicleType || null, plate: input.plate || null, dni: input.dni || null, licenseNumber: input.licenseNumber || null, insurance: input.insurance || null, docsOk } });
     }
     return { ok: true, tempPassword, geocoded: !!coords, geocodedLabel: coords?.label || null };
   } catch (e) {
