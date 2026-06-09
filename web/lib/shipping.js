@@ -15,13 +15,13 @@ export const TARIFF = {
 
 export const MIN_SHIP = 5000; // costo de envío mínimo
 
-// Costo según la tabla de bandas del backoffice (rows: [{uptoKm, price}]). Mínimo $5000.
-// Si no hay distancia o no hay tabla, devuelve el mínimo.
-export function shippingCostFromTariff(km, rows) {
-  if (km == null || !rows || rows.length === 0) return MIN_SHIP;
+// Costo según la tabla de bandas del backoffice (rows: [{uptoKm, price}]).
+// `min` viene de la config del negocio (default $5000). Sin distancia o sin tabla -> mínimo.
+export function shippingCostFromTariff(km, rows, min = MIN_SHIP) {
+  if (km == null || !rows || rows.length === 0) return min;
   const sorted = [...rows].sort((a, b) => a.uptoKm - b.uptoKm);
   const band = sorted.find((r) => km <= r.uptoKm) || sorted[sorted.length - 1];
-  return Math.max(MIN_SHIP, Math.round(Number(band.price)));
+  return Math.max(min, Math.round(Number(band.price)));
 }
 
 export function haversineKm(a, b) {

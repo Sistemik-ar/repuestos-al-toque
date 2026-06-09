@@ -33,7 +33,7 @@ export default function Admin() {
   function delRow(i) { setTariffs((t) => t.filter((_, j) => j !== i)); }
   async function saveT() {
     const res = await saveShippingTariffs(tariffs);
-    if (res?.ok) { toast({ title: 'Tarifas guardadas', sub: `${res.count} bandas · mínimo $5.000`, icon: 'fa-check', type: 'green' }); setTariffs(await getShippingTariffs()); }
+    if (res?.ok) { toast({ title: 'Tarifas guardadas', sub: `${res.count} bandas`, icon: 'fa-check', type: 'green' }); setTariffs(await getShippingTariffs()); }
   }
 
   const k = d?.kpis || { users: 0, requests: 0, paid: 0, commission: 0 };
@@ -69,7 +69,7 @@ export default function Admin() {
 
         {/* Tarifas de envío */}
         <div className="card mb-16">
-          <div className="section-title"><h2>Tarifas de envío (por km)</h2><span className="text-xs muted">mínimo $5.000</span></div>
+          <div className="section-title"><h2>Tarifas de envío (por km)</h2><span className="text-xs muted">respeta el envío mínimo configurado</span></div>
           <p className="text-sm muted mb-12">Definí cuánto sale el envío según la distancia. "Hasta N km → precio". Se usa la banda más chica que cubra la distancia.</p>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
@@ -202,6 +202,11 @@ function Pricing() {
       <div className="grid-2 mb-12">
         <div className="field" style={{ marginBottom: 0 }}><label>Comisión de la plataforma (%)</label><input className="input" inputMode="decimal" value={s.commissionPct} onChange={(e) => set('commissionPct', e.target.value)} /></div>
         <div className="field" style={{ marginBottom: 0 }}><label>Recargo Mercado Pago (%)</label><input className="input" inputMode="decimal" value={s.mpFeePct} onChange={(e) => set('mpFeePct', e.target.value)} /></div>
+      </div>
+      <div className="field mb-12" style={{ maxWidth: 220 }}>
+        <label>Envío mínimo ($)</label>
+        <input className="input" inputMode="numeric" value={s.minShip} onChange={(e) => set('minShip', e.target.value)} />
+        <div className="text-xs muted mt-4">Ninguna banda de la tabla cobra menos que esto.</div>
       </div>
       <label className="flex-center gap-8 mb-8" style={{ cursor: 'pointer' }}>
         <input type="checkbox" checked={s.mpFeeEnabled} onChange={(e) => set('mpFeeEnabled', e.target.checked)} />

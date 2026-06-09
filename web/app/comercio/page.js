@@ -139,9 +139,10 @@ function EntregaCard({ r, label, veh, onChanged }) {
       <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
       <div className="flex-between mb-12">
         <span className="text-sm muted">Venta <b className="text-green">{r.part ? '$' + r.part.toLocaleString('es-AR') : ''}</b></span>
-        {r.orderStatus === 'SHIPPED' && <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retirado · en camino</span>}
-        {r.orderStatus === 'DELIVERED' && <span className="badge badge-green"><i className="fa-solid fa-box-open"></i> Entregado</span>}
+        {r.orderStatus === 'SHIPPED' && <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retirado · en camino al taller</span>}
+        {r.orderStatus === 'DELIVERED' && <span className="badge badge-green"><i className="fa-solid fa-box-open"></i> Entregado al mecánico</span>}
         {r.orderStatus === 'PAID' && !r.hasDelivery && <span className="badge badge-gray"><i className="fa-solid fa-clock"></i> Esperando repartidor</span>}
+        {r.orderStatus === 'PAID' && r.hasDelivery && <span className="badge badge-yellow"><i className="fa-solid fa-motorcycle"></i> Repartidor en camino a tu local</span>}
       </div>
       {r.orderStatus === 'PAID' && r.hasDelivery && (
         <div>

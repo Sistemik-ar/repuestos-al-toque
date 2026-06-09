@@ -435,6 +435,7 @@ export async function saveBusinessSettings(input) {
     ['commissionPct', String(Number(input.commissionPct) || 0)],
     ['mpFeePct', String(Number(input.mpFeePct) || 0)],
     ['mpFeeEnabled', input.mpFeeEnabled ? 'true' : 'false'],
+    ['minShip', String(Math.max(0, Number(input.minShip) || 0))],
   ];
   for (const [key, value] of entries) await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
   return { ok: true };
