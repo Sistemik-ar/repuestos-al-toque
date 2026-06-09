@@ -54,6 +54,8 @@ body {
 }
 
 a { color: inherit; text-decoration: none; }
+/* los <button> usados como tarjetas (card/select de opciones) heredan el texto claro */
+button { color: inherit; font-family: inherit; }
 
 ::selection { background: var(--purple); color: white; }
 

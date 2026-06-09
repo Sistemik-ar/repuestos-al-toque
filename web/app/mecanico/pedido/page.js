@@ -41,8 +41,7 @@ export default function Pedido() {
   const cuitOk = (v) => /^\d{11}$/.test(String(v || '').replace(/\D/g, ''));
   const step1Valid = !!st.brand && !!(needsOther ? st.modelOther.trim() : st.model);
   const step3Valid = !!st.desc.trim() &&
-    (st.invoiceType !== 'factura_a' ||
-      (st.emisorRazon.trim() && cuitOk(st.emisorCuit) && st.solicRazon.trim() && cuitOk(st.solicCuit)));
+    (st.invoiceType !== 'factura_a' || (st.solicRazon.trim() && cuitOk(st.solicCuit)));
   const stepOk = step === 1 ? step1Valid : step === 3 ? step3Valid : true;
 
   function quickVehicle(b, m, y) {
@@ -267,23 +266,12 @@ function InvoiceSection({ st, set }) {
 
       {st.invoiceType === 'factura_a' && (
         <div className="animate-in">
-          <div className="card mb-12">
-            <div className="eyebrow mb-8">Datos del comercio emisor</div>
-            <div className="field" style={{ marginBottom: 10 }}>
-              <label>Razón Social</label>
-              <input className="input" value={st.emisorRazon} onChange={(e) => set({ emisorRazon: e.target.value })} placeholder="Razón social del comercio" />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>CUIT</label>
-              <input className="input" inputMode="numeric" value={st.emisorCuit} onChange={(e) => set({ emisorCuit: e.target.value })} placeholder="11 dígitos" />
-              {cuitErr(st.emisorCuit) && <div className="text-xs text-red mt-4">El CUIT debe tener 11 dígitos</div>}
-            </div>
-          </div>
+          <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-circle-info text-purple"></i><div className="text-xs subtle">Los datos del <b>emisor</b> los completa el comercio que te vende (con su CUIT). Vos cargás los datos a nombre de quién va la factura.</div></div>
           <div className="card mb-12">
             <div className="eyebrow mb-8">Datos del solicitante de la factura</div>
             <div className="field" style={{ marginBottom: 10 }}>
               <label>Razón Social</label>
-              <input className="input" value={st.solicRazon} onChange={(e) => set({ solicRazon: e.target.value })} placeholder="Razón social del solicitante" />
+              <input className="input" value={st.solicRazon} onChange={(e) => set({ solicRazon: e.target.value })} placeholder="Tu razón social" />
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
               <label>CUIT</label>

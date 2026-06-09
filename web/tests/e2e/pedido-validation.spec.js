@@ -39,16 +39,14 @@ test.describe('Validación del pedido', () => {
 
     await page.getByRole('button', { name: 'Factura A' }).click();
     const continuar = page.getByRole('button', { name: /Continuar/i });
-    await expect(continuar).toBeDisabled(); // falta completar Factura A
+    await expect(continuar).toBeDisabled(); // falta completar datos del solicitante
 
-    await page.getByPlaceholder('Razón social del comercio').fill('Repuestos Centro SA');
-    await page.getByPlaceholder('11 dígitos').first().fill('123'); // CUIT inválido
-    await expect(page.getByText(/El CUIT debe tener 11 dígitos/i).first()).toBeVisible();
+    await page.getByPlaceholder('Tu razón social').fill('Taller Patagonia');
+    await page.getByPlaceholder('11 dígitos').fill('123'); // CUIT inválido
+    await expect(page.getByText(/El CUIT debe tener 11 dígitos/i)).toBeVisible();
     await expect(continuar).toBeDisabled();
 
-    await page.getByPlaceholder('11 dígitos').first().fill('30123456789');
-    await page.getByPlaceholder('Razón social del solicitante').fill('Taller Patagonia');
-    await page.getByPlaceholder('11 dígitos').nth(1).fill('20111111110');
+    await page.getByPlaceholder('11 dígitos').fill('20111111110');
     await expect(continuar).toBeEnabled();
     await continuar.click();
     await expect(page.locator('text=Paso 4 de 5')).toBeVisible();

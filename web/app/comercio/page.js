@@ -15,6 +15,7 @@ export default function Comercio() {
   const [tab, setTab] = useState('pend');
   const [modal, setModal] = useState(null);
   const [dismissed, setDismissed] = useState([]);
+  const [zoom, setZoom] = useState(null);
   const badge = tierFor('store', 312);
 
   const load = async () => {
@@ -91,9 +92,9 @@ export default function Comercio() {
               {r.photoUrls?.length > 0 && <span className="badge badge-purple"><i className="fa-solid fa-image"></i> {r.photoUrls.length} foto(s)</span>}
             </div>
             {r.invoiceType === 'factura_a' && (
-              <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-file-invoice text-yellow"></i><div className="text-xs subtle"><b>Factura A.</b> Emisor: {r.emisorRazon} (CUIT {r.emisorCuit}) · Solicitante: {r.solicRazon} (CUIT {r.solicCuit})</div></div>
+              <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-file-invoice text-yellow"></i><div className="text-xs subtle"><b>Factura A</b> a nombre de: {r.solicRazon || '—'} {r.solicCuit ? `(CUIT ${r.solicCuit})` : ''}. Emitís vos con tu CUIT.</div></div>
             )}
-            {r.photoUrls?.length > 0 && <div className="flex gap-8 mb-12">{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />)}</div>}
+            {r.photoUrls?.length > 0 && <div className="flex gap-8 mb-12">{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" onClick={() => setZoom(u)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />)}</div>}
             <div className="locked-info mb-12"><i className="fa-solid fa-user-secret"></i> Mecánico anónimo hasta concretar</div>
             <div className="flex gap-12">
               <button className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} onClick={() => { setDismissed((d) => [...d, r.id]); toast({ title: 'Marcado sin stock', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' }); }}><i className="fa-solid fa-ban"></i> Sin stock</button>
@@ -118,6 +119,7 @@ export default function Comercio() {
       </div>
 
       {modal && <CotizarModal lead={modal} label={label(modal)} veh={veh(modal)} onClose={() => setModal(null)} onSend={sendQuote} />}
+      {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} /></div>}
     </div>
   );
 }

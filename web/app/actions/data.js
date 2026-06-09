@@ -221,7 +221,24 @@ export async function createQuote(requestId, input) {
 export async function getMyDeliveries() {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return [];
   const orders = await prisma.order.findMany({ where: { status: { in: ['PAID', 'SHIPPED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
-  return orders.map((o) => ({ orderId: o.id, status: o.status, ...reqBase(o.request) }));
+  const storeIds = [...new Set(orders.map((o) => o.storeId))];
+  const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
+  const [stores, mechs] = await Promise.all([
+    prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true, address: true, barrio: true } }),
+    prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true, address: true, barrio: true } }),
+  ]);
+  const sMap = Object.fromEntries(stores.map((x) => [x.userId, x]));
+  const mMap = Object.fromEntries(mechs.map((x) => [x.userId, x]));
+  return orders.map((o) => ({
+    orderId: o.id, status: o.status, ...reqBase(o.request),
+    pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio } : null,
+    dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio } : null,
+  }));
+}
+export async function markPickedUp(orderId) {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
+  await prisma.order.update({ where: { id: orderId }, data: { status: 'SHIPPED' } });
+  return { ok: true };
 }
 export async function markDelivered(orderId) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
