@@ -86,18 +86,18 @@ export default function Cotizaciones() {
               <span className="badge badge-gray">#{request.code}</span>
             </div>
 
-            {!revealed ? (
-              <div className="card text-center" style={{ padding: 28 }}>
-                <div className="spinner" style={{ margin: '0 auto 14px' }}></div>
-                <div className="text-sm" style={{ fontWeight: 700 }}>Esperando que los comercios coticen…</div>
-                <div className="text-xs muted mt-4">Las ofertas se muestran todas juntas al cerrar la ventana.</div>
-                {quotes.length > 0 && <div className="badge badge-yellow mt-12"><i className="fa-solid fa-tags"></i> {quotes.length} cotización(es) recibida(s)</div>}
-              </div>
-            ) : quotes.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">No llegaron ofertas</div><div className="text-xs mb-16">Podés reintentar otra ventana</div><button className="btn btn-primary btn-sm" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</button></div>
+            {quotes.length === 0 ? (
+              !revealed ? (
+                <div className="card text-center" style={{ padding: 24 }}>
+                  <div className="text-sm" style={{ fontWeight: 700 }}>Todavía no hay cotizaciones</div>
+                  <div className="text-xs muted mt-4">Van a ir apareciendo acá a medida que los comercios coticen.</div>
+                </div>
+              ) : (
+                <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">No llegaron ofertas</div><div className="text-xs mb-16">Podés reintentar otra ventana</div><button className="btn btn-primary btn-sm" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</button></div>
+              )
             ) : (
               <>
-                <div className="section-title"><h2>Ofertas recibidas ({quotes.length})</h2><span className="text-xs muted">orden por calificación</span></div>
+                <div className="section-title"><h2>Cotizaciones recibidas ({quotes.length})</h2><span className="text-xs muted">{revealed ? 'orden por calificación' : 'elegís al cerrar la ventana'}</span></div>
                 <div className="flex-col gap-12">
                   {quotes.map((q) => (
                     <div key={q.id} className={`quote-card animate-in ${selected === q.id ? 'selected' : ''}`}>
@@ -120,7 +120,9 @@ export default function Cotizaciones() {
                       <div className="divider" style={{ margin: '12px 0' }}></div>
                       <div className="flex-between">
                         <div><div className="text-xs muted">Precio final</div><div className="price">{money(q.price)}</div></div>
-                        <button className={`btn btn-sm ${selected === q.id ? 'btn-success' : 'btn-primary'}`} onClick={() => choose(q)}>{selected === q.id ? <><i className="fa-solid fa-check"></i> Elegida</> : 'Elegir oferta'}</button>
+                        {revealed
+                          ? <button className={`btn btn-sm ${selected === q.id ? 'btn-success' : 'btn-primary'}`} onClick={() => choose(q)}>{selected === q.id ? <><i className="fa-solid fa-check"></i> Elegida</> : 'Elegir oferta'}</button>
+                          : <button className="btn btn-sm btn-ghost" disabled><i className="fa-solid fa-lock"></i> Elegís al cerrar</button>}
                       </div>
                       <div className="locked-info mt-12"><i className="fa-solid fa-lock"></i> Vendedor: <span className="badge badge-gray" style={{ marginLeft: 4 }}>Anónimo hasta concretar</span></div>
                     </div>
