@@ -48,8 +48,8 @@ export async function createRequest(input) {
   const s = await getSession();
   if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
   if (!String(input.desc || '').trim()) return { error: 'Describí el repuesto que necesitás.' };
-  let categoryId = null;
-  if (input.cat) { const c = await prisma.category.findUnique({ where: { slug: input.cat } }); categoryId = c?.id ?? null; }
+  let categoryId = input._categoryId ?? null;
+  if (!categoryId && input.cat) { const c = await prisma.category.findUnique({ where: { slug: input.cat } }); categoryId = c?.id ?? null; }
   const data = {
     mechanicId: s.id,
     brand: input.brand || null, model: input.model || null, year: input.year ? parseInt(input.year, 10) : null, vin: input.vin || null,
@@ -77,6 +77,7 @@ export async function createRequest(input) {
 
 export async function getMyRequests() {
   const s = await getSession(); if (!s) return [];
+  await expireUnpaid();
   const rows = await prisma.request.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' }, include: { category: true } });
   return rows.map(reqBase);
 }
@@ -111,8 +112,35 @@ export async function acceptQuote(quoteId) {
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
   if (!q || q.request.mechanicId !== s.id) return { error: 'No autorizado' };
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } });
-  await prisma.request.update({ where: { id: q.requestId }, data: { status: 'CLOSED' } });
+  await prisma.request.update({ where: { id: q.requestId }, data: { status: 'CLOSED', selectedAt: new Date() } });
   return { ok: true, requestId: q.requestId, quoteId };
+}
+
+// Si el mecánico eligió una oferta pero no pagó en 24hs, el pedido pasa a CANCELADO.
+// Se evalúa de forma perezosa en cada lectura (sin cron).
+const PAY_TTL_MS = 24 * 60 * 60 * 1000;
+async function expireUnpaid() {
+  try {
+    await prisma.request.updateMany({
+      where: { status: 'CLOSED', selectedAt: { lt: new Date(Date.now() - PAY_TTL_MS) } },
+      data: { status: 'CANCELLED' },
+    });
+  } catch {}
+}
+
+// El mecánico vuelve a publicar un pedido (cancelado, entregado o el que sea) con los mismos datos.
+export async function duplicateRequest(id) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const r = await prisma.request.findUnique({ where: { id } });
+  if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
+  return createRequest({
+    brand: r.brand, model: r.model, year: r.year ? String(r.year) : '', vin: r.vin,
+    cat: null, desc: r.description, urgency: URGENCY_LABEL[r.urgency],
+    photoUrls: r.photoUrls || [],
+    invoiceType: r.invoiceType === 'FACTURA_A' ? 'factura_a' : 'consumidor_final',
+    solicRazon: r.invBuyerName, solicCuit: r.invBuyerCuit,
+    _categoryId: r.categoryId,
+  });
 }
 
 export async function closeWindow(requestId) {
@@ -201,13 +229,25 @@ async function ccActiveBetween(mechanicId, storeId) {
 // ---- Comercio (vendedor) ----
 export async function getOpenRequestsForStore() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
+  await expireUnpaid();
   const rows = await prisma.request.findMany({
-    where: { status: { in: ['OPEN', 'QUOTED'] } },
-    orderBy: { createdAt: 'desc' },
-    include: { category: true, quotes: { where: { storeId: s.id }, select: { id: true, price: true } } },
+    where: {
+      OR: [
+        { status: { in: ['OPEN', 'QUOTED'] } },
+        // cerradas/canceladas solo si yo coticé (para ver "pendiente de pago" / "cancelado")
+        { status: { in: ['CLOSED', 'CANCELLED'] }, quotes: { some: { storeId: s.id } } },
+      ],
+    },
+    orderBy: { createdAt: 'asc' }, // las nuevas aparecen a la derecha
+    include: { category: true, quotes: { where: { storeId: s.id }, select: { id: true, price: true, status: true } } },
   });
   // sin identidad del mecánico
-  return rows.map((r) => ({ ...reqBase(r), myCount: r.quotes.length, myPrices: r.quotes.map((q) => num(q.price)) }));
+  return rows.map((r) => ({
+    ...reqBase(r),
+    myCount: r.quotes.length,
+    myPrices: r.quotes.map((q) => num(q.price)),
+    mySelected: r.quotes.some((q) => q.status === 'SELECTED'),
+  }));
 }
 
 export async function getStoreSales() {

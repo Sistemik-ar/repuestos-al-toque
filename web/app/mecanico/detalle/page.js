@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getRequestDetail, rateOrder, getMyRatingsForOrder } from '@/app/actions/data';
+import { useRouter } from 'next/navigation';
+import { getRequestDetail, rateOrder, getMyRatingsForOrder, duplicateRequest } from '@/app/actions/data';
 
 const STEPS = [
   { key: 'OPEN', label: 'Pedido creado', icon: 'fa-clipboard-list' },
@@ -15,9 +16,20 @@ const STEPS = [
 const ORDER_OF = { OPEN: 0, CLOSED: 1, QUOTED: 1, PAID: 2, SHIPPED: 3, DELIVERED: 4 };
 
 export default function Detalle() {
+  const router = useRouter();
   const [id, setId] = useState(null);
   const [r, setR] = useState(null);
   const [zoom, setZoom] = useState(null);
+  const [duping, setDuping] = useState(false);
+
+  async function volverAPedir() {
+    setDuping(true);
+    const res = await duplicateRequest(id);
+    setDuping(false);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: 'Pedido republicado', sub: `Nuevo pedido #${res.code}`, icon: 'fa-rotate-right', type: 'green' });
+    router.push(`/mecanico/cotizaciones?id=${res.id}`);
+  }
 
   useEffect(() => { setId(new URLSearchParams(window.location.search).get('id')); }, []);
   usePoll(async () => { if (id) { try { const d = await getRequestDetail(id); setR((p) => keep(p, d)); } catch {} } }, 5000);
@@ -40,7 +52,16 @@ export default function Detalle() {
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-question"></i></div><div className="text-sm">No encontramos el pedido</div></div>
         ) : (
           <>
+            {/* Cancelado por falta de pago */}
+            {r.status === 'CANCELLED' && (
+              <div className="card mb-16" style={{ borderColor: 'rgba(239,68,68,0.4)' }}>
+                <div className="flex-center gap-12 mb-12"><div className="store-avatar" style={{ background: 'rgba(239,68,68,0.16)', color: '#FCA5A5' }}><i className="fa-solid fa-ban"></i></div><div><div className="text-sm" style={{ fontWeight: 800 }}>Pedido cancelado</div><div className="text-xs muted">Pasaron más de 24hs sin completar el pago</div></div></div>
+                <button className="btn btn-primary btn-block" disabled={duping} onClick={volverAPedir}>{duping ? <span className="spinner"></span> : <><i className="fa-solid fa-rotate-right"></i> Volver a pedir</>}</button>
+              </div>
+            )}
+
             {/* Seguimiento */}
+            {r.status !== 'CANCELLED' && (
             <div className="card mb-16">
               <div className="section-title"><h2>Seguimiento</h2></div>
               {STEPS.map((st, i) => (
@@ -52,6 +73,7 @@ export default function Detalle() {
                 </div>
               ))}
             </div>
+            )}
 
             {/* Datos del pedido */}
             <div className="card mb-16">
@@ -108,6 +130,9 @@ export default function Detalle() {
             {/* Acciones según estado */}
             {['OPEN', 'QUOTED', 'CLOSED'].includes(r.status) && (
               <Link href={`/mecanico/cotizaciones?id=${r.id}`} className="btn btn-primary btn-block btn-lg"><i className="fa-solid fa-tags"></i> Ver cotizaciones {r.quotesCount > 0 ? `(${r.quotesCount})` : ''}</Link>
+            )}
+            {r.status === 'DELIVERED' && (
+              <button className="btn btn-ghost btn-block" disabled={duping} onClick={volverAPedir}>{duping ? <span className="spinner"></span> : <><i className="fa-solid fa-rotate-right"></i> Volver a pedir este repuesto</>}</button>
             )}
           </>
         )}

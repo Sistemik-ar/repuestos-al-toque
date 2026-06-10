@@ -161,7 +161,7 @@ export default function Pedido() {
             </div>
             <div className="field">
               <label>Foto <span className="muted">(opcional)</span></label>
-              <input id="reqPhoto" type="file" accept="image/*" hidden onChange={onPickPhoto} />
+              <input id="reqPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickPhoto} />
               <label htmlFor="reqPhoto" className="upload-area" style={{ display: 'block', cursor: 'pointer' }}>
                 <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`} style={{ fontSize: 24 }}></i>
                 <div className="text-sm mt-8" style={{ fontWeight: 600 }}>{uploading ? 'Subiendo…' : 'Agregar foto'}</div>

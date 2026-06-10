@@ -235,6 +235,7 @@ model Request {
   invBuyerName  String?       @map("inv_buyer_name")
   invBuyerCuit  String?       @map("inv_buyer_cuit")
   status        RequestStatus @default(OPEN)
+  selectedAt    DateTime?     @map("selected_at") // cuándo eligió oferta (timer de pago 24hs)
   windowEndsAt  DateTime?     @map("window_ends_at")
   extraInfo     String?       @map("extra_info")
   createdAt     DateTime      @default(now()) @map("created_at")

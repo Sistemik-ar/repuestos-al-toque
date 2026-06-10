@@ -29,8 +29,15 @@ export default function Comercio() {
   };
   usePoll(load, 4000);
 
-  const pend = open.filter((r) => r.myCount === 0 && !dismissed.includes(r.id));
+  // pendientes: solo con la ventana de cotización todavía abierta
+  const windowOpen = (r) => ['OPEN', 'QUOTED'].includes(r.status) && (!r.windowEndsAt || r.windowEndsAt > Date.now());
+  const pend = open.filter((r) => r.myCount === 0 && windowOpen(r) && !dismissed.includes(r.id));
   const cot = open.filter((r) => r.myCount > 0);
+  const cotBadge = (r) => {
+    if (r.status === 'CANCELLED') return ['badge-red', 'fa-ban', 'Cancelado · no pagó'];
+    if (r.status === 'CLOSED') return r.mySelected ? ['badge-yellow', 'fa-clock', 'Pendiente de pago'] : ['badge-gray', 'fa-circle-xmark', 'No elegida'];
+    return ['badge-purple', 'fa-hourglass-half', 'Esperando decisión'];
+  };
   const initials = (me?.name || 'RC').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
@@ -133,13 +140,16 @@ export default function Comercio() {
 
         {tab === 'cot' && (cot.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
-        ) : <div className="cards-grid">{cot.map((r) => (
-          <div className="card mb-12" key={r.id}>
-            <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div><span className="badge badge-purple">{r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</span></div>
-            <div className="flex-between text-sm mb-12"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{r.myPrices.map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
-            {r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
-          </div>
-        ))}</div>)}
+        ) : <div className="cards-grid">{cot.map((r) => {
+          const [bCls, bIcon, bTxt] = cotBadge(r);
+          return (
+            <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' ? { opacity: 0.65 } : {}}>
+              <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
+              <div className="flex-between text-sm mb-12"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
+              {['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
+            </div>
+          );
+        })}</div>)}
 
         {tab === 'ent' && (sales.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box"></i></div><div className="text-sm">Sin ventas concretadas todavía</div></div>
@@ -244,7 +254,7 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         </div>
         <div className="field">
           <label>Fotos de la pieza <span className="muted">(hasta 3, opcional)</span></label>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPick} />
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPick} />
           <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
             {photos.map((src, i) => (
               <div key={i} style={{ position: 'relative' }}>

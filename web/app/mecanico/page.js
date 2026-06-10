@@ -23,8 +23,8 @@ export default function MecanicoDashboard() {
   usePoll(load, 4000);
 
   const activos = requests.filter((r) => ['OPEN', 'QUOTED', 'CLOSED'].includes(r.status));
-  const coordinar = requests.filter((r) => ['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status));
-  const SHIP_BADGE = { PAID: ['badge-yellow', 'fa-clock', 'Esperando flete'], SHIPPED: ['badge-yellow', 'fa-truck-fast', 'En camino'], DELIVERED: ['badge-green', 'fa-box-open', 'Entregado'] };
+  const coordinar = requests.filter((r) => ['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status));
+  const SHIP_BADGE = { PAID: ['badge-yellow', 'fa-clock', 'Esperando flete'], SHIPPED: ['badge-yellow', 'fa-truck-fast', 'En camino'], DELIVERED: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado · no pagado'] };
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim() || 'Vehículo';
   const initials = (me?.name || 'TP').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -106,7 +106,7 @@ export default function MecanicoDashboard() {
               const [cls, icon, txt] = SHIP_BADGE[r.status] || SHIP_BADGE.PAID;
               return (
                 <Link key={r.id} href={`/mecanico/detalle?id=${r.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
-                  <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)} · #{r.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
+                  <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)} · #{r.code}</div>{r.status !== 'CANCELLED' && <span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span>}</div>
                   <div className="flex-between"><span className={`badge ${cls}`}><i className={`fa-solid ${icon}`}></i> {txt}</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver detalle →</span></div>
                 </Link>
               );
