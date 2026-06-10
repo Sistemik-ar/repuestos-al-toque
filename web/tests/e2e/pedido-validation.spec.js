@@ -1,28 +1,28 @@
 import { test, expect } from '@playwright/test';
-
-async function login(page, email) {
-  await page.goto('/login');
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', 'repuestos123');
-  await page.getByRole('button', { name: /Ingresar/i }).click();
-  await expect(page).toHaveURL(/\/mecanico/);
-}
+import { login, uniquePlate } from './helpers';
 
 test.describe('Validación del pedido', () => {
-  test('no se puede continuar sin elegir vehículo', async ({ page }) => {
+  test('patente o VIN obligatorio: sin patente no se puede continuar', async ({ page }) => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
-    await expect(page.getByRole('button', { name: /Continuar/i })).toBeDisabled();
+    const continuar = page.getByRole('button', { name: /Continuar/i });
+    await expect(continuar).toBeDisabled();
     await page.locator('button:has-text("Toyota Hilux")').first().click();
-    await expect(page.getByRole('button', { name: /Continuar/i })).toBeEnabled();
+    await expect(continuar).toBeDisabled(); // vehículo sí, pero falta patente
+    await page.getByPlaceholder('ABC123 o AB123CD').fill('XYZ'); // formato inválido
+    await expect(page.getByText(/Formato: ABC123/i)).toBeVisible();
+    await expect(continuar).toBeDisabled();
+    await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
+    await expect(continuar).toBeEnabled();
   });
 
   test('la descripción del repuesto es obligatoria', async ({ page }) => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
     await page.locator('button:has-text("Toyota Hilux")').first().click();
+    await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
     await page.getByRole('button', { name: /Continuar/i }).click();
-    await page.locator('text=Frenos').first().click(); // paso 3 (consumidor final por defecto)
+    await page.locator('text=Frenos').first().click();
     const continuar = page.getByRole('button', { name: /Continuar/i });
     await expect(continuar).toBeDisabled();
     await page.locator('textarea').first().fill('Pastillas de freno E2E');
@@ -33,16 +33,17 @@ test.describe('Validación del pedido', () => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
     await page.locator('button:has-text("Toyota Hilux")').first().click();
+    await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
     await page.getByRole('button', { name: /Continuar/i }).click();
     await page.locator('text=Frenos').first().click();
     await page.locator('textarea').first().fill('Pastillas de freno E2E');
 
     await page.getByRole('button', { name: 'Factura A' }).click();
     const continuar = page.getByRole('button', { name: /Continuar/i });
-    await expect(continuar).toBeDisabled(); // falta completar datos del solicitante
+    await expect(continuar).toBeDisabled();
 
     await page.getByPlaceholder('Tu razón social').fill('Taller Patagonia');
-    await page.getByPlaceholder('11 dígitos').fill('123'); // CUIT inválido
+    await page.getByPlaceholder('11 dígitos').fill('123');
     await expect(page.getByText(/El CUIT debe tener 11 dígitos/i)).toBeVisible();
     await expect(continuar).toBeDisabled();
 

@@ -4,8 +4,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
-import { createRequest } from '@/app/actions/data';
+import { addJobItem, publishJob } from '@/app/actions/data';
 import { uploadPhoto } from '@/lib/upload';
+
+const plateOk = (p) => /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}\s?[A-Z]{2})$/i.test(String(p || '').trim());
 
 const years = [];
 for (let y = 2026; y >= 1990; y--) years.push(String(y));
@@ -14,9 +16,11 @@ const labels = ['Vehículo', 'Categoría', 'Descripción', 'Urgencia', 'Confirma
 export default function Pedido() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
+  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
   const [searching, setSearching] = useState(false);
-  const [prog, setProg] = useState(5);
+  const [jobId, setJobId] = useState(null);
+  const [itemCount, setItemCount] = useState(0);
+  const [added, setAdded] = useState(false); // pantalla "¿seguir comprando?"
   const [uploading, setUploading] = useState(false);
 
   async function onPickPhoto(e) {
@@ -39,7 +43,8 @@ export default function Pedido() {
   const set = (patch) => setSt((s) => ({ ...s, ...patch }));
 
   const cuitOk = (v) => /^\d{11}$/.test(String(v || '').replace(/\D/g, ''));
-  const step1Valid = !!st.brand && !!(needsOther ? st.modelOther.trim() : st.model);
+  const idOk = plateOk(st.plate) || String(st.vin).trim().length === 17; // patente O VIN, obligatorio
+  const step1Valid = !!st.brand && !!(needsOther ? st.modelOther.trim() : st.model) && idOk;
   const step3Valid = !!st.desc.trim() &&
     (st.invoiceType !== 'factura_a' || (st.solicRazon.trim() && cuitOk(st.solicCuit)));
   const stepOk = step === 1 ? step1Valid : step === 3 ? step3Valid : true;
@@ -61,15 +66,32 @@ export default function Pedido() {
   }
 
   async function submit() {
-    const payload = { ...st, model: needsOther ? st.modelOther : st.model };
+    const payload = { ...st, model: needsOther ? st.modelOther : st.model, jobId };
     setSearching(true);
-    const res = await createRequest(payload);
-    if (res?.error) { setSearching(false); toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    let p = 5;
-    const id = setInterval(() => {
-      p += Math.random() * 22; if (p > 100) p = 100; setProg(p);
-      if (p >= 100) { clearInterval(id); setTimeout(() => router.push('/mecanico/cotizaciones?id=' + res.id), 400); }
-    }, 280);
+    const res = await addJobItem(payload);
+    setSearching(false);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    setJobId(res.jobId);
+    setItemCount((c) => c + 1);
+    setAdded(true); // pantalla: ¿seguir comprando o publicar?
+  }
+
+  function otroRepuesto() {
+    set({ cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [] });
+    setAdded(false); setStep(2); window.scrollTo({ top: 0 });
+  }
+  async function esoEsTodo() {
+    const res = await publishJob(jobId);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: 'Trabajo publicado', sub: 'Los comercios tienen 10 minutos para cotizar', icon: 'fa-paper-plane', type: 'green' });
+    router.push('/mecanico/trabajo?id=' + jobId);
+  }
+  async function otroAuto() {
+    const res = await publishJob(jobId);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: 'Trabajo publicado', sub: 'Arranquemos con el otro auto', icon: 'fa-car', type: 'green' });
+    setSt({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
+    setJobId(null); setItemCount(0); setAdded(false); setStep(1); window.scrollTo({ top: 0 });
   }
 
   return (
@@ -123,7 +145,13 @@ export default function Pedido() {
               </select>
             </div>
             <div className="field">
-              <label>VIN <span className="muted">(opcional)</span></label>
+              <label>Patente *</label>
+              <input className="input" placeholder="ABC123 o AB123CD" style={{ textTransform: 'uppercase' }} value={st.plate} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} />
+              {st.plate && !plateOk(st.plate) && <div className="text-xs text-red mt-4">Formato: ABC123 o AB123CD</div>}
+              <div className="text-xs muted mt-4"><i className="fa-solid fa-truck-fast"></i> La patente agrupa los repuestos de este auto en un solo envío. ¡Cargala bien!</div>
+            </div>
+            <div className="field">
+              <label>VIN <span className="muted">(opcional si cargaste patente)</span></label>
               <input className="input" placeholder="Ej: 8AJHA8CD9J1234567" value={st.vin} onChange={(e) => set({ vin: e.target.value })} />
             </div>
             <div className="chip-row mb-8">
@@ -234,14 +262,25 @@ export default function Pedido() {
       </div>
 
       {searching && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-0)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center' }}>
-          <div className="radar-wrap mb-24">
-            <div className="radar-ring"></div><div className="radar-ring"></div><div className="radar-ring"></div>
-            <div className="radar-core"><i className="fa-solid fa-satellite-dish"></i></div>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-0)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="spinner"></div>
+        </div>
+      )}
+
+      {/* ¿Seguir comprando? (los 3 botones) */}
+      {added && (
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-0)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div className="form-narrow" style={{ width: '100%', maxWidth: 480 }}>
+            <div className="card glow mb-16" style={{ textAlign: 'center' }}>
+              <div className="store-avatar" style={{ margin: '0 auto 10px', background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-check"></i></div>
+              <div className="h-md">Repuesto agregado</div>
+              <div className="text-sm muted mt-4">{st.brand} {needsOther ? st.modelOther : st.model} · {st.plate || st.vin} · <b>{itemCount} ítem{itemCount === 1 ? '' : 's'}</b> en este trabajo</div>
+              <div className="text-xs muted mt-8"><i className="fa-solid fa-circle-info"></i> Los comercios recién lo ven cuando publiques. Todo lo de este auto viaja en un solo envío por comercio.</div>
+            </div>
+            <button className="btn btn-primary btn-block btn-lg mb-12" onClick={otroRepuesto}><i className="fa-solid fa-plus"></i> Agregar otro repuesto a este auto</button>
+            <button className="btn btn-ghost btn-block mb-12" onClick={otroAuto}><i className="fa-solid fa-car"></i> Publicar y comprar para otro auto</button>
+            <button className="btn btn-yellow btn-block btn-lg" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · publicar trabajo</button>
           </div>
-          <h2 className="h-lg mb-8">Buscando casas de repuestos cercanas…</h2>
-          <p className="subtle mb-16">Notificando comercios de {st.catLabel || 'Frenos'} en Bariloche</p>
-          <div style={{ width: 220 }} className="progress-track"><div className="progress-fill" style={{ width: prog + '%' }}></div></div>
         </div>
       )}
     </div>

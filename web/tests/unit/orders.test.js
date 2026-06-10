@@ -50,3 +50,31 @@ describe('confirmPaidByRef', () => {
     expect(prisma.request.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'PAID' } }));
   });
 });
+
+describe('confirmPaidByRef — trabajo (job::)', () => {
+  it('paga todos los ítems elegidos y cobra UN envío por comercio', async () => {
+    prisma.job = { findUnique: vi.fn(), update: vi.fn().mockResolvedValue({}) };
+    prisma.job.findUnique.mockResolvedValue({
+      id: 'j1', mechanicId: 'm1',
+      requests: [
+        { id: 'r1', status: 'CLOSED', quotes: [{ id: 'q1', status: 'SELECTED', storeId: 's1', price: 80000 }] },
+        { id: 'r2', status: 'CLOSED', quotes: [{ id: 'q2', status: 'SELECTED', storeId: 's1', price: 20000 }] },
+        { id: 'r3', status: 'CLOSED', quotes: [{ id: 'q3', status: 'SENT', storeId: 's2', price: 99999 }] }, // no elegido
+      ],
+    });
+    prisma.request.findUnique.mockResolvedValue({ mechanicId: 'm1' });
+    prisma.storeProfile.findUnique.mockResolvedValue({ lat: null, lng: null });
+    prisma.mechanicProfile.findUnique.mockResolvedValue({ lat: null, lng: null });
+    prisma.shippingTariff.findMany.mockResolvedValue([]);
+    prisma.setting.findMany.mockResolvedValue([]);
+    prisma.order.upsert.mockResolvedValue({});
+    prisma.request.update.mockResolvedValue({});
+
+    const ok = await confirmPaidByRef('job::j1');
+    expect(ok).toBe(true);
+    expect(prisma.order.upsert).toHaveBeenCalledTimes(2); // solo los elegidos
+    const ships = prisma.order.upsert.mock.calls.map((c) => c[0].create.freightAmount);
+    expect(ships.filter((x) => x > 0)).toHaveLength(1); // mismo comercio -> 1 solo flete
+    expect(prisma.job.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'PAID' } }));
+  });
+});

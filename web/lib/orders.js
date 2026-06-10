@@ -41,10 +41,38 @@ export async function computeShip(requestId, storeId) {
   }
 }
 
-// ref = "requestId::quoteId" (o "requestId::quoteId::cc" para cuenta corriente).
+// Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem
+// elegido; el envío se cobra UNA vez por comercio (en el primer ítem de cada comercio).
+async function confirmJobPaid(jobId) {
+  const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
+  if (!j) return false;
+  const settings = await getSettings();
+  const seenStores = new Set();
+  for (const r of j.requests) {
+    const sel = r.quotes.find((q) => q.status === 'SELECTED');
+    if (!sel || ['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) continue;
+    const part = num(sel.price);
+    const commission = Math.round(part * (Number(settings.commissionPct) / 100));
+    const ship = seenStores.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);
+    seenStores.add(sel.storeId);
+    try {
+      await prisma.order.upsert({
+        where: { requestId: r.id },
+        update: { status: 'PAID' },
+        create: { requestId: r.id, quoteId: sel.id, mechanicId: j.mechanicId, storeId: sel.storeId, partAmount: part, commissionPct: Number(settings.commissionPct), commissionAmount: commission, freightAmount: ship, total: part + commission + ship, status: 'PAID' },
+      });
+    } catch (e) { if (e?.code !== 'P2002') throw e; }
+    await prisma.request.update({ where: { id: r.id }, data: { status: 'PAID' } }).catch(() => {});
+  }
+  await prisma.job.update({ where: { id: jobId }, data: { status: 'PAID' } }).catch(() => {});
+  return true;
+}
+
+// ref = "requestId::quoteId" (o "::cc" para cuenta corriente, o "job::<id>" para un trabajo).
 // Crea la orden y marca el pedido como pagado (idempotente).
 export async function confirmPaidByRef(ref) {
   if (!ref || !String(ref).includes('::')) return false;
+  if (String(ref).startsWith('job::')) return confirmJobPaid(String(ref).slice(5));
   const [requestId, quoteId, mode] = String(ref).split('::');
   const creditAccount = mode === 'cc';
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });

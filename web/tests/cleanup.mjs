@@ -2,13 +2,17 @@
 import { PrismaClient } from '@prisma/client';
 const p = new PrismaClient();
 
-const reqs = await p.request.findMany({ where: { description: { contains: 'E2E' } }, select: { id: true } });
+const reqs = await p.request.findMany({ where: { description: { contains: 'E2E' } }, select: { id: true, jobId: true } });
 const ids = reqs.map((r) => r.id);
+const jobIds = [...new Set(reqs.map((r) => r.jobId).filter(Boolean))];
 if (ids.length) {
   await p.order.deleteMany({ where: { requestId: { in: ids } } });
   await p.requestQuote.deleteMany({ where: { requestId: { in: ids } } });
   await p.request.deleteMany({ where: { id: { in: ids } } });
 }
+if (jobIds.length) await p.job.deleteMany({ where: { id: { in: jobIds }, requests: { none: {} } } });
+// borradores de prueba sin ítems
+await p.job.deleteMany({ where: { requests: { none: {} }, status: 'DRAFT' } });
 
 const mech = await p.user.findUnique({ where: { email: 'mecanico@repuestosaltoque.com.ar' } });
 const store = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });

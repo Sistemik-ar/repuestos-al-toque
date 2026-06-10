@@ -59,7 +59,10 @@ export async function createRequest(input) {
     invoiceType: input.invoiceType === 'factura_a' ? 'FACTURA_A' : 'CONSUMIDOR_FINAL',
     invEmisorName: input.emisorRazon || null, invEmisorCuit: input.emisorCuit || null,
     invBuyerName: input.solicRazon || null, invBuyerCuit: input.solicCuit || null,
-    status: 'OPEN', windowEndsAt: new Date(Date.now() + 10 * 60 * 1000),
+    jobId: input._jobId ?? null,
+    status: 'OPEN',
+    // los ítems de un trabajo en armado no tienen ventana hasta publicar ("Eso es todo")
+    windowEndsAt: input._noWindow ? null : new Date(Date.now() + 10 * 60 * 1000),
   };
   // código legible + reintento por si dos pedidos se crean a la vez (evita colisión del unique)
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -233,7 +236,8 @@ export async function getOpenRequestsForStore() {
   const rows = await prisma.request.findMany({
     where: {
       OR: [
-        { status: { in: ['OPEN', 'QUOTED'] } },
+        // publicadas (los borradores de trabajos no tienen ventana y no se ven)
+        { status: { in: ['OPEN', 'QUOTED'] }, windowEndsAt: { not: null } },
         // cerradas/canceladas solo si yo coticé (para ver "pendiente de pago" / "cancelado")
         { status: { in: ['CLOSED', 'CANCELLED'] }, quotes: { some: { storeId: s.id } } },
       ],
@@ -563,4 +567,143 @@ export async function disableCreditAccount(id) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
   await prisma.creditAccount.update({ where: { id }, data: { active: false, disabledAt: new Date() } });
   return { ok: true };
+}
+
+// ================= Trabajos (pedidos por vehículo) =================
+const PLATE_RE = /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}\s?[A-Z]{2})$/i; // ABC123 / AB123CD
+const normPlate = (p) => String(p || '').toUpperCase().replace(/\s+/g, '');
+
+function jobBase(j) {
+  const items = (j.requests || []).map(reqBase);
+  return {
+    id: j.id, code: j.code, brand: j.brand, model: j.model, year: j.year, plate: j.plate, vin: j.vin,
+    status: j.status, windowEndsAt: j.windowEndsAt ? j.windowEndsAt.getTime() : null,
+    createdAt: j.createdAt?.getTime() || 0, items,
+  };
+}
+
+// Crea el Trabajo (borrador) + primer ítem, o agrega un ítem a un trabajo en armado.
+export async function addJobItem(input) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  let job = null;
+  if (input.jobId) {
+    job = await prisma.job.findUnique({ where: { id: input.jobId } });
+    if (!job || job.mechanicId !== s.id) return { error: 'Trabajo inválido' };
+    if (job.status !== 'DRAFT') return { error: 'Este trabajo ya fue publicado' };
+  } else {
+    const plate = normPlate(input.plate);
+    const hasVin = String(input.vin || '').trim().length === 17;
+    if (!PLATE_RE.test(plate) && !hasVin) return { error: 'Cargá la patente (ABC123 o AB123CD) o el VIN completo (17 caracteres). Es clave para consolidar el envío.' };
+    // misma patente en otro trabajo abierto con otro vehículo -> probablemente está "inventando"
+    if (PLATE_RE.test(plate)) {
+      const dup = await prisma.job.findFirst({ where: { mechanicId: s.id, plate, status: { in: ['DRAFT', 'OPEN', 'CLOSED'] } } });
+      if (dup && (dup.brand !== input.brand || dup.model !== input.model)) {
+        return { error: `La patente ${plate} ya está en el Trabajo #${dup.code} (${dup.brand} ${dup.model}). Revisala.` };
+      }
+      if (dup) return { ok: true, jobId: dup.id, joined: true }; // mismo vehículo: agrupar ahí
+    }
+    const n = await prisma.job.count();
+    job = await prisma.job.create({
+      data: {
+        code: 'T-' + (100 + n + Math.floor(Math.random() * 9)),
+        mechanicId: s.id, brand: input.brand || null, model: input.model || null,
+        year: input.year ? parseInt(input.year, 10) : null,
+        plate: PLATE_RE.test(plate) ? plate : '', vin: input.vin || null, status: 'DRAFT',
+      },
+    });
+  }
+  const res = await createRequest({ ...input, _jobId: job.id, _noWindow: true });
+  if (res?.error) return res;
+  return { ok: true, jobId: job.id, itemId: res.id };
+}
+
+// "Eso es todo" -> publica el trabajo: arranca UNA ventana de 10 min para todos los ítems.
+export async function publishJob(jobId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const job = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: true } });
+  if (!job || job.mechanicId !== s.id) return { error: 'No autorizado' };
+  if (job.requests.length === 0) return { error: 'Agregá al menos un repuesto' };
+  const ends = new Date(Date.now() + 10 * 60 * 1000);
+  await prisma.job.update({ where: { id: jobId }, data: { status: 'OPEN', windowEndsAt: ends } });
+  await prisma.request.updateMany({ where: { jobId }, data: { windowEndsAt: ends, status: 'OPEN' } });
+  return { ok: true };
+}
+
+export async function closeJobWindow(jobId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job || job.mechanicId !== s.id) return { error: 'No autorizado' };
+  const now = new Date();
+  await prisma.job.update({ where: { id: jobId }, data: { windowEndsAt: now } });
+  await prisma.request.updateMany({ where: { jobId }, data: { windowEndsAt: now } });
+  return { ok: true };
+}
+
+export async function getMyJobs() {
+  const s = await getSession(); if (!s) return [];
+  await expireUnpaid();
+  // borradores sin tocar por 24hs -> cancelados
+  await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
+  const jobs = await prisma.job.findMany({ where: { mechanicId: s.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true } } } });
+  return jobs.map(jobBase);
+}
+
+export async function getJob(jobId) {
+  const s = await getSession(); if (!s) return null;
+  const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { category: true, quotes: true } } } });
+  if (!j || j.mechanicId !== s.id) return null;
+  const base = jobBase(j);
+  base.items = j.requests.map((r) => ({
+    ...reqBase(r),
+    quotesCount: r.quotes.length,
+    selected: r.quotes.filter((q) => q.status === 'SELECTED').map(quotePublic)[0] || null,
+  }));
+  return base;
+}
+
+// Checkout del trabajo: UN link por todos los ítems elegidos.
+// Envío: UNO por comercio involucrado (consolidación básica del DeliveryGroup).
+export async function createJobCheckout(jobId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
+  if (!j || j.mechanicId !== s.id) return { error: 'No autorizado' };
+  const chosen = [];
+  for (const r of j.requests) {
+    const sel = r.quotes.find((q) => q.status === 'SELECTED');
+    if (sel && !['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) chosen.push({ req: r, quote: sel });
+  }
+  if (chosen.length === 0) return { error: 'Elegí al menos una cotización' };
+
+  const settings = await readSettings();
+  let parts = 0, commission = 0;
+  for (const c of chosen) {
+    const part = num(c.quote.price) || 0;
+    parts += part;
+    commission += Math.round(part * (Number(settings.commissionPct) / 100));
+  }
+  // un envío por comercio distinto
+  const stores = [...new Set(chosen.map((c) => c.quote.storeId))];
+  let ship = 0;
+  for (const storeId of stores) ship += await computeShip(chosen.find((c) => c.quote.storeId === storeId).req.id, storeId);
+  const sub = parts + commission + ship;
+  const mpFee = settings.mpFeeEnabled ? Math.round(sub * (Number(settings.mpFeePct) / 100)) : 0;
+  const total = sub + mpFee;
+  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : total;
+
+  const h = headers();
+  const host = h.get('host') || 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+  try {
+    const { link } = await createPaymentLink({
+      orderRef: `job::${jobId}`,
+      title: `Repuestos · Trabajo #${j.code} · ${j.brand || ''} ${j.model || ''} ${j.plate || ''}`.trim(),
+      amount,
+      backUrl: `${proto}://${host}/api/mp/return`,
+      notificationUrl: `${proto}://${host}/api/mp/webhook`,
+    });
+    await prisma.job.update({ where: { id: jobId }, data: { selectedAt: new Date(), status: 'CLOSED' } });
+    return { link, breakdown: { parts, commission, ship, mpFee, total, stores: stores.length, items: chosen.length } };
+  } catch (e) {
+    return { error: e?.message || 'No se pudo generar el link de pago.' };
+  }
 }

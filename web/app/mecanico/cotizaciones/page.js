@@ -16,10 +16,13 @@ export default function Cotizaciones() {
   const [zoom, setZoom] = useState(null);
   const announced = useRef(false);
 
+  const [jobId, setJobId] = useState(null);
   useEffect(() => {
     setMounted(true);
     setNow(Date.now());
-    const rid = new URLSearchParams(window.location.search).get('id');
+    const params = new URLSearchParams(window.location.search);
+    const rid = params.get('id');
+    setJobId(params.get('job'));
     setId(rid);
     if (!rid) return;
     let alive = true;
@@ -47,6 +50,8 @@ export default function Cotizaciones() {
     const q = quotes.find((x) => x.id === selected); if (!q) return;
     const res = await acceptQuote(q.id);
     if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    // si el ítem es parte de un trabajo, se vuelve al trabajo (el pago es agrupado)
+    if (jobId) { toast({ title: 'Elección confirmada', sub: 'Seguí con los demás ítems o generá el link', icon: 'fa-check', type: 'green' }); router.push(`/mecanico/trabajo?id=${jobId}`); return; }
     router.push('/mecanico/pago');
   }
   async function retry() { announced.current = false; await reopenWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
@@ -136,7 +141,7 @@ export default function Cotizaciones() {
 
       {selected !== null && (
         <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '14px 16px', background: 'linear-gradient(0deg,var(--bg-0),transparent)' }}>
-          <button className="btn btn-yellow btn-block btn-lg" onClick={continuar}><i className="fa-solid fa-lock"></i> Continuar al pago</button>
+          <button className="btn btn-yellow btn-block btn-lg" onClick={continuar}><i className="fa-solid fa-lock"></i> {jobId ? 'Confirmar elección' : 'Continuar al pago'}</button>
         </div>
       )}
 

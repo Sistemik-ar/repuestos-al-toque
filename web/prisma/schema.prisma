@@ -234,6 +234,8 @@ model Request {
   invEmisorCuit String?       @map("inv_emisor_cuit")
   invBuyerName  String?       @map("inv_buyer_name")
   invBuyerCuit  String?       @map("inv_buyer_cuit")
+  jobId         String?       @map("job_id")
+  job           Job?          @relation(fields: [jobId], references: [id])
   status        RequestStatus @default(OPEN)
   selectedAt    DateTime?     @map("selected_at") // cuándo eligió oferta (timer de pago 24hs)
   windowEndsAt  DateTime?     @map("window_ends_at")
@@ -466,4 +468,35 @@ model CreditAccount {
   @@index([mechanicId])
   @@index([storeId])
   @@map("credit_accounts")
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  PAID
+  CANCELLED
+  DONE
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  mechanicId   String    @map("mechanic_id")
+  brand        String?
+  model        String?
+  year         Int?
+  plate        String
+  vin          String?
+  status       JobStatus @default(DRAFT)
+  windowEndsAt DateTime? @map("window_ends_at")
+  selectedAt   DateTime? @map("selected_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  requests Request[]
+
+  @@index([mechanicId])
+  @@index([status])
+  @@map("jobs")
 }
