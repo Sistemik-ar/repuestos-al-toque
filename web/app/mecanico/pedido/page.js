@@ -21,6 +21,7 @@ export default function Pedido() {
   const [jobId, setJobId] = useState(null);
   const [itemCount, setItemCount] = useState(0);
   const [added, setAdded] = useState(false); // pantalla "¿seguir comprando?"
+  const [error, setError] = useState(''); // error persistente (no desaparece solo)
   const [uploading, setUploading] = useState(false);
 
   async function onPickPhoto(e) {
@@ -66,11 +67,12 @@ export default function Pedido() {
   }
 
   async function submit() {
+    setError('');
     const payload = { ...st, model: needsOther ? st.modelOther : st.model, jobId };
     setSearching(true);
     const res = await addJobItem(payload);
     setSearching(false);
-    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    if (res?.error) { setError(res.error); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     setJobId(res.jobId);
     setItemCount((c) => c + 1);
     setAdded(true); // pantalla: ¿seguir comprando o publicar?
@@ -108,6 +110,18 @@ export default function Pedido() {
       </div>
 
       <div className="container form-narrow">
+        {error && (
+          <div className="card mb-16" style={{ borderColor: 'rgba(239,68,68,0.55)', background: 'rgba(239,68,68,0.10)' }}>
+            <div className="flex-center gap-12">
+              <div className="store-avatar" style={{ width: 36, height: 36, background: 'rgba(239,68,68,0.2)', color: '#FCA5A5', flexShrink: 0 }}><i className="fa-solid fa-triangle-exclamation"></i></div>
+              <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 800, color: '#FCA5A5' }}>No pudimos enviar el pedido</div><div className="text-sm subtle mt-4">{error}</div></div>
+              <button className="icon-btn" style={{ flexShrink: 0 }} onClick={() => setError('')}><i className="fa-solid fa-xmark"></i></button>
+            </div>
+            {/^La patente/.test(error) && (
+              <button className="btn btn-ghost btn-sm btn-block mt-12" onClick={() => { setError(''); setStep(1); window.scrollTo({ top: 0 }); }}><i className="fa-solid fa-pen"></i> Corregir la patente</button>
+            )}
+          </div>
+        )}
         <div className="steps">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className={`step ${i < step ? 'done' : i === step ? 'current' : ''}`}></div>

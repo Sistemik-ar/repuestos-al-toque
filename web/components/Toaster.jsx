@@ -8,7 +8,9 @@ export default function Toaster() {
       const id = Math.random().toString(36).slice(2);
       const t = { id, ...e.detail };
       setItems((x) => [...x, t]);
-      const dur = t.duration || 3800;
+      // advertencias/errores duran más (el usuario tiene que poder leerlos)
+      const isWarn = t.type === 'yellow' || t.type === 'red';
+      const dur = t.duration || (isWarn ? 9000 : 3800);
       setTimeout(() => setItems((x) => x.filter((i) => i.id !== id)), dur);
     }
     window.addEventListener('rat-toast', onToast);
@@ -18,7 +20,7 @@ export default function Toaster() {
   return (
     <div className="toast-container">
       {items.map((t) => (
-        <div className="toast" key={t.id}>
+        <div className="toast" key={t.id} onClick={() => setItems((x) => x.filter((i) => i.id !== t.id))} style={{ cursor: 'pointer' }}>
           <div className={`toast-icon ${t.type || 'purple'}`}>
             <i className={`fa-solid ${t.icon || 'fa-bell'}`}></i>
           </div>
