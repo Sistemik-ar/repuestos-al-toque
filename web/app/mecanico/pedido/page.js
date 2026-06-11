@@ -85,13 +85,13 @@ export default function Pedido() {
   async function esoEsTodo() {
     const res = await publishJob(jobId);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: 'Trabajo publicado', sub: 'Los comercios tienen 10 minutos para cotizar', icon: 'fa-paper-plane', type: 'green' });
+    toast({ title: 'Presupuesto solicitado', sub: 'Los comercios tienen 10 minutos para cotizar', icon: 'fa-paper-plane', type: 'green' });
     router.push('/mecanico/trabajo?id=' + jobId);
   }
   async function otroAuto() {
     const res = await publishJob(jobId);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: 'Trabajo publicado', sub: 'Arranquemos con el otro auto', icon: 'fa-car', type: 'green' });
+    toast({ title: 'Presupuesto solicitado', sub: 'Arranquemos con el otro auto', icon: 'fa-car', type: 'green' });
     setSt({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
     setJobId(null); setItemCount(0); setAdded(false); setStep(1); window.scrollTo({ top: 0 });
   }
@@ -293,7 +293,7 @@ export default function Pedido() {
             </div>
             <button className="btn btn-primary btn-block btn-lg mb-12" onClick={otroRepuesto}><i className="fa-solid fa-plus"></i> Agregar otro repuesto a este auto</button>
             <button className="btn btn-ghost btn-block mb-12" onClick={otroAuto}><i className="fa-solid fa-car"></i> Publicar y comprar para otro auto</button>
-            <button className="btn btn-yellow btn-block btn-lg" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · publicar trabajo</button>
+            <button className="btn btn-yellow btn-block btn-lg" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · solicitar presupuesto</button>
           </div>
         </div>
       )}

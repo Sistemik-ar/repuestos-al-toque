@@ -50,7 +50,7 @@ async function confirmJobPaid(jobId) {
   const seenStores = new Set();
   for (const r of j.requests) {
     const sel = r.quotes.find((q) => q.status === 'SELECTED');
-    if (!sel || ['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) continue;
+    if (!sel || ['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) continue;
     const part = num(sel.price);
     const commission = Math.round(part * (Number(settings.commissionPct) / 100));
     const ship = seenStores.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);

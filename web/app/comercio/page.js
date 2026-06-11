@@ -140,16 +140,29 @@ export default function Comercio() {
 
         {tab === 'cot' && (cot.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
-        ) : <div className="cards-grid">{cot.map((r) => {
-          const [bCls, bIcon, bTxt] = cotBadge(r);
-          return (
-            <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' ? { opacity: 0.65 } : {}}>
-              <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
-              <div className="flex-between text-sm mb-12"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
-              {['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
+        ) : (
+          // agrupado por estado, cronológico dentro de cada grupo
+          [
+            ['Esperando decisión', cot.filter((r) => ['OPEN', 'QUOTED'].includes(r.status))],
+            ['Pendiente de pago', cot.filter((r) => r.status === 'CLOSED' && r.mySelected)],
+            ['No elegidas', cot.filter((r) => r.status === 'CLOSED' && !r.mySelected)],
+            ['Canceladas', cot.filter((r) => r.status === 'CANCELLED')],
+          ].filter(([, rows]) => rows.length > 0).map(([titulo, rows]) => (
+            <div key={titulo} className="section">
+              <div className="section-title"><h2>{titulo}</h2><span className="text-xs muted">{rows.length}</span></div>
+              <div className="cards-grid">{rows.map((r) => {
+                const [bCls, bIcon, bTxt] = cotBadge(r);
+                return (
+                  <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' ? { opacity: 0.65 } : {}}>
+                    <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
+                    <div className="flex-between text-sm mb-12"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
+                    {['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
+                  </div>
+                );
+              })}</div>
             </div>
-          );
-        })}</div>)}
+          ))
+        ))}
 
         {tab === 'ent' && (sales.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box"></i></div><div className="text-sm">Sin ventas concretadas todavía</div></div>
@@ -181,9 +194,12 @@ function EntregaCard({ r, label, veh, onChanged }) {
         {r.orderStatus === 'PAID' && !r.hasDelivery && <span className="badge badge-gray"><i className="fa-solid fa-clock"></i> Esperando repartidor</span>}
         {r.orderStatus === 'PAID' && r.hasDelivery && <span className="badge badge-yellow"><i className="fa-solid fa-motorcycle"></i> Repartidor en camino a tu local</span>}
       </div>
+      {r.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle"><b>Incidencia:</b> {r.issue}</span></div>}
       {r.orderStatus === 'PAID' && r.hasDelivery && (
         <div>
-          <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Cuando venga el repartidor, pedile su PIN y confirmá el retiro</div>
+          {r.arrivedPickup
+            ? <div className="float-notif mb-8" style={{ padding: '8px 12px', borderColor: 'rgba(250,204,21,0.45)' }}><i className="fa-solid fa-location-dot text-yellow"></i><span className="text-xs subtle"><b>El repartidor está en tu local</b> — pedile su PIN y confirmá el retiro</span></div>
+            : <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Cuando venga el repartidor, pedile su PIN y confirmá el retiro</div>}
           <div className="flex gap-12">
             <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
             <button className="btn btn-yellow btn-block" disabled={pin.length !== 4} onClick={confirmar}><i className="fa-solid fa-box"></i> Confirmar retiro</button>

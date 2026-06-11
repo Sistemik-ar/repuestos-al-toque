@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getMyDeliveries, markDelivered, claimDelivery } from '@/app/actions/data';
+import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
@@ -29,6 +29,18 @@ export default function Repartidor() {
     const r = await markDelivered(o.orderId, pin);
     if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
     else toast({ title: 'Entrega confirmada 🎉', sub: 'Ciclo completado', icon: 'fa-check', type: 'green' });
+    load();
+  }
+  async function llegue(o, stage) {
+    const r = await reportArrival(o.orderId, stage);
+    if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
+    else toast({ title: 'Llegada avisada', sub: stage === 'pickup' ? 'El comercio ya sabe que estás ahí — pedile que confirme con tu PIN' : 'El mecánico ya sabe que llegaste — pedile su PIN', icon: 'fa-location-dot', type: 'green' });
+    load();
+  }
+  async function nadie(o, stage) {
+    const r = await reportIssue(o.orderId, stage === 'pickup' ? 'Nadie me atendió en el comercio' : 'Nadie me atendió en el taller');
+    if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
+    else toast({ title: 'Incidencia registrada', sub: 'Queda avisado para el comercio y el admin', icon: 'fa-flag', type: 'purple' });
     load();
   }
   async function logout() { await logoutAction(); router.push('/login'); }
@@ -86,14 +98,23 @@ export default function Repartidor() {
               <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
               <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
             </div>
+            {o.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle">{o.issue}</span></div>}
             {o.status === 'PAID' ? (
-              <div className="card" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.35)', textAlign: 'center', padding: 14 }}>
-                <div className="text-xs muted mb-4">Mostrale este PIN al vendedor al retirar</div>
-                <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{o.pickupPin || '— — — —'}</div>
-                <div className="text-xs muted mt-4">El vendedor lo ingresa para confirmar que te llevás la pieza</div>
+              <div>
+                {!o.arrivedPickup && <button className="btn btn-primary btn-block mb-12" onClick={() => llegue(o, 'pickup')}><i className="fa-solid fa-location-dot"></i> Llegué al comercio</button>}
+                <div className="card mb-12" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.35)', textAlign: 'center', padding: 14 }}>
+                  <div className="text-xs muted mb-4">Mostrale este PIN al vendedor al retirar</div>
+                  <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{o.pickupPin || '— — — —'}</div>
+                  <div className="text-xs muted mt-4">El vendedor lo ingresa para confirmar que te llevás la pieza</div>
+                </div>
+                <button className="btn btn-ghost btn-sm btn-block" onClick={() => nadie(o, 'pickup')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</button>
               </div>
             ) : (
-              <EntregaPin onConfirm={(pin) => entregar(o, pin)} />
+              <div>
+                {!o.arrivedDrop && <button className="btn btn-primary btn-block mb-12" onClick={() => llegue(o, 'drop')}><i className="fa-solid fa-location-dot"></i> Llegué al taller</button>}
+                <EntregaPin onConfirm={(pin) => entregar(o, pin)} />
+                <button className="btn btn-ghost btn-sm btn-block mt-12" onClick={() => nadie(o, 'drop')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</button>
+              </div>
             )}
           </div>
         ))}</div>}

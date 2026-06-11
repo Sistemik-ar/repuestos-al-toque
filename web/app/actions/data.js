@@ -106,7 +106,7 @@ export async function getRequestDetail(id) {
     ...reqBase(r),
     quotesCount: r.quotes.length,
     selected: sel ? quotePublic(sel) : null,
-    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, hasDelivery: !!o.deliveryId, deliveryPin: ['PAID', 'SHIPPED'].includes(o.status) ? o.deliveryPin : null } : null,
+    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, hasDelivery: !!o.deliveryId, deliveryPin: ['PAID', 'SHIPPED'].includes(o.status) ? o.deliveryPin : null, arrivedDrop: !!o.arrivedDropAt } : null,
   };
 }
 
@@ -257,7 +257,7 @@ export async function getOpenRequestsForStore() {
 export async function getStoreSales() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
   const orders = await prisma.order.findMany({ where: { storeId: s.id, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
-  return orders.map((o) => ({ orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
+  return orders.map((o) => ({ orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount, arrivedPickup: !!o.arrivedPickupAt, issue: o.issue || null, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
 }
 
 export async function createQuote(requestId, input) {
@@ -303,6 +303,7 @@ export async function getMyDeliveries() {
   const mMap = Object.fromEntries(mechs.map((x) => [x.userId, x]));
   return orders.map((o) => ({
     orderId: o.id, status: o.status, mine: o.deliveryId === s.id, freight: num(o.freightAmount),
+    arrivedPickup: !!o.arrivedPickupAt, arrivedDrop: !!o.arrivedDropAt, issue: o.issue || null,
     // el PIN de retiro solo lo ve el repartidor asignado (se lo muestra al vendedor)
     pickupPin: o.deliveryId === s.id ? o.pickupPin : null,
     ...reqBase(o.request),
@@ -701,7 +702,7 @@ export async function createJobCheckout(jobId) {
   const chosen = [];
   for (const r of j.requests) {
     const sel = r.quotes.find((q) => q.status === 'SELECTED');
-    if (sel && !['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) chosen.push({ req: r, quote: sel });
+    if (sel && !['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) chosen.push({ req: r, quote: sel });
   }
   if (chosen.length === 0) return { error: 'Elegí al menos una cotización' };
 
@@ -739,4 +740,34 @@ export async function createJobCheckout(jobId) {
   } catch (e) {
     return { error: e?.message || 'No se pudo generar el link de pago.' };
   }
+}
+
+// ---- Repartidor: aviso de llegada e incidencias ----
+export async function reportArrival(orderId, stage) {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, status: true } });
+  if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
+  if (stage === 'pickup' && o.status === 'PAID') await prisma.order.update({ where: { id: orderId }, data: { arrivedPickupAt: new Date() } });
+  else if (stage === 'drop' && o.status === 'SHIPPED') await prisma.order.update({ where: { id: orderId }, data: { arrivedDropAt: new Date() } });
+  else return { error: 'Etapa inválida' };
+  return { ok: true };
+}
+
+export async function reportIssue(orderId, text) {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true } });
+  if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
+  await prisma.order.update({ where: { id: orderId }, data: { issue: String(text || 'Nadie me atendió').slice(0, 200), issueAt: new Date() } });
+  return { ok: true };
+}
+
+// ---- Mecánico: desestimar un ítem del trabajo (antes de generar el link) ----
+export async function cancelItem(itemId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const r = await prisma.request.findUnique({ where: { id: itemId }, include: { job: true } });
+  if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
+  if (['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) return { error: 'Este ítem ya fue pagado' };
+  if (r.job && ['CLOSED', 'PAID'].includes(r.job.status)) return { error: 'El link de pago ya fue generado; cancelá el trabajo completo' };
+  await prisma.request.update({ where: { id: itemId }, data: { status: 'CANCELLED' } });
+  return { ok: true };
 }

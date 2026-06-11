@@ -116,6 +116,9 @@ export default function Detalle() {
             )}
 
             {/* PIN de entrega: el mecánico se lo da al repartidor cuando recibe la pieza */}
+            {r.order?.arrivedDrop && r.status === 'SHIPPED' && (
+              <div className="float-notif mb-12" style={{ borderColor: 'rgba(250,204,21,0.5)' }}><i className="fa-solid fa-location-dot text-yellow"></i><div className="text-sm subtle"><b>¡El repartidor llegó a tu taller!</b> Recibí la pieza y dale tu PIN de entrega.</div></div>
+            )}
             {r.order?.deliveryPin && r.order.hasDelivery && (
               <div className="card glow mb-16" style={{ textAlign: 'center', borderColor: 'rgba(250,204,21,0.4)' }}>
                 <div className="text-xs muted mb-4">Tu PIN de entrega</div>

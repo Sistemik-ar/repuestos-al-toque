@@ -14,9 +14,12 @@ if (jobIds.length) await p.job.deleteMany({ where: { id: { in: jobIds }, request
 // borradores de prueba sin ítems
 await p.job.deleteMany({ where: { requests: { none: {} }, status: 'DRAFT' } });
 
-const mech = await p.user.findUnique({ where: { email: 'mecanico@repuestosaltoque.com.ar' } });
-const store = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });
-if (mech && store) await p.creditAccount.deleteMany({ where: { mechanicId: mech.id, storeId: store.id } });
+// La CC entre cuentas seed SOLO se resetea con --full (el equipo la usa para probar)
+if (process.argv.includes('--full')) {
+  const mech = await p.user.findUnique({ where: { email: 'mecanico@repuestosaltoque.com.ar' } });
+  const store = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });
+  if (mech && store) await p.creditAccount.deleteMany({ where: { mechanicId: mech.id, storeId: store.id } });
+}
 
 const testUsers = await p.user.findMany({ where: { email: { startsWith: 'e2e-' } }, select: { id: true } });
 for (const id of testUsers.map((u) => u.id)) {

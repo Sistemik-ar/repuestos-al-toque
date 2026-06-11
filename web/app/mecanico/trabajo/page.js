@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, toast, fmtTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getJob, closeJobWindow, createJobCheckout, publishJob, setItemCredit } from '@/app/actions/data';
+import { getJob, closeJobWindow, createJobCheckout, publishJob, setItemCredit, cancelItem } from '@/app/actions/data';
 
 const ITEM_BADGE = {
   OPEN: ['badge-purple', 'Cotizando'], QUOTED: ['badge-purple', 'Cotizando'],
@@ -32,13 +32,21 @@ export default function Trabajo() {
   const secs = ends ? Math.max(0, Math.round((ends - now) / 1000)) : 0;
   const windowOpen = j?.status === 'OPEN' && ends && now < ends;
   const items = j?.items || [];
-  const chosen = items.filter((i) => i.selected);
+  const chosen = items.filter((i) => i.selected && i.status !== 'CANCELLED');
   // una vez generado el link (job CLOSED) o pagado, las elecciones quedan bloqueadas
   const locked = ['CLOSED', 'PAID', 'DONE'].includes(j?.status);
 
   async function toggleCC(it) {
     const res = await setItemCredit(it.id, !it.useCredit);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    setJ(await getJob(id));
+  }
+
+  async function desestimar(it) {
+    if (!window.confirm(`¿Desestimar "${it.desc || it.catLabel}"? No se va a comprar ni cobrar.`)) return;
+    const res = await cancelItem(it.id);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: 'Repuesto desestimado', icon: 'fa-ban', type: 'purple' });
     setJ(await getJob(id));
   }
 
@@ -82,7 +90,7 @@ export default function Trabajo() {
                 <div className="text-xs muted mt-4 mb-12">Los comercios todavía no lo ven. Publicalo cuando esté completo.</div>
                 <div className="flex gap-12">
                   <Link href="/mecanico/pedido" className="btn btn-ghost btn-sm">Seguir agregando</Link>
-                  <button className="btn btn-yellow btn-block btn-sm" onClick={async () => { await publishJob(id); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Publicar ahora</button>
+                  <button className="btn btn-yellow btn-block btn-sm" onClick={async () => { await publishJob(id); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</button>
                 </div>
               </div>
             )}
@@ -112,8 +120,11 @@ export default function Trabajo() {
                       <input type="checkbox" checked={!!it.useCredit} onChange={() => toggleCC(it)} />
                     </label>
                   )}
-                  {it.selected && ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked && (
-                    <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="text-xs text-purple" style={{ fontWeight: 700 }}>Cambiar elección →</Link>
+                  {['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked && (
+                    <div className="flex-between mt-8">
+                      {it.selected ? <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="text-xs text-purple" style={{ fontWeight: 700 }}>Cambiar elección →</Link> : <span></span>}
+                      <button className="text-xs" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', fontWeight: 700 }} onClick={() => desestimar(it)}><i className="fa-solid fa-ban"></i> Desestimar</button>
+                    </div>
                   )}
                 </div>
               );
