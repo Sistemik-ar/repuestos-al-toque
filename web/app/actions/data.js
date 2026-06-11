@@ -601,7 +601,14 @@ export async function addJobItem(input) {
       if (dup && (dup.brand !== input.brand || dup.model !== input.model)) {
         return { error: `La patente ${plate} ya está en el Trabajo #${dup.code} (${dup.brand} ${dup.model}). Revisala.` };
       }
-      if (dup) return { ok: true, jobId: dup.id, joined: true }; // mismo vehículo: agrupar ahí
+      // mismo vehículo: solo se agrupa si el trabajo sigue EN ARMADO; publicado/en pago no se puede tocar
+      if (dup && dup.status === 'DRAFT') { job = dup; }
+      else if (dup) return { error: `Ese vehículo ya tiene el Trabajo #${dup.code} en curso (${dup.status === 'OPEN' ? 'cotizando' : 'pendiente de pago'}). Esperá a que termine o desestimalo antes de crear otro.` };
+    }
+    if (job) {
+      const res0 = await createRequest({ ...input, _jobId: job.id, _noWindow: true });
+      if (res0?.error) return res0;
+      return { ok: true, jobId: job.id, itemId: res0.id, joined: true };
     }
     // código legible con reintento (dos trabajos a la vez no pueden chocar el unique)
     const n = await prisma.job.count();
@@ -651,8 +658,9 @@ export async function closeJobWindow(jobId) {
 export async function getMyJobs() {
   const s = await getSession(); if (!s) return [];
   await expireUnpaid();
-  // borradores sin tocar por 24hs -> cancelados
+  // borradores sin tocar por 24hs -> cancelados; trabajos con link generado y sin pagar 24hs -> cancelados
   await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
+  await prisma.job.updateMany({ where: { status: 'CLOSED', selectedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
   const jobs = await prisma.job.findMany({ where: { mechanicId: s.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true } } } });
   return jobs.map(jobBase);
 }

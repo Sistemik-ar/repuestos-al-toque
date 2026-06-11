@@ -1,31 +1,42 @@
 import { test, expect } from '@playwright/test';
+import { login } from './helpers';
 
-async function login(page, email, home) {
-  await page.goto('/login');
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', 'repuestos123');
-  await page.getByRole('button', { name: /Ingresar/i }).click();
-  await expect(page).toHaveURL(home);
-}
-
-// Serial dentro del archivo (fullyParallel:false) para no pisar la misma relación CC.
+// Serial: los 3 pasos usan la MISMA relación CC (mecánico seed <-> vendedor seed).
+// La suite termina con la CC ACTIVA (estado que usa el equipo para probar).
 test.describe.configure({ mode: 'serial' });
+
+const STORE = 'Repuestos Centro';
+
+test('si la CC está activa, el admin puede desactivarla', async ({ browser }) => {
+  const ac = await browser.newContext();
+  const a = await ac.newPage();
+  await login(a, 'admin@repuestosaltoque.com.ar');
+  const row = a.locator('tr', { hasText: STORE }).filter({ hasText: 'Taller' }).first();
+  await expect(row).toBeVisible({ timeout: 15000 }); // esperar a que la tabla cargue
+  const desactivar = row.getByRole('button', { name: /^Desactivar$/ });
+  if (await desactivar.count()) {
+    await desactivar.click();
+    await expect(row.getByText(/Desactivada/)).toBeVisible({ timeout: 10000 });
+  }
+  await ac.close();
+});
 
 test('rechazo: el comercio rechaza y el mecánico ve "Rechazada"', async ({ browser }) => {
   const mc = await browser.newContext();
   const m = await mc.newPage();
-  await login(m, 'mecanico@repuestosaltoque.com.ar', /\/mecanico/);
+  await login(m, 'mecanico@repuestosaltoque.com.ar');
   await m.goto('/mecanico/cuentas');
-  await m.getByRole('button', { name: /Solicitar/i }).first().click();
-  await expect(m.getByText(/Pendiente de validación/i).first()).toBeVisible();
+  const card = m.locator('.card', { hasText: STORE }).first();
+  await card.getByRole('button', { name: /Solicitar/i }).click();
+  await expect(card.getByText(/Pendiente de validación/i)).toBeVisible({ timeout: 10000 });
 
   const sc = await browser.newContext();
   const s = await sc.newPage();
-  await login(s, 'vendedor@repuestosaltoque.com.ar', /\/comercio/);
+  await login(s, 'vendedor@repuestosaltoque.com.ar');
   await s.getByRole('button', { name: /^Rechazar$/ }).first().click();
 
   await m.reload();
-  await expect(m.getByText(/Rechazada/i).first()).toBeVisible({ timeout: 10000 });
+  await expect(m.locator('.card', { hasText: STORE }).first().getByText(/Rechazada/i)).toBeVisible({ timeout: 10000 });
 
   await mc.close(); await sc.close();
 });
@@ -33,25 +44,25 @@ test('rechazo: el comercio rechaza y el mecánico ve "Rechazada"', async ({ brow
 test('aprobación: solicitar → admin valida → comercio aprueba → "Aprobada"', async ({ browser }) => {
   const mc = await browser.newContext();
   const m = await mc.newPage();
-  await login(m, 'mecanico@repuestosaltoque.com.ar', /\/mecanico/);
+  await login(m, 'mecanico@repuestosaltoque.com.ar');
   await m.goto('/mecanico/cuentas');
-  // tras el rechazo previo, vuelve a poder solicitar
-  await m.getByRole('button', { name: /Solicitar/i }).first().click();
-  await expect(m.getByText(/Pendiente de validación/i).first()).toBeVisible();
+  const card = m.locator('.card', { hasText: STORE }).first();
+  await card.getByRole('button', { name: /Solicitar/i }).click();
+  await expect(card.getByText(/Pendiente de validación/i)).toBeVisible({ timeout: 10000 });
 
   const ac = await browser.newContext();
   const a = await ac.newPage();
-  await login(a, 'admin@repuestosaltoque.com.ar', /\/admin/);
+  await login(a, 'admin@repuestosaltoque.com.ar');
   await a.getByRole('button', { name: /^Validar$/ }).first().click();
   await expect(a.getByRole('button', { name: /^Validar$/ })).toHaveCount(0, { timeout: 10000 });
 
   const sc = await browser.newContext();
   const s = await sc.newPage();
-  await login(s, 'vendedor@repuestosaltoque.com.ar', /\/comercio/);
+  await login(s, 'vendedor@repuestosaltoque.com.ar');
   await s.getByRole('button', { name: /^Aprobar$/ }).first().click();
 
   await m.reload();
-  await expect(m.getByText(/Aprobada/i).first()).toBeVisible({ timeout: 10000 });
+  await expect(m.locator('.card', { hasText: STORE }).first().getByText(/Aprobada/i)).toBeVisible({ timeout: 10000 });
 
   await mc.close(); await ac.close(); await sc.close();
 });

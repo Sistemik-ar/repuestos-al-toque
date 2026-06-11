@@ -66,6 +66,11 @@ async function confirmJobPaid(jobId) {
     } catch (e) { if (e?.code !== 'P2002') throw e; }
     await prisma.request.update({ where: { id: r.id }, data: { status: 'PAID' } }).catch(() => {});
   }
+  // los ítems sin cotización elegida quedan "sin compra" (el vendedor deja de esperar decisión)
+  await prisma.request.updateMany({
+    where: { jobId, status: { in: ['OPEN', 'QUOTED', 'CLOSED'] }, quotes: { none: { status: 'SELECTED' } } },
+    data: { status: 'CANCELLED' },
+  }).catch(() => {});
   await prisma.job.update({ where: { id: jobId }, data: { status: 'PAID' } }).catch(() => {});
   return true;
 }

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@/lib/db', () => ({
   prisma: {
     requestQuote: { findUnique: vi.fn(), update: vi.fn() },
-    request: { findUnique: vi.fn(), update: vi.fn() },
+    request: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn().mockResolvedValue({}) },
     storeProfile: { findUnique: vi.fn() },
     mechanicProfile: { findUnique: vi.fn() },
     shippingTariff: { findMany: vi.fn() },
