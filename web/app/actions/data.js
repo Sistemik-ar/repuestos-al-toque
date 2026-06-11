@@ -156,9 +156,16 @@ export async function closeWindow(requestId) {
 
 export async function reopenWindow(requestId) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
-  const r = await prisma.request.findUnique({ where: { id: requestId }, select: { mechanicId: true } });
+  const r = await prisma.request.findUnique({ where: { id: requestId }, select: { mechanicId: true, jobId: true } });
   if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
-  await prisma.request.update({ where: { id: requestId }, data: { status: 'OPEN', windowEndsAt: new Date(Date.now() + 10 * 60 * 1000) } });
+  const ends = new Date(Date.now() + 10 * 60 * 1000);
+  if (r.jobId) {
+    // la ventana es del TRABAJO: reabrir reabre todos los ítems aún sin comprar
+    await prisma.job.update({ where: { id: r.jobId }, data: { status: 'OPEN', windowEndsAt: ends } }).catch(() => {});
+    await prisma.request.updateMany({ where: { jobId: r.jobId, status: { in: ['OPEN', 'QUOTED', 'CLOSED'] } }, data: { status: 'OPEN', windowEndsAt: ends } });
+  } else {
+    await prisma.request.update({ where: { id: requestId }, data: { status: 'OPEN', windowEndsAt: ends } });
+  }
   return { ok: true };
 }
 
@@ -661,7 +668,7 @@ export async function getMyJobs() {
   // borradores sin tocar por 24hs -> cancelados; trabajos con link generado y sin pagar 24hs -> cancelados
   await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
   await prisma.job.updateMany({ where: { status: 'CLOSED', selectedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
-  const jobs = await prisma.job.findMany({ where: { mechanicId: s.id, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true } } } });
+  const jobs = await prisma.job.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true } } } });
   return jobs.map(jobBase);
 }
 
@@ -707,6 +714,7 @@ export async function createJobCheckout(jobId) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
   const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
   if (!j || j.mechanicId !== s.id) return { error: 'No autorizado' };
+  if (['CANCELLED', 'PAID', 'DONE'].includes(j.status)) return { error: 'Este trabajo ya no admite pagos' };
   const chosen = [];
   for (const r of j.requests) {
     const sel = r.quotes.find((q) => q.status === 'SELECTED');

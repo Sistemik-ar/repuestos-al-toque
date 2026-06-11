@@ -24,7 +24,8 @@ export default function MecanicoDashboard() {
 
   const activos = jobs.filter((jb) => ['DRAFT', 'OPEN', 'CLOSED'].includes(jb.status));
   const coordinar = jobs.filter((jb) => ['PAID', 'DONE'].includes(jb.status));
-  const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-pen', 'En armado'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'] };
+  const cancelados = jobs.filter((jb) => jb.status === 'CANCELLED');
+  const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-pen', 'En armado'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado'] };
   const veh = (jb) => `${jb.brand || ''} ${jb.model || ''}`.trim() || 'Vehículo';
   const initials = (me?.name || 'TP').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
@@ -108,6 +109,17 @@ export default function MecanicoDashboard() {
               <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
                 <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate} · #{jb.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
                 <div className="flex-between"><span className="text-xs muted">{jb.items.length} repuesto{jb.items.length === 1 ? '' : 's'} · seguilos desde el trabajo</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span></div>
+              </Link>
+            ))}</div>
+          </div>
+        )}
+
+        {cancelados.length > 0 && (
+          <div className="section">
+            <div className="section-title"><h2>Cancelados</h2><span className="text-xs muted">{cancelados.length}</span></div>
+            <div className="cards-grid">{cancelados.map((jb) => (
+              <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block', opacity: 0.7 }}>
+                <div className="flex-between"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate || jb.vin} · #{jb.code}</div><span className="badge badge-red"><i className="fa-solid fa-ban"></i> Cancelado</span></div>
               </Link>
             ))}</div>
           </div>

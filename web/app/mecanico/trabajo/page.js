@@ -33,8 +33,8 @@ export default function Trabajo() {
   const windowOpen = j?.status === 'OPEN' && ends && now < ends;
   const items = j?.items || [];
   const chosen = items.filter((i) => i.selected && i.status !== 'CANCELLED');
-  // una vez generado el link (job CLOSED) o pagado, las elecciones quedan bloqueadas
-  const locked = ['CLOSED', 'PAID', 'DONE'].includes(j?.status);
+  // una vez generado el link (job CLOSED), pagado o cancelado, las elecciones quedan bloqueadas
+  const locked = ['CLOSED', 'PAID', 'DONE', 'CANCELLED'].includes(j?.status);
 
   async function toggleCC(it) {
     const res = await setItemCredit(it.id, !it.useCredit);
@@ -84,6 +84,12 @@ export default function Trabajo() {
               </div>
             )}
 
+            {j.status === 'CANCELLED' && (
+              <div className="card mb-16" style={{ borderColor: 'rgba(239,68,68,0.45)' }}>
+                <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(239,68,68,0.16)', color: '#FCA5A5' }}><i className="fa-solid fa-ban"></i></div><div><div className="text-sm" style={{ fontWeight: 800 }}>Trabajo cancelado</div><div className="text-xs muted">Pasaron 24hs sin completar el pago. Podés volver a pedir cada repuesto desde su detalle.</div></div></div>
+              </div>
+            )}
+
             {j.status === 'DRAFT' && (
               <div className="card mb-16" style={{ borderColor: 'rgba(250,204,21,0.4)' }}>
                 <div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-pen text-yellow"></i> Trabajo en armado</div>
@@ -106,9 +112,14 @@ export default function Trabajo() {
                     <span className={`badge ${cls}`}>{txt}</span>
                   </div>
                   {it.selected ? (
-                    <div className="flex-between">
-                      <span className="text-xs muted"><i className="fa-solid fa-user-secret"></i> {it.selected.alias} · {it.selected.partBrand}</span>
-                      <span className="price" style={{ fontSize: 16 }}>{money(it.selected.price)}{it.useCredit && <span className="badge badge-purple" style={{ marginLeft: 6 }}>CC</span>}</span>
+                    <div>
+                      <div className="flex-between">
+                        <span className="text-xs muted"><i className="fa-solid fa-user-secret"></i> {it.selected.alias} · {it.selected.partBrand}</span>
+                        <span className="price" style={{ fontSize: 16 }}>{money(it.selected.price)}{it.useCredit && <span className="badge badge-purple" style={{ marginLeft: 6 }}>CC</span>}</span>
+                      </div>
+                      {['PAID', 'SHIPPED', 'DELIVERED'].includes(it.status) && (
+                        <Link href={`/mecanico/detalle?id=${it.id}`} className="btn btn-ghost btn-sm btn-block mt-12"><i className="fa-solid fa-truck-fast"></i> Ver detalle y seguimiento</Link>
+                      )}
                     </div>
                   ) : ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked ? (
                     <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="btn btn-primary btn-sm btn-block"><i className="fa-solid fa-tags"></i> Ver cotizaciones {it.quotesCount > 0 ? `(${it.quotesCount})` : ''}</Link>
@@ -131,7 +142,7 @@ export default function Trabajo() {
             })}
 
             {/* Checkout agrupado */}
-            {chosen.length > 0 && j.status !== 'PAID' && (
+            {chosen.length > 0 && !['PAID', 'CANCELLED', 'DONE'].includes(j.status) && (
               <div className="card glow mb-16">
                 <div className="section-title"><h2>Pago del trabajo</h2><span className="text-xs muted">{chosen.length} ítem{chosen.length === 1 ? '' : 's'}</span></div>
                 {locked && <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-lock text-yellow"></i><div className="text-xs subtle">Link generado: las elecciones quedaron bloqueadas. Si necesitás cambiar algo, cancelá y creá un trabajo nuevo.</div></div>}
