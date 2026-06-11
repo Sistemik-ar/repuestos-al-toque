@@ -30,6 +30,7 @@ function reqBase(r) {
     invoiceType: r.invoiceType === 'FACTURA_A' ? 'factura_a' : 'consumidor_final',
     emisorRazon: r.invEmisorName, emisorCuit: r.invEmisorCuit, solicRazon: r.invBuyerName, solicCuit: r.invBuyerCuit,
     windowEndsAt: r.windowEndsAt ? r.windowEndsAt.getTime() : null,
+    selectedAt: r.selectedAt ? r.selectedAt.getTime() : null,
     createdAt: r.createdAt?.getTime() || 0,
   };
 }
