@@ -602,15 +602,23 @@ export async function addJobItem(input) {
       }
       if (dup) return { ok: true, jobId: dup.id, joined: true }; // mismo vehículo: agrupar ahí
     }
+    // código legible con reintento (dos trabajos a la vez no pueden chocar el unique)
     const n = await prisma.job.count();
-    job = await prisma.job.create({
-      data: {
-        code: 'T-' + (100 + n + Math.floor(Math.random() * 9)),
-        mechanicId: s.id, brand: input.brand || null, model: input.model || null,
-        year: input.year ? parseInt(input.year, 10) : null,
-        plate: PLATE_RE.test(plate) ? plate : '', vin: input.vin || null, status: 'DRAFT',
-      },
-    });
+    let created = null;
+    for (let attempt = 0; attempt < 6 && !created; attempt++) {
+      try {
+        created = await prisma.job.create({
+          data: {
+            code: 'T-' + (100 + n + attempt * 7 + Math.floor(Math.random() * 50)),
+            mechanicId: s.id, brand: input.brand || null, model: input.model || null,
+            year: input.year ? parseInt(input.year, 10) : null,
+            plate: PLATE_RE.test(plate) ? plate : '', vin: input.vin || null, status: 'DRAFT',
+          },
+        });
+      } catch (e) { if (e?.code !== 'P2002') throw e; }
+    }
+    if (!created) return { error: 'No se pudo crear el trabajo, reintentá.' };
+    job = created;
   }
   const res = await createRequest({ ...input, _jobId: job.id, _noWindow: true });
   if (res?.error) return res;
@@ -652,13 +660,36 @@ export async function getJob(jobId) {
   const s = await getSession(); if (!s) return null;
   const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { category: true, quotes: true } } } });
   if (!j || j.mechanicId !== s.id) return null;
+  const cc = await prisma.creditAccount.findMany({ where: { mechanicId: s.id, active: true }, select: { storeId: true } });
+  const ccSet = new Set(cc.map((c) => c.storeId));
   const base = jobBase(j);
-  base.items = j.requests.map((r) => ({
-    ...reqBase(r),
-    quotesCount: r.quotes.length,
-    selected: r.quotes.filter((q) => q.status === 'SELECTED').map(quotePublic)[0] || null,
-  }));
+  base.items = j.requests.map((r) => {
+    const sel = r.quotes.find((q) => q.status === 'SELECTED') || null;
+    return {
+      ...reqBase(r),
+      quotesCount: r.quotes.length,
+      selected: sel ? quotePublic(sel) : null,
+      useCredit: r.useCredit,
+      creditEligible: !!sel && ccSet.has(sel.storeId), // CC activa con el comercio elegido
+    };
+  });
   return base;
+}
+
+// Marca/desmarca un ítem para pagar con cuenta corriente (verifica CC activa real).
+export async function setItemCredit(itemId, on) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const r = await prisma.request.findUnique({ where: { id: itemId }, include: { quotes: true, job: true } });
+  if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
+  if (r.job && ['CLOSED', 'PAID'].includes(r.job.status)) return { error: 'El link de pago ya fue generado; no se puede cambiar' };
+  if (on) {
+    const sel = r.quotes.find((q) => q.status === 'SELECTED');
+    if (!sel) return { error: 'Primero elegí una cotización' };
+    const cc = await prisma.creditAccount.findFirst({ where: { mechanicId: s.id, storeId: sel.storeId, active: true } });
+    if (!cc) return { error: 'No tenés cuenta corriente activa con ese comercio' };
+  }
+  await prisma.request.update({ where: { id: itemId }, data: { useCredit: !!on } });
+  return { ok: true };
 }
 
 // Checkout del trabajo: UN link por todos los ítems elegidos.
@@ -675,10 +706,12 @@ export async function createJobCheckout(jobId) {
   if (chosen.length === 0) return { error: 'Elegí al menos una cotización' };
 
   const settings = await readSettings();
-  let parts = 0, commission = 0;
+  let parts = 0, creditParts = 0, commission = 0;
   for (const c of chosen) {
     const part = num(c.quote.price) || 0;
-    parts += part;
+    // ítems a cuenta corriente: el repuesto NO se cobra por la app (lo liquida el comercio),
+    // pero la comisión y el envío sí
+    if (c.req.useCredit) creditParts += part; else parts += part;
     commission += Math.round(part * (Number(settings.commissionPct) / 100));
   }
   // un envío por comercio distinto
@@ -702,7 +735,7 @@ export async function createJobCheckout(jobId) {
       notificationUrl: `${proto}://${host}/api/mp/webhook`,
     });
     await prisma.job.update({ where: { id: jobId }, data: { selectedAt: new Date(), status: 'CLOSED' } });
-    return { link, breakdown: { parts, commission, ship, mpFee, total, stores: stores.length, items: chosen.length } };
+    return { link, breakdown: { parts, creditParts, commission, ship, mpFee, total, stores: stores.length, items: chosen.length } };
   } catch (e) {
     return { error: e?.message || 'No se pudo generar el link de pago.' };
   }

@@ -234,6 +234,7 @@ model Request {
   invEmisorCuit String?       @map("inv_emisor_cuit")
   invBuyerName  String?       @map("inv_buyer_name")
   invBuyerCuit  String?       @map("inv_buyer_cuit")
+  useCredit     Boolean       @default(false) @map("use_credit") // ítem a cuenta corriente
   jobId         String?       @map("job_id")
   job           Job?          @relation(fields: [jobId], references: [id])
   status        RequestStatus @default(OPEN)

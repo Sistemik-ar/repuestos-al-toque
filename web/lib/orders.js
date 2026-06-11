@@ -55,11 +55,13 @@ async function confirmJobPaid(jobId) {
     const commission = Math.round(part * (Number(settings.commissionPct) / 100));
     const ship = seenStores.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);
     seenStores.add(sel.storeId);
+    // ítem a cuenta corriente: el repuesto se imputa a la CC, la app solo cobró comisión+envío
+    const cobrado = (r.useCredit ? 0 : part) + commission + ship;
     try {
       await prisma.order.upsert({
         where: { requestId: r.id },
         update: { status: 'PAID' },
-        create: { requestId: r.id, quoteId: sel.id, mechanicId: j.mechanicId, storeId: sel.storeId, partAmount: part, commissionPct: Number(settings.commissionPct), commissionAmount: commission, freightAmount: ship, total: part + commission + ship, status: 'PAID' },
+        create: { requestId: r.id, quoteId: sel.id, mechanicId: j.mechanicId, storeId: sel.storeId, partAmount: part, commissionPct: Number(settings.commissionPct), commissionAmount: commission, freightAmount: ship, creditAccount: !!r.useCredit, total: cobrado, status: 'PAID' },
       });
     } catch (e) { if (e?.code !== 'P2002') throw e; }
     await prisma.request.update({ where: { id: r.id }, data: { status: 'PAID' } }).catch(() => {});

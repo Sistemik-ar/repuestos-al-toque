@@ -5,6 +5,8 @@ export async function login(page, email) {
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', 'repuestos123');
   await page.getByRole('button', { name: /Ingresar/i }).click();
+  // esperar a que el login efectivamente redirija (si no, la próxima navegación rebota a /login)
+  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 15000 });
 }
 
 // patente única por corrida para no agrupar con trabajos de tests anteriores

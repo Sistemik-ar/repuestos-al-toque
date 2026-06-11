@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, toast, fmtTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getJob, closeJobWindow, createJobCheckout, publishJob } from '@/app/actions/data';
+import { getJob, closeJobWindow, createJobCheckout, publishJob, setItemCredit } from '@/app/actions/data';
 
 const ITEM_BADGE = {
   OPEN: ['badge-purple', 'Cotizando'], QUOTED: ['badge-purple', 'Cotizando'],
@@ -33,7 +33,14 @@ export default function Trabajo() {
   const windowOpen = j?.status === 'OPEN' && ends && now < ends;
   const items = j?.items || [];
   const chosen = items.filter((i) => i.selected);
-  const choosable = items.filter((i) => ['OPEN', 'QUOTED', 'CLOSED'].includes(i.status));
+  // una vez generado el link (job CLOSED) o pagado, las elecciones quedan bloqueadas
+  const locked = ['CLOSED', 'PAID', 'DONE'].includes(j?.status);
+
+  async function toggleCC(it) {
+    const res = await setItemCredit(it.id, !it.useCredit);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    setJ(await getJob(id));
+  }
 
   async function cerrar() { await closeJobWindow(id); const d = await getJob(id); setJ(d); }
   async function pagar() {
@@ -93,12 +100,19 @@ export default function Trabajo() {
                   {it.selected ? (
                     <div className="flex-between">
                       <span className="text-xs muted"><i className="fa-solid fa-user-secret"></i> {it.selected.alias} · {it.selected.partBrand}</span>
-                      <span className="price" style={{ fontSize: 16 }}>{money(it.selected.price)}</span>
+                      <span className="price" style={{ fontSize: 16 }}>{money(it.selected.price)}{it.useCredit && <span className="badge badge-purple" style={{ marginLeft: 6 }}>CC</span>}</span>
                     </div>
-                  ) : ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) ? (
+                  ) : ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked ? (
                     <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="btn btn-primary btn-sm btn-block"><i className="fa-solid fa-tags"></i> Ver cotizaciones {it.quotesCount > 0 ? `(${it.quotesCount})` : ''}</Link>
                   ) : <Link href={`/mecanico/detalle?id=${it.id}`} className="btn btn-ghost btn-sm btn-block">Ver detalle</Link>}
-                  {it.selected && ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && (
+                  {/* cuenta corriente por ítem (solo antes de generar el link) */}
+                  {it.selected && it.creditEligible && !locked && (
+                    <label className="flex-between mt-12" style={{ cursor: 'pointer', gap: 10 }}>
+                      <span className="text-xs subtle"><i className="fa-solid fa-id-card-clip text-purple"></i> Pagar este repuesto con Cuenta Corriente <span className="muted">(acá solo pagás comisión + envío)</span></span>
+                      <input type="checkbox" checked={!!it.useCredit} onChange={() => toggleCC(it)} />
+                    </label>
+                  )}
+                  {it.selected && ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked && (
                     <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="text-xs text-purple" style={{ fontWeight: 700 }}>Cambiar elección →</Link>
                   )}
                 </div>
@@ -109,9 +123,11 @@ export default function Trabajo() {
             {chosen.length > 0 && j.status !== 'PAID' && (
               <div className="card glow mb-16">
                 <div className="section-title"><h2>Pago del trabajo</h2><span className="text-xs muted">{chosen.length} ítem{chosen.length === 1 ? '' : 's'}</span></div>
+                {locked && <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-lock text-yellow"></i><div className="text-xs subtle">Link generado: las elecciones quedaron bloqueadas. Si necesitás cambiar algo, cancelá y creá un trabajo nuevo.</div></div>}
                 {link?.breakdown && (
                   <div className="mb-12">
                     <div className="flex-between mb-8"><span className="text-sm muted">Repuestos ({link.breakdown.items})</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.parts)}</span></div>
+                    {link.breakdown.creditParts > 0 && <div className="flex-between mb-8"><span className="text-sm muted"><i className="fa-solid fa-id-card-clip text-purple"></i> A cuenta corriente (no se cobra acá)</span><span className="text-sm" style={{ fontWeight: 700, textDecoration: 'line-through', opacity: 0.6 }}>{money(link.breakdown.creditParts)}</span></div>}
                     <div className="flex-between mb-8"><span className="text-sm muted">Comisión</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.commission)}</span></div>
                     <div className="flex-between mb-8"><span className="text-sm muted">Envío ({link.breakdown.stores} comercio{link.breakdown.stores === 1 ? '' : 's'}, una sola visita)</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.ship)}</span></div>
                     {link.breakdown.mpFee > 0 && <div className="flex-between mb-8"><span className="text-sm muted">Recargo MP</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.mpFee)}</span></div>}
