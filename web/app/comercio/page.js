@@ -19,12 +19,24 @@ export default function Comercio() {
   const [zoom, setZoom] = useState(null);
   const badge = tierFor('store', 312);
 
+  const arrivalsRef = useRef(null); // para avisar UNA vez cuando llega el repartidor
   const load = async () => {
     try {
       const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
       setMe((p) => keep(p, m || null));
       setOpen((p) => keep(p, o || []));
       setSales((p) => keep(p, s || []));
+      // aviso emergente: el repartidor llegó al local (transición de estado)
+      const ahora = new Set((s || []).filter((x) => x.orderStatus === 'PAID' && x.arrivedPickup).map((x) => x.orderId));
+      if (arrivalsRef.current) {
+        for (const x of s || []) {
+          if (ahora.has(x.orderId) && !arrivalsRef.current.has(x.orderId)) {
+            ping();
+            toast({ title: '🛵 ¡Llegó el repartidor!', sub: `Está en tu local por «${x.desc || x.catLabel}» — pedile su PIN y confirmá el retiro (pestaña Concretadas)`, icon: 'fa-location-dot', type: 'yellow', duration: 12000 });
+          }
+        }
+      }
+      arrivalsRef.current = ahora;
     } catch {} // si una action falla (red/DB), conservamos el último estado válido
   };
   usePoll(load, 4000);

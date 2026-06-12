@@ -30,5 +30,5 @@ for (const id of testUsers.map((u) => u.id)) {
   await p.user.delete({ where: { id } }).catch(() => {});
 }
 
-console.log(`limpieza: ${ids.length} pedidos E2E, ${testUsers.length} usuarios de prueba, CC reseteada`);
+console.log(`limpieza: ${ids.length} pedidos E2E, ${testUsers.length} usuarios de prueba, CC intacta (usar --full para resetearla)`);
 await p.$disconnect();

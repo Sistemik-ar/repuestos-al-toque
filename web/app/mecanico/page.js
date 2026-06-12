@@ -3,8 +3,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
-import { tierFor } from '@/lib/ui';
+import { tierFor, toast, ping } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
+import { useRef } from 'react';
 import { getMe, getMyJobs } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
@@ -14,10 +15,22 @@ export default function MecanicoDashboard() {
   const [me, setMe] = useState(null);
   const [jobs, setJobs] = useState([]);
 
+  const arrivalsRef = useRef(null); // avisar UNA vez cuando el repartidor llega al taller
   const load = async () => {
     try {
       const [m, js] = await Promise.all([getMe(), getMyJobs()]);
       setMe((p) => keep(p, m || null)); setJobs((p) => keep(p, js || []));
+      const items = (js || []).flatMap((jb) => jb.items || []);
+      const ahora = new Set(items.filter((i) => i.arrivedDrop).map((i) => i.id));
+      if (arrivalsRef.current) {
+        for (const i of items) {
+          if (ahora.has(i.id) && !arrivalsRef.current.has(i.id)) {
+            ping();
+            toast({ title: '📍 ¡El repartidor llegó a tu taller!', sub: `Trae «${i.desc || i.catLabel}» — recibí la pieza y dale tu PIN (está en el detalle del pedido)`, icon: 'fa-location-dot', type: 'yellow', duration: 12000 });
+          }
+        }
+      }
+      arrivalsRef.current = ahora;
     } catch {}
   };
   usePoll(load, 4000);

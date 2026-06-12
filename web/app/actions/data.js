@@ -113,8 +113,13 @@ export async function getRequestDetail(id) {
 
 export async function acceptQuote(quoteId) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
-  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
+  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: { include: { job: true } } } });
   if (!q || q.request.mechanicId !== s.id) return { error: 'No autorizado' };
+  // guard de estado: una pestaña vieja no puede cambiar la elección de algo pagado/cancelado
+  if (!['OPEN', 'QUOTED', 'CLOSED'].includes(q.request.status)) return { error: 'Este pedido ya no admite cambios' };
+  if (q.request.job && !['DRAFT', 'OPEN'].includes(q.request.job.status)) return { error: 'El link de pago ya fue generado: la elección está bloqueada' };
+  // al cambiar de elección, des-seleccionar las otras cotizaciones del ítem
+  await prisma.requestQuote.updateMany({ where: { requestId: q.requestId, status: 'SELECTED' }, data: { status: 'SENT' } });
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } });
   await prisma.request.update({ where: { id: q.requestId }, data: { status: 'CLOSED', selectedAt: new Date() } });
   return { ok: true, requestId: q.requestId, quoteId };
@@ -161,7 +166,10 @@ export async function reopenWindow(requestId) {
   if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
   const ends = new Date(Date.now() + 10 * 60 * 1000);
   if (r.jobId) {
-    // la ventana es del TRABAJO: reabrir reabre todos los ítems aún sin comprar
+    // la ventana es del TRABAJO: reabrir reabre todos los ítems aún sin comprar.
+    // Solo si el trabajo sigue vivo (no pagado/cancelado/con link generado).
+    const job = await prisma.job.findUnique({ where: { id: r.jobId }, select: { status: true } });
+    if (!job || !['OPEN', 'DRAFT'].includes(job.status)) return { error: 'Este trabajo ya no admite reabrir la ventana' };
     await prisma.job.update({ where: { id: r.jobId }, data: { status: 'OPEN', windowEndsAt: ends } }).catch(() => {});
     await prisma.request.updateMany({ where: { jobId: r.jobId, status: { in: ['OPEN', 'QUOTED', 'CLOSED'] } }, data: { status: 'OPEN', windowEndsAt: ends } });
   } else {
@@ -584,7 +592,7 @@ const PLATE_RE = /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}\s?[A-Z]{2})$/i; // ABC123 
 const normPlate = (p) => String(p || '').toUpperCase().replace(/\s+/g, '');
 
 function jobBase(j) {
-  const items = (j.requests || []).map(reqBase);
+  const items = (j.requests || []).map((r) => ({ ...reqBase(r), arrivedDrop: !!(r.order?.arrivedDropAt && r.order?.status === 'SHIPPED') }));
   return {
     id: j.id, code: j.code, brand: j.brand, model: j.model, year: j.year, plate: j.plate, vin: j.vin,
     status: j.status, windowEndsAt: j.windowEndsAt ? j.windowEndsAt.getTime() : null,
@@ -670,7 +678,7 @@ export async function getMyJobs() {
   // borradores sin tocar por 24hs -> cancelados; trabajos con link generado y sin pagar 24hs -> cancelados
   await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
   await prisma.job.updateMany({ where: { status: 'CLOSED', selectedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
-  const jobs = await prisma.job.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true } } } });
+  const jobs = await prisma.job.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true, order: { select: { arrivedDropAt: true, status: true } } } } } });
   return jobs.map(jobBase);
 }
 
@@ -742,6 +750,10 @@ export async function createJobCheckout(jobId) {
   const total = sub + mpFee;
   const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : total;
 
+  const breakdown = { parts, creditParts, commission, ship, mpFee, total, stores: stores.length, items: chosen.length };
+  // si el link ya fue generado, se REUTILIZA: dos links distintos = riesgo de cobro doble
+  if (j.status === 'CLOSED' && j.paymentLink) return { link: j.paymentLink, breakdown };
+
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
   const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
@@ -753,8 +765,8 @@ export async function createJobCheckout(jobId) {
       backUrl: `${proto}://${host}/api/mp/return`,
       notificationUrl: `${proto}://${host}/api/mp/webhook`,
     });
-    await prisma.job.update({ where: { id: jobId }, data: { selectedAt: new Date(), status: 'CLOSED' } });
-    return { link, breakdown: { parts, creditParts, commission, ship, mpFee, total, stores: stores.length, items: chosen.length } };
+    await prisma.job.update({ where: { id: jobId }, data: { selectedAt: new Date(), status: 'CLOSED', paymentLink: link } });
+    return { link, breakdown };
   } catch (e) {
     return { error: e?.message || 'No se pudo generar el link de pago.' };
   }
