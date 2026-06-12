@@ -2,12 +2,13 @@
 import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
-import { getSession } from '@/lib/session';
+import { getSession, invalidateStatusCache } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
 import { computeShip, computePricing } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, inBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
+import { parsePrice } from '@/lib/money';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
@@ -118,6 +119,7 @@ export async function acceptQuote(quoteId) {
   // guard de estado: una pestaña vieja no puede cambiar la elección de algo pagado/cancelado
   if (!['OPEN', 'QUOTED', 'CLOSED'].includes(q.request.status)) return { error: 'Este pedido ya no admite cambios' };
   if (q.request.job && !['DRAFT', 'OPEN'].includes(q.request.job.status)) return { error: 'El link de pago ya fue generado: la elección está bloqueada' };
+  if (q.request.windowEndsAt && q.request.windowEndsAt.getTime() > Date.now()) return { error: 'Esperá a que cierre la ventana para elegir' };
   // al cambiar de elección, des-seleccionar las otras cotizaciones del ítem
   await prisma.requestQuote.updateMany({ where: { requestId: q.requestId, status: 'SELECTED' }, data: { status: 'SENT' } });
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } });
@@ -287,12 +289,13 @@ export async function createQuote(requestId, input) {
   const MAX_OPCIONES = 3;
   const mine = await prisma.requestQuote.count({ where: { requestId, storeId: s.id } });
   if (mine >= MAX_OPCIONES) return { error: `Podés enviar hasta ${MAX_OPCIONES} opciones por solicitud` };
+  if (parsePrice(input.price) <= 0) return { error: 'Ingresá un precio válido' };
   const store = await prisma.storeProfile.findUnique({ where: { userId: s.id } });
   await prisma.requestQuote.create({
     data: {
       requestId, storeId: s.id, alias: aliasFor(s.name || store?.tradeName),
       optionLabel: input.optionLabel || null,
-      partBrand: input.partBrand || null, price: Number(String(input.price).replace(/\D/g, '')) || 0,
+      partBrand: input.partBrand || null, price: parsePrice(input.price),
       warranty: input.warranty || '6 meses', note: input.note || null,
       ratingSnapshot: store?.ratingAvg ?? 4.8, photoUrls: input.photoUrls || [],
     },
@@ -470,6 +473,7 @@ export async function createUser(input) {
 export async function setUserStatus(userId, status) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
   await prisma.user.update({ where: { id: userId }, data: { status } });
+  invalidateStatusCache(userId);
   return { ok: true };
 }
 

@@ -47,3 +47,20 @@ describe('computePricing — casos borde', () => {
     expect(p.commission).toBe(500); // round(499.95)
   });
 });
+
+import { parsePrice } from '@/lib/money';
+describe('parsePrice (entrada manual del vendedor)', () => {
+  it('formatos comunes', () => {
+    expect(parsePrice('45000')).toBe(45000);
+    expect(parsePrice('45.000')).toBe(45000);
+    expect(parsePrice('$ 45.000')).toBe(45000);
+    expect(parsePrice('45.000,50')).toBe(45001);
+    expect(parsePrice('1500.50')).toBe(1501); // antes daba 150050
+    expect(parsePrice('1,500.50')).toBe(1501);
+  });
+  it('basura -> 0 (rechazado por la validación)', () => {
+    expect(parsePrice('')).toBe(0);
+    expect(parsePrice('abc')).toBe(0);
+    expect(parsePrice('-5')).toBe(0);
+  });
+});
