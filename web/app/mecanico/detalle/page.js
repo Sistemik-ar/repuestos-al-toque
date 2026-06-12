@@ -27,8 +27,8 @@ export default function Detalle() {
     const res = await duplicateRequest(id);
     setDuping(false);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: 'Pedido republicado', sub: `Nuevo pedido #${res.code}`, icon: 'fa-rotate-right', type: 'green' });
-    router.push(`/mecanico/cotizaciones?id=${res.id}`);
+    toast({ title: 'Pedido republicado', sub: 'Nuevo trabajo creado', icon: 'fa-rotate-right', type: 'green' });
+    router.push(`/mecanico/trabajo?id=${res.jobId}`);
   }
 
   useEffect(() => { setId(new URLSearchParams(window.location.search).get('id')); }, []);

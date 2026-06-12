@@ -189,8 +189,8 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   }
   await m.getByRole('button', { name: /Enviar calificación/i }).click();
   await expect(m.getByText(/Gracias por calificar/i)).toBeVisible({ timeout: 10000 });
-  const after = await storeRatingStats();
-  expect(after.count).toBeGreaterThan(before.count); // la reputación del vendedor acumula
+  // la escritura de la reseña puede tardar un instante en verse en la base -> poll
+  await expect.poll(async () => (await storeRatingStats()).count, { timeout: 10000 }).toBeGreaterThan(before.count);
 
   // 8) historial: el vendedor ve la venta "Entregado al mecánico"
   await s.reload();

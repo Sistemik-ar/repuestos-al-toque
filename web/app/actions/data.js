@@ -94,7 +94,7 @@ export async function getRequestForMechanic(id) {
   // cuentas corrientes activas del mecánico (para etiquetar ofertas sin revelar identidad)
   const cc = await prisma.creditAccount.findMany({ where: { mechanicId: s.id, active: true }, select: { storeId: true } });
   const ccSet = new Set(cc.map((c) => c.storeId));
-  return { ...reqBase(r), quotes: r.quotes.map((q) => quotePublic(q, ccSet.has(q.storeId))) };
+  return { ...reqBase(r), jobId: r.jobId, quotes: r.quotes.map((q) => quotePublic(q, ccSet.has(q.storeId))) };
 }
 
 // Detalle completo de un pedido del mecánico (estado, oferta elegida, totales, envío).
@@ -120,10 +120,12 @@ export async function acceptQuote(quoteId) {
   if (!['OPEN', 'QUOTED', 'CLOSED'].includes(q.request.status)) return { error: 'Este pedido ya no admite cambios' };
   if (q.request.job && !['DRAFT', 'OPEN'].includes(q.request.job.status)) return { error: 'El link de pago ya fue generado: la elección está bloqueada' };
   if (q.request.windowEndsAt && q.request.windowEndsAt.getTime() > Date.now()) return { error: 'Esperá a que cierre la ventana para elegir' };
-  // al cambiar de elección, des-seleccionar las otras cotizaciones del ítem
-  await prisma.requestQuote.updateMany({ where: { requestId: q.requestId, status: 'SELECTED' }, data: { status: 'SENT' } });
-  await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } });
-  await prisma.request.update({ where: { id: q.requestId }, data: { status: 'CLOSED', selectedAt: new Date() } });
+  // transacción: des-seleccionar otras + seleccionar esta + cerrar request (un doble-tap no deja 2 SELECTED)
+  await prisma.$transaction([
+    prisma.requestQuote.updateMany({ where: { requestId: q.requestId, status: 'SELECTED' }, data: { status: 'SENT' } }),
+    prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }),
+    prisma.request.update({ where: { id: q.requestId }, data: { status: 'CLOSED', selectedAt: new Date() } }),
+  ]);
   return { ok: true, requestId: q.requestId, quoteId };
 }
 
@@ -132,8 +134,14 @@ export async function acceptQuote(quoteId) {
 const PAY_TTL_MS = 24 * 60 * 60 * 1000;
 async function expireUnpaid() {
   try {
+    // NO tocar ítems cuyo trabajo ya tiene link generado (job CLOSED): ese reloj lo maneja
+    // el trabajo en getMyJobs, para no descalzar (ítem cancelado pero link aún pagable).
     await prisma.request.updateMany({
-      where: { status: 'CLOSED', selectedAt: { lt: new Date(Date.now() - PAY_TTL_MS) } },
+      where: {
+        status: 'CLOSED',
+        selectedAt: { lt: new Date(Date.now() - PAY_TTL_MS) },
+        OR: [{ jobId: null }, { job: { status: { not: 'CLOSED' } } }],
+      },
       data: { status: 'CANCELLED' },
     });
   } catch {}
@@ -142,16 +150,21 @@ async function expireUnpaid() {
 // El mecánico vuelve a publicar un pedido (cancelado, entregado o el que sea) con los mismos datos.
 export async function duplicateRequest(id) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
-  const r = await prisma.request.findUnique({ where: { id } });
+  const r = await prisma.request.findUnique({ where: { id }, include: { job: true } });
   if (!r || r.mechanicId !== s.id) return { error: 'No autorizado' };
-  return createRequest({
-    brand: r.brand, model: r.model, year: r.year ? String(r.year) : '', vin: r.vin,
-    cat: null, desc: r.description, urgency: URGENCY_LABEL[r.urgency],
-    photoUrls: r.photoUrls || [],
+  const v = r.job || r; // datos del vehículo (del trabajo, o del request si fuera legacy)
+  const res = await addJobItem({
+    brand: v.brand, model: v.model, year: v.year ? String(v.year) : '',
+    plate: v.plate || '', vin: v.vin || '',
+    desc: r.description, urgency: URGENCY_LABEL[r.urgency], photoUrls: r.photoUrls || [],
     invoiceType: r.invoiceType === 'FACTURA_A' ? 'factura_a' : 'consumidor_final',
+    emisorRazon: r.invEmisorName, emisorCuit: r.invEmisorCuit,
     solicRazon: r.invBuyerName, solicCuit: r.invBuyerCuit,
     _categoryId: r.categoryId,
   });
+  if (res?.error) return res;
+  await publishJob(res.jobId);
+  return { ok: true, jobId: res.jobId };
 }
 
 export async function closeWindow(requestId) {
@@ -175,72 +188,13 @@ export async function reopenWindow(requestId) {
     await prisma.job.update({ where: { id: r.jobId }, data: { status: 'OPEN', windowEndsAt: ends } }).catch(() => {});
     await prisma.request.updateMany({ where: { jobId: r.jobId, status: { in: ['OPEN', 'QUOTED', 'CLOSED'] } }, data: { status: 'OPEN', windowEndsAt: ends } });
   } else {
+    const cur = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true } });
+    if (!cur || !['OPEN', 'QUOTED', 'CLOSED'].includes(cur.status)) return { error: 'Este pedido ya no admite reabrir' };
     await prisma.request.update({ where: { id: requestId }, data: { status: 'OPEN', windowEndsAt: ends } });
   }
   return { ok: true };
 }
 
-export async function markRequestPaid(requestId, quoteId) {
-  const s = await getSession(); if (!s) return { error: 'No autorizado' };
-  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId } });
-  if (!q) return { error: 'Cotización no encontrada' };
-  const part = num(q.price) || 0;
-  const ship = await computeShip(requestId, q.storeId);
-  const p = computePricing(part, ship, await readSettings());
-  const orderData = { quoteId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: p.ship, mpFeeAmount: p.mpFeeAmount, total: p.total, status: 'PAID' };
-  await prisma.order.upsert({
-    where: { requestId },
-    update: orderData,
-    create: { requestId, mechanicId: s.id, ...orderData },
-  });
-  await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
-  return { ok: true };
-}
-
-// ---- Mercado Pago: crea el link de pago (cobro centralizado a la cuenta de Jorge) ----
-export async function createMpCheckout(requestId, quoteId, opts = {}) {
-  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
-  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
-  if (!q || q.request.mechanicId !== s.id) return { error: 'No autorizado' };
-
-  const part = num(q.price) || 0;
-  const ship = await computeShip(requestId, q.storeId);
-  // verificación server-side: solo se honra cuenta corriente si existe una CC ACTIVA real
-  const creditAccount = !!opts.creditAccount && (await ccActiveBetween(s.id, q.storeId));
-  const p = computePricing(part, ship, await readSettings(), creditAccount);
-  // Monto de prueba: si MP_TEST_AMOUNT está seteado, cobra eso (ej: 10) en vez del total real.
-  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : p.total;
-  const orderRef = creditAccount ? `${requestId}::${quoteId}::cc` : `${requestId}::${quoteId}`;
-
-  const h = headers();
-  const host = h.get('host') || 'localhost:3000';
-  const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-  const appUrl = `${proto}://${host}`;
-
-  try {
-    const { link } = await createPaymentLink({
-      orderRef,
-      title: creditAccount ? `Comisión + envío · pedido #${q.request.code}` : `Repuesto · pedido #${q.request.code}`,
-      amount,
-      backUrl: `${appUrl}/api/mp/return`,
-      notificationUrl: `${appUrl}/api/mp/webhook`,
-    });
-    return { link };
-  } catch (e) {
-    return { error: e?.message || 'No se pudo generar el link de pago.' };
-  }
-}
-
-// Desglose para mostrar en la pantalla de pago (mismo cálculo que el checkout).
-export async function getOrderBreakdown(requestId, quoteId, opts = {}) {
-  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return null;
-  const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
-  if (!q || q.request.mechanicId !== s.id) return null;
-  const part = num(q.price) || 0;
-  const ship = await computeShip(requestId, q.storeId);
-  const creditAccount = !!opts.creditAccount && (await ccActiveBetween(s.id, q.storeId));
-  return computePricing(part, ship, await readSettings(), creditAccount);
-}
 
 async function ccActiveBetween(mechanicId, storeId) {
   const cc = await prisma.creditAccount.findFirst({ where: { mechanicId, storeId, active: true }, select: { id: true } });
@@ -629,6 +583,7 @@ export async function addJobItem(input) {
     if (job) {
       const res0 = await createRequest({ ...input, _jobId: job.id, _noWindow: true });
       if (res0?.error) return res0;
+      await prisma.job.update({ where: { id: job.id }, data: { updatedAt: new Date() } }).catch(() => {});
       return { ok: true, jobId: job.id, itemId: res0.id, joined: true };
     }
     // código legible con reintento (dos trabajos a la vez no pueden chocar el unique)
@@ -651,6 +606,8 @@ export async function addJobItem(input) {
   }
   const res = await createRequest({ ...input, _jobId: job.id, _noWindow: true });
   if (res?.error) return res;
+  // mantener vivo el borrador (evita que el decaimiento de 24hs lo cancele mientras lo arma)
+  await prisma.job.update({ where: { id: job.id }, data: { updatedAt: new Date() } }).catch(() => {});
   return { ok: true, jobId: job.id, itemId: res.id };
 }
 
@@ -660,6 +617,7 @@ export async function publishJob(jobId) {
   const job = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: true } });
   if (!job || job.mechanicId !== s.id) return { error: 'No autorizado' };
   if (job.requests.length === 0) return { error: 'Agregá al menos un repuesto' };
+  if (job.status !== 'DRAFT') return { error: 'Este trabajo ya fue publicado' };
   const ends = new Date(Date.now() + 10 * 60 * 1000);
   await prisma.job.update({ where: { id: jobId }, data: { status: 'OPEN', windowEndsAt: ends } });
   await prisma.request.updateMany({ where: { jobId }, data: { windowEndsAt: ends, status: 'OPEN' } });

@@ -6,6 +6,9 @@ const reqs = await p.request.findMany({ where: { description: { contains: 'E2E' 
 const ids = reqs.map((r) => r.id);
 const jobIds = [...new Set(reqs.map((r) => r.jobId).filter(Boolean))];
 if (ids.length) {
+  // las reseñas referencian la orden (FK): borrarlas antes que las órdenes
+  const ordIds = (await p.order.findMany({ where: { requestId: { in: ids } }, select: { id: true } })).map((o) => o.id);
+  if (ordIds.length) await p.rating.deleteMany({ where: { orderId: { in: ordIds } } });
   await p.order.deleteMany({ where: { requestId: { in: ids } } });
   await p.requestQuote.deleteMany({ where: { requestId: { in: ids } } });
   await p.request.deleteMany({ where: { id: { in: ids } } });

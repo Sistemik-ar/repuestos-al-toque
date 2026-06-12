@@ -50,9 +50,10 @@ export default function Cotizaciones() {
     const q = quotes.find((x) => x.id === selected); if (!q) return;
     const res = await acceptQuote(q.id);
     if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
-    // si el ítem es parte de un trabajo, se vuelve al trabajo (el pago es agrupado)
-    if (jobId) { toast({ title: 'Elección confirmada', sub: 'Seguí con los demás ítems o generá el link', icon: 'fa-check', type: 'green' }); router.push(`/mecanico/trabajo?id=${jobId}`); return; }
-    router.push('/mecanico/pago');
+    // todo ítem pertenece a un trabajo: el pago es agrupado, se vuelve al trabajo
+    const jb = jobId || request?.jobId;
+    toast({ title: 'Elección confirmada', sub: 'Seguí con los demás ítems o generá el link', icon: 'fa-check', type: 'green' });
+    router.push(jb ? `/mecanico/trabajo?id=${jb}` : '/mecanico');
   }
   async function retry() { announced.current = false; await reopenWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
   async function cerrar() { await closeWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }

@@ -3,6 +3,17 @@ import { prisma } from '@/lib/db';
 import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
 import { drivingKm } from '@/lib/geo';
 import { getSettings } from '@/lib/settings';
+import { mpIsTest } from '@/lib/mercadopago';
+
+// ¿El pago real (transaction_amount de MP) cubre lo esperado?
+// Tolerancia del 10%: el envío (OSRM) y el redondeo del recargo MP pueden variar unos pesos
+// entre la generación del link y la confirmación. Solo bloquea un sub-pago grosero (ej: pagar $10
+// por algo de $50.000). En modo prueba (MP_TEST_AMOUNT) no se compara.
+export function paidCoversExpected(paidAmount, expectedTotal) {
+  if (mpIsTest() || process.env.MP_TEST_AMOUNT) return true;
+  if (paidAmount == null || !Number.isFinite(Number(paidAmount))) return true; // sin dato (legacy) -> no bloquear
+  return Number(paidAmount) >= expectedTotal * 0.9;
+}
 
 const num = (d) => (d == null ? 0 : Number(d));
 
@@ -43,25 +54,35 @@ export async function computeShip(requestId, storeId) {
 
 // Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem
 // elegido; el envío se cobra UNA vez por comercio (en el primer ítem de cada comercio).
-async function confirmJobPaid(jobId) {
+async function confirmJobPaid(jobId, paidAmount) {
   const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
   if (!j) return false;
   const settings = await getSettings();
-  const seenStores = new Set();
+  // primera pasada: calcular el total esperado de los ítems a confirmar para verificar el monto pagado
+  const seenShip = new Set();
+  let expectedTotal = 0;
+  const plan = [];
   for (const r of j.requests) {
     const sel = r.quotes.find((q) => q.status === 'SELECTED');
     if (!sel || ['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) continue;
     const part = num(sel.price);
     const commission = Math.round(part * (Number(settings.commissionPct) / 100));
-    const ship = seenStores.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);
-    seenStores.add(sel.storeId);
-    // ítem a cuenta corriente: el repuesto se imputa a la CC, la app solo cobró comisión+envío
-    const cobrado = (r.useCredit ? 0 : part) + commission + ship;
+    const ship = seenShip.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);
+    seenShip.add(sel.storeId);
+    const cobrableItem = (r.useCredit ? 0 : part) + commission + ship;
+    const mpFeeItem = settings.mpFeeEnabled ? Math.round(cobrableItem * (Number(settings.mpFeePct) / 100)) : 0;
+    const cobrado = cobrableItem + mpFeeItem;
+    expectedTotal += cobrado;
+    plan.push({ r, sel, part, commission, ship, mpFeeItem, cobrado });
+  }
+  // verificación de monto: si el pago real no cubre lo esperado, NO confirmar (posible manipulación)
+  if (!paidCoversExpected(paidAmount, expectedTotal)) return false;
+  for (const { r, sel, part, commission, ship, mpFeeItem, cobrado } of plan) {
     try {
       await prisma.order.upsert({
         where: { requestId: r.id },
         update: { status: 'PAID' },
-        create: { requestId: r.id, quoteId: sel.id, mechanicId: j.mechanicId, storeId: sel.storeId, partAmount: part, commissionPct: Number(settings.commissionPct), commissionAmount: commission, freightAmount: ship, creditAccount: !!r.useCredit, total: cobrado, status: 'PAID' },
+        create: { requestId: r.id, quoteId: sel.id, mechanicId: j.mechanicId, storeId: sel.storeId, partAmount: part, commissionPct: Number(settings.commissionPct), commissionAmount: commission, freightAmount: ship, mpFeeAmount: mpFeeItem, creditAccount: !!r.useCredit, total: cobrado, status: 'PAID' },
       });
     } catch (e) { if (e?.code !== 'P2002') throw e; }
     await prisma.request.update({ where: { id: r.id }, data: { status: 'PAID' } }).catch(() => {});
@@ -77,9 +98,9 @@ async function confirmJobPaid(jobId) {
 
 // ref = "requestId::quoteId" (o "::cc" para cuenta corriente, o "job::<id>" para un trabajo).
 // Crea la orden y marca el pedido como pagado (idempotente).
-export async function confirmPaidByRef(ref) {
+export async function confirmPaidByRef(ref, paidAmount) {
   if (!ref || !String(ref).includes('::')) return false;
-  if (String(ref).startsWith('job::')) return confirmJobPaid(String(ref).slice(5));
+  if (String(ref).startsWith('job::')) return confirmJobPaid(String(ref).slice(5), paidAmount);
   const [requestId, quoteId, mode] = String(ref).split('::');
   const creditAccount = mode === 'cc';
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
@@ -89,6 +110,8 @@ export async function confirmPaidByRef(ref) {
   const ship = await computeShip(requestId, q.storeId);
   const settings = await getSettings();
   const p = computePricing(part, ship, settings, creditAccount);
+  // verificación de monto (defensa en profundidad): el pago real debe cubrir el total
+  if (!paidCoversExpected(paidAmount, p.total)) return false;
 
   try {
     await prisma.order.upsert({

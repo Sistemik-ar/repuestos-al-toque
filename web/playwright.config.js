@@ -18,5 +18,8 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 120000,
+    // El modo prueba de pagos (atajo de confirmación sin MP real) lo controla el harness E2E,
+    // NO el .env: en producción MP_TEST_AMOUNT va apagado. Así el suite es autónomo y reproducible.
+    env: { MP_TEST_AMOUNT: process.env.MP_TEST_AMOUNT || '10' },
   },
 });

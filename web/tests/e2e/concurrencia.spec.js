@@ -143,6 +143,76 @@ test('dos repartidores tocan "Tomar pedido" a la vez: gana uno solo', async ({ b
   await mc.close(); await sc.close(); await d1c.close(); await d2c.close();
 });
 
+test('retorno de MP con payment_id falso NO confirma (exige pago verificado)', async ({ browser }) => {
+  test.setTimeout(90000);
+  const desc = `Forjado E2E ${Date.now()}`;
+  const { m, mc, sc, jobId } = await trabajoElegido(browser, desc, uniquePlate());
+
+  // un atacante arma la URL de retorno con un payment_id inventado: getPayment lo consulta
+  // contra MP, no existe/no está aprobado -> no se confirma nada.
+  const ref = encodeURIComponent('job::' + jobId);
+  await m.request.get(`/api/mp/return?payment_id=999999999999&status=approved&external_reference=${ref}`);
+
+  const orders = await db().order.findMany({ where: { request: { description: desc } } });
+  expect(orders).toHaveLength(0); // no se creó ninguna orden
+  const job = await db().job.findUnique({ where: { id: jobId }, select: { status: true } });
+  expect(job.status).not.toBe('PAID'); // el trabajo NO quedó pagado
+
+  await mc.close(); await sc.close();
+});
+
+test('doble-tap en la elección nunca deja dos cotizaciones SELECTED', async ({ browser }) => {
+  test.setTimeout(90000);
+  const desc = `DobleTap E2E ${Date.now()}`;
+  const plate = uniquePlate();
+  const mc = await browser.newContext();
+  const m = await mc.newPage();
+  await login(m, 'mecanico@repuestosaltoque.com.ar');
+  await crearItem(m, desc, plate);
+  await publicarTrabajo(m);
+
+  // el vendedor manda DOS opciones para el mismo ítem (Original / Alternativa)
+  const sc = await browser.newContext();
+  const s = await sc.newPage();
+  await login(s, 'vendedor@repuestosaltoque.com.ar');
+  for (const price of ['30000', '42000']) {
+    const card = s.locator('.card', { hasText: desc });
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await card.getByRole('button', { name: /Cotizar/i }).click();
+    await s.locator('input[inputmode="numeric"]').first().fill(price);
+    await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+    await s.waitForTimeout(800);
+  }
+
+  // cerrar ventana y abrir las cotizaciones en DOS pestañas
+  await m.bringToFront();
+  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
+  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
+  const itemId = (await db().request.findFirst({ where: { description: desc }, select: { id: true } })).id;
+  const jobId = (await db().request.findFirst({ where: { description: desc }, select: { jobId: true } })).jobId;
+
+  const t1 = await mc.newPage(); const t2 = await mc.newPage();
+  for (const t of [t1, t2]) {
+    await t.goto(`/mecanico/cotizaciones?id=${itemId}&job=${jobId}`);
+    await expect(t.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
+  }
+  // cada pestaña elige una oferta DISTINTA y confirma a la vez
+  await t1.getByRole('button', { name: /Elegir oferta/i }).first().click();
+  await t2.getByRole('button', { name: /Elegir oferta/i }).last().click();
+  await Promise.all([
+    t1.getByRole('button', { name: /Confirmar elección/i }).click(),
+    t2.getByRole('button', { name: /Confirmar elección/i }).click(),
+  ]);
+
+  // invariante: como mucho UNA cotización SELECTED (la transacción des-selecciona la otra)
+  await expect.poll(async () =>
+    db().requestQuote.count({ where: { request: { description: desc }, status: 'SELECTED' } }),
+    { timeout: 10000 }
+  ).toBeLessThanOrEqual(1);
+
+  await mc.close(); await sc.close();
+});
+
 test('regenerar el link de pago devuelve EL MISMO link (no cobra doble)', async ({ browser }) => {
   test.setTimeout(120000);
   const desc = `MismoLink E2E ${Date.now()}`;

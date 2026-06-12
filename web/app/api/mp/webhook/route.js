@@ -15,13 +15,14 @@ export async function POST(req) {
     if (type === 'payment' && paymentId) {
       const pay = await getPayment(paymentId);
       if (pay?.status === 'approved' && pay?.external_reference) {
-        await confirmPaidByRef(pay.external_reference);
+        await confirmPaidByRef(pay.external_reference, pay.transaction_amount);
       }
     }
     return Response.json({ received: true });
   } catch (e) {
-    // Siempre 200 para que MP no reintente en loop por un error nuestro.
-    return Response.json({ received: true });
+    // Error interno real (ej: DB caída): devolver 500 para que MP REINTENTE.
+    // Sin esto, un pago cobrado podía quedar sin confirmar si el comprador no volvía por el navegador.
+    return new Response(JSON.stringify({ error: 'retry' }), { status: 500 });
   }
 }
 
