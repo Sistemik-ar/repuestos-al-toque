@@ -1,28 +1,30 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
+import { db } from './db';
 
-// Serial: los 3 pasos usan la MISMA relación CC (mecánico seed <-> vendedor seed).
+// Ciclo de Cuenta Corriente con estado inicial DETERMINÍSTICO (se resetea por DB).
 // La suite termina con la CC ACTIVA (estado que usa el equipo para probar).
 test.describe.configure({ mode: 'serial' });
 
 const STORE = 'Repuestos Centro';
 
-test('si la CC está activa, el admin puede desactivarla', async ({ browser }) => {
-  const ac = await browser.newContext();
-  const a = await ac.newPage();
-  await login(a, 'admin@repuestosaltoque.com.ar');
-  // esperar a que el panel cargue; si NO existe relación CC todavía (base reseteada), no hay nada que desactivar
-  await expect(a.getByRole('heading', { name: 'Alta de usuario' })).toBeVisible({ timeout: 15000 });
-  const row = a.locator('tr', { hasText: STORE }).filter({ hasText: 'Taller' }).first();
-  const existe = await row.isVisible({ timeout: 8000 }).catch(() => false);
-  if (existe) {
-    const desactivar = row.getByRole('button', { name: /^Desactivar$/ });
-    if (await desactivar.count()) {
-      await desactivar.click();
-      await expect(row.getByText(/Desactivada/)).toBeVisible({ timeout: 10000 });
-    }
-  }
-  await ac.close();
+test.beforeAll(async () => {
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: 'mecanico@repuestosaltoque.com.ar' } });
+  const store = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });
+  await p.creditAccount.deleteMany({ where: { mechanicId: mech.id, storeId: store.id } });
+});
+
+test.afterAll(async () => {
+  // pase lo que pase, la CC del equipo queda ACTIVA
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: 'mecanico@repuestosaltoque.com.ar' } });
+  const store = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });
+  await p.creditAccount.upsert({
+    where: { mechanicId_storeId: { mechanicId: mech.id, storeId: store.id } },
+    update: { adminStatus: 'APPROVED', storeStatus: 'APPROVED', active: true, disabledAt: null },
+    create: { mechanicId: mech.id, storeId: store.id, adminStatus: 'APPROVED', storeStatus: 'APPROVED', active: true },
+  });
 });
 
 test('rechazo: el comercio rechaza y el mecánico ve "Rechazada"', async ({ browser }) => {
