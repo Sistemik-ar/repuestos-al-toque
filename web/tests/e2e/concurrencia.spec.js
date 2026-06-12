@@ -213,6 +213,62 @@ test('doble-tap en la elección nunca deja dos cotizaciones SELECTED', async ({ 
   await mc.close(); await sc.close();
 });
 
+test('claim consolida por patente: un repartidor toma TODO el auto (no se parte el viaje)', async ({ browser }) => {
+  test.setTimeout(120000);
+  const stamp = Date.now();
+  const plate = uniquePlate();
+  const d1 = `Consol1 E2E ${stamp}`, d2 = `Consol2 E2E ${stamp}`;
+  const mc = await browser.newContext(); const m = await mc.newPage();
+  await login(m, 'mecanico@repuestosaltoque.com.ar');
+  await crearItem(m, d1, plate);
+  await crearItem(m, d2, plate); // mismo trabajo (misma patente)
+  await publicarTrabajo(m);
+
+  // el MISMO comercio cotiza ambos ítems
+  const sc = await browser.newContext(); const s = await sc.newPage();
+  await login(s, 'vendedor@repuestosaltoque.com.ar');
+  for (const d of [d1, d2]) {
+    const card = s.locator('.card', { hasText: d });
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await card.getByRole('button', { name: /Cotizar/i }).click();
+    await s.locator('input[inputmode="numeric"]').first().fill('30000');
+    await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+    await expect(s.locator('.card', { hasText: d })).toHaveCount(0, { timeout: 10000 });
+  }
+
+  // el mecánico cierra la ventana y elige ambos ítems
+  await m.bringToFront();
+  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
+  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
+  const jobId = new URL(m.url()).searchParams.get('id');
+  for (const d of [d1, d2]) {
+    await m.locator('.card', { hasText: d }).getByRole('link', { name: /Ver cotizaciones/i }).click();
+    await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
+    await m.getByRole('button', { name: /Elegir oferta/i }).first().click();
+    await m.getByRole('button', { name: /Confirmar elección/i }).click();
+    await expect(m).toHaveURL(/\/mecanico\/trabajo\?id=/);
+  }
+  // pagar el trabajo (atajo de prueba) -> dos órdenes PAID, mismo auto + mismo comercio
+  await m.request.get(`/api/mp/return?status=approved&external_reference=${encodeURIComponent('job::' + jobId)}`);
+  await expect.poll(async () =>
+    db().order.count({ where: { request: { description: { in: [d1, d2] } }, status: 'PAID' } }),
+    { timeout: 10000 }
+  ).toBe(2);
+
+  // el repartidor toma UN ítem -> el claim consolida y se lleva AMBAS órdenes del auto
+  const rep = await db().user.findUnique({ where: { email: 'repartidor@repuestosaltoque.com.ar' }, select: { id: true } });
+  const dc = await browser.newContext(); const dd = await dc.newPage();
+  await login(dd, 'repartidor@repuestosaltoque.com.ar');
+  await dd.locator('.card', { hasText: d1 }).first().getByRole('button', { name: /Tomar pedido/i }).click();
+
+  await expect.poll(async () => {
+    const ords = await db().order.findMany({ where: { request: { description: { in: [d1, d2] } } }, select: { deliveryId: true } });
+    return ords.every((o) => o.deliveryId === rep.id) ? ords.length : -1;
+  }, { timeout: 10000 }).toBe(2); // las DOS quedaron asignadas al MISMO repartidor
+
+  await mc.close(); await sc.close(); await dc.close();
+});
+
 test('regenerar el link de pago devuelve EL MISMO link (no cobra doble)', async ({ browser }) => {
   test.setTimeout(120000);
   const desc = `MismoLink E2E ${Date.now()}`;

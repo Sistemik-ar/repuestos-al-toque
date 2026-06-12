@@ -34,7 +34,7 @@ test('anonimato: el mecánico no ve el nombre del comercio y el comercio no ve e
   await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
-  await expect(m.getByText(/Proveedor #|Distribuidor|Zona Oeste/i).first()).toBeVisible(); // alias
+  await expect(m.getByText(/Proveedor [A-Z]/).first()).toBeVisible(); // alias rotativo (A/B/C…)
   await expect(m.locator('body')).not.toContainText('Repuestos Centro'); // identidad real del vendedor
   await expect(m.getByText(/Anónimo hasta concretar/i).first()).toBeVisible();
 

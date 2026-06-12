@@ -9,16 +9,11 @@ import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, inBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
+import { aliasLabel } from '@/lib/alias';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
 
-const ALIASES = { 'Repuestos Centro': 'Proveedor #12', 'Andina Parts': 'Distribuidor Centro', 'Patagonia Frenos': 'Zona Oeste Parts' };
-function aliasFor(name) {
-  if (ALIASES[name]) return ALIASES[name];
-  let h = 0; for (const c of String(name || 'Vendedor')) h = (h * 31 + c.charCodeAt(0)) % 97;
-  return 'Proveedor #' + (10 + (h % 80));
-}
 
 const num = (d) => (d == null ? null : Number(d));
 
@@ -235,7 +230,7 @@ export async function getStoreSales() {
 
 export async function createQuote(requestId, input) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
-  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true } });
+  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true } });
   if (!req) return { error: 'Solicitud no encontrada' };
   if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
   if (req.windowEndsAt && req.windowEndsAt.getTime() < Date.now()) return { error: 'La ventana de cotización ya cerró' };
@@ -245,9 +240,16 @@ export async function createQuote(requestId, input) {
   if (mine >= MAX_OPCIONES) return { error: `Podés enviar hasta ${MAX_OPCIONES} opciones por solicitud` };
   if (parsePrice(input.price) <= 0) return { error: 'Ingresá un precio válido' };
   const store = await prisma.storeProfile.findUnique({ where: { userId: s.id } });
+  // alias rotativo por trabajo: reuso el mío si ya coticé acá; si no, soy el próximo en orden de llegada
+  const scope = req.jobId ? { request: { jobId: req.jobId } } : { requestId };
+  let alias;
+  const previas = await prisma.requestQuote.findMany({ where: scope, select: { storeId: true, alias: true }, orderBy: { createdAt: 'asc' } });
+  const mineAlias = previas.find((q) => q.storeId === s.id)?.alias;
+  if (mineAlias) alias = mineAlias;
+  else alias = aliasLabel([...new Set(previas.map((q) => q.storeId))].length);
   await prisma.requestQuote.create({
     data: {
-      requestId, storeId: s.id, alias: aliasFor(s.name || store?.tradeName),
+      requestId, storeId: s.id, alias,
       optionLabel: input.optionLabel || null,
       partBrand: input.partBrand || null, price: parsePrice(input.price),
       warranty: input.warranty || '6 meses', note: input.note || null,
@@ -295,10 +297,24 @@ export async function claimDelivery(orderId) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
   const prof = await prisma.deliveryProfile.findUnique({ where: { userId: s.id }, select: { docsOk: true } });
   if (!prof?.docsOk) return { error: 'Tu cuenta no está habilitada todavía (falta validar tu documentación)' };
-  const r = await prisma.order.updateMany({
-    where: { id: orderId, deliveryId: null, status: 'PAID' },
-    data: { deliveryId: s.id, pickupPin: newPin(), deliveryPin: newPin() },
+  const o = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { status: true, deliveryId: true, storeId: true, mechanicId: true, request: { select: { job: { select: { plate: true } } } } },
   });
+  if (!o) return { error: 'Pedido no encontrado' };
+  if (o.deliveryId) return { error: 'Otro repartidor ya tomó este pedido' };
+  if (o.status !== 'PAID') return { error: 'Este pedido ya no está disponible' };
+  // CONSOLIDACIÓN POR PATENTE: el viaje es del AUTO. Se toman JUNTAS todas las órdenes pagadas
+  // sin repartidor de la MISMA patente + MISMO comercio + MISMO mecánico (destino). Así dos
+  // repartidores no se reparten los ítems de un mismo auto (uno se quedaría con el viaje de $0).
+  // No se consolida por mecánico: un mecánico tiene varios autos y el cliente de un auto no debe
+  // pagar el transporte de otro. Sin patente válida (legacy) se toma solo esta orden.
+  const plate = (o.request?.job?.plate || '').trim();
+  const where = plate
+    ? { deliveryId: null, status: 'PAID', storeId: o.storeId, mechanicId: o.mechanicId, request: { job: { plate } } }
+    : { id: orderId, deliveryId: null, status: 'PAID' };
+  // un solo viaje => un solo par de PINs (retiro en el comercio, entrega al mecánico)
+  const r = await prisma.order.updateMany({ where, data: { deliveryId: s.id, pickupPin: newPin(), deliveryPin: newPin() } });
   if (r.count === 0) return { error: 'Otro repartidor ya tomó este pedido' };
   return { ok: true };
 }
