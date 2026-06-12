@@ -46,6 +46,21 @@ export default function Comercio() {
     if (r.status === 'CLOSED') return r.mySelected ? ['badge-yellow', 'fa-clock', 'Pendiente de pago'] : ['badge-gray', 'fa-circle-xmark', 'No elegida'];
     return ['badge-purple', 'fa-hourglass-half', 'Esperando decisión'];
   };
+  // tiempos legibles para las tarjetas del comerciante
+  const timeAgo = (ts) => {
+    if (!ts) return '';
+    const s = (Date.now() - ts) / 1000;
+    if (s < 3600) return `hace ${Math.max(1, Math.round(s / 60))} min`;
+    if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
+    const d = Math.round(s / 86400);
+    return `hace ${d} día${d === 1 ? '' : 's'}`;
+  };
+  const venceEn = (selectedAt) => {
+    const ms = (selectedAt || 0) + 24 * 3600 * 1000 - Date.now();
+    if (ms <= 0) return 'Vence ya';
+    const h = Math.floor(ms / 3600000), mn = Math.floor((ms % 3600000) / 60000);
+    return `Vence en ${h} h ${mn} m`;
+  };
   const initials = (me?.name || 'RC').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
   const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
@@ -149,25 +164,32 @@ export default function Comercio() {
         {tab === 'cot' && (cot.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
         ) : (
-          // agrupado por estado; cada grupo con el orden que le sirve al comerciante:
-          // esperando = más nuevas primero · pendiente de pago = vence antes primero ·
-          // sin respuesta (zombies >24hs) = atenuadas abajo · resto = historial newest-first
+          // agrupado por estado; cada grupo con el orden que le sirve al comerciante
           [
-            ['Esperando decisión', vivas],
-            ['Pendiente de pago', cot.filter((r) => r.status === 'CLOSED' && r.mySelected).sort((a, b) => (a.selectedAt || 0) - (b.selectedAt || 0))],
-            ['Sin respuesta', sinRespuesta],
-            ['No elegidas', cot.filter((r) => r.status === 'CLOSED' && !r.mySelected).sort((a, b) => b.createdAt - a.createdAt)],
-            ['Canceladas', cot.filter((r) => r.status === 'CANCELLED').sort((a, b) => b.createdAt - a.createdAt)],
-          ].filter(([, rows]) => rows.length > 0).map(([titulo, rows]) => (
-            <div key={titulo} className="section">
-              <div className="section-title"><h2>{titulo}</h2><span className="text-xs muted">{rows.length}</span></div>
-              <div className="cards-grid">{rows.map((r) => {
-                const [bCls, bIcon, bTxt] = titulo === 'Sin respuesta' ? ['badge-gray', 'fa-moon', 'Sin respuesta'] : cotBadge(r);
+            { titulo: 'Esperando decisión', icon: 'fa-hourglass-half', sub: 'Más nuevas primero — son las que tienen chance real de convertir.', rows: vivas },
+            { titulo: 'Pendiente de pago', icon: 'fa-stopwatch', sub: 'El mecánico ya eligió tu cotización — tiene 24 hs para pagar. La que vence antes, primero.', rows: cot.filter((r) => r.status === 'CLOSED' && r.mySelected).sort((a, b) => (a.selectedAt || 0) - (b.selectedAt || 0)) },
+            { titulo: 'Sin respuesta', icon: 'fa-moon', banner: 'Ventana cerrada hace más de 24 hs y el mecánico no decidió. Siguen activas — todavía puede elegir — pero no compiten con las vivas.', rows: sinRespuesta },
+            { titulo: 'No elegidas', icon: 'fa-circle-xmark', rows: cot.filter((r) => r.status === 'CLOSED' && !r.mySelected).sort((a, b) => b.createdAt - a.createdAt) },
+            { titulo: 'Canceladas', icon: 'fa-ban', rows: cot.filter((r) => r.status === 'CANCELLED').sort((a, b) => b.createdAt - a.createdAt) },
+          ].filter((g) => g.rows.length > 0).map((g) => (
+            <div key={g.titulo} className="section">
+              <div className="section-title"><h2><i className={`fa-solid ${g.icon} text-purple`} style={{ marginRight: 6 }}></i>{g.titulo}</h2><span className="text-xs muted">{g.rows.length}</span></div>
+              {g.sub && <p className="text-xs muted mb-12" style={{ marginTop: -6 }}>{g.sub}</p>}
+              {g.banner && <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-circle-info text-purple"></i><span className="text-xs subtle">{g.banner}</span></div>}
+              <div className="cards-grid">{g.rows.map((r) => {
+                const esPago = g.titulo === 'Pendiente de pago';
+                const esZombie = g.titulo === 'Sin respuesta';
+                const [bCls, bIcon, bTxt] = esZombie ? ['badge-gray', 'fa-moon', 'Sin respuesta'] : esPago ? ['badge-yellow', 'fa-stopwatch', venceEn(r.selectedAt)] : cotBadge(r);
                 return (
-                  <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' || titulo === 'Sin respuesta' ? { opacity: 0.6 } : {}}>
+                  <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' || esZombie ? { opacity: 0.6 } : esPago ? { borderColor: 'rgba(250,204,21,0.35)' } : {}}>
                     <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
-                    <div className="flex-between text-sm mb-12"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
-                    {['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
+                    {esPago ? (
+                      <div className="flex-between text-sm mb-8"><span className="muted">Eligió tu precio</span><span className="text-yellow" style={{ fontWeight: 800 }}>{r.mySelectedPrice ? '$' + r.mySelectedPrice.toLocaleString('es-AR') : '—'}</span></div>
+                    ) : (
+                      <div className="flex-between text-sm mb-8"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
+                    )}
+                    <div className="text-xs muted mb-8"><i className="fa-regular fa-clock"></i> {esPago ? `eligió ${timeAgo(r.selectedAt)}` : timeAgo(r.createdAt)}</div>
+                    {g.titulo === 'Esperando decisión' && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
                   </div>
                 );
               })}</div>

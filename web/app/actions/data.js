@@ -259,6 +259,7 @@ export async function getOpenRequestsForStore() {
     myCount: r.quotes.length,
     myPrices: r.quotes.map((q) => num(q.price)),
     mySelected: r.quotes.some((q) => q.status === 'SELECTED'),
+    mySelectedPrice: num(r.quotes.find((q) => q.status === 'SELECTED')?.price) || null,
   }));
 }
 
