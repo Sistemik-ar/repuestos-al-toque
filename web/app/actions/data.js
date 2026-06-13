@@ -475,12 +475,12 @@ export async function createUser(input) {
   let coords = null;
   if (role === 'MECHANIC' || role === 'STORE') {
     if (!String(input.address || '').trim()) return { error: 'La dirección es obligatoria para mecánicos y comercios.' };
-    // Si el admin eligió una dirección del autocompletado, ya viene con coords exactas: las
-    // usamos directo (no re-geocodificamos). Si tipeó a mano, geocodificamos el texto.
+    // La dirección DEBE elegirse del autocompletado (trae coords exactas). No se geocodifica
+    // texto libre: garantiza que el envío se calcula sobre una dirección real de Bariloche.
     const picked = input.lat != null && input.lng != null ? { lat: Number(input.lat), lng: Number(input.lng), label: input.address } : null;
-    coords = picked || (await geocode(`${input.address} ${input.barrio || ''}`.trim()));
-    if (!coords) return { error: 'No encontramos esa dirección. Elegila del listado o revisá calle y número (ej: "Av. Bustillo 1240").' };
-    if (!inBariloche(coords)) return { error: `Esa dirección no está en Bariloche (encontramos: ${coords.label?.slice(0, 80)}…). Revisala.` };
+    if (!picked) return { error: 'Elegí la dirección del listado de sugerencias (no la escribas a mano).' };
+    if (!inBariloche(picked)) return { error: 'Esa dirección no está en Bariloche. Elegí una del listado.' };
+    coords = picked;
   }
 
   try {

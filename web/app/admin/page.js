@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, setUserEmail, searchAddresses } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
 
@@ -224,6 +224,44 @@ function StoreCatRow({ store, categories, onSaved }) {
   );
 }
 
+// Autocompletado de direcciones de Bariloche: la dirección DEBE elegirse de la lista (trae coords
+// exactas para el cálculo de envío). Si el admin edita el texto, se borra la elección y hay que re-elegir.
+function AddressAutocomplete({ value, picked, onType, onPick }) {
+  const [sug, setSug] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const tRef = useRef(null);
+  function handleType(v) {
+    onType(v);
+    clearTimeout(tRef.current);
+    if (v.trim().length < 4) { setSug([]); setOpen(false); return; }
+    setLoading(true); setOpen(true);
+    tRef.current = setTimeout(async () => {
+      try { const res = await searchAddresses(v.trim()); setSug(res || []); } catch { setSug([]); }
+      setLoading(false);
+    }, 350);
+  }
+  return (
+    <div style={{ position: 'relative' }}>
+      <input className="input" value={value} autoComplete="off" placeholder="Escribí la calle y número, y elegí del listado"
+        onChange={(e) => handleType(e.target.value)} onFocus={() => { if (sug.length) setOpen(true); }} />
+      {picked
+        ? <div className="text-xs text-green mt-4"><i className="fa-solid fa-circle-check"></i> Dirección validada en Bariloche</div>
+        : value.trim().length >= 4 && <div className="text-xs muted mt-4">{loading ? 'Buscando…' : 'Elegí una opción del listado ↓'}</div>}
+      {open && !picked && sug.length > 0 && (
+        <div className="card" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: 'auto', padding: 6 }}>
+          {sug.map((c, i) => (
+            <button key={i} type="button" className="btn btn-ghost btn-sm btn-block" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }}
+              onClick={() => { onPick(c); setSug([]); setOpen(false); }}>
+              <i className="fa-solid fa-location-dot text-purple"></i> {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Kpi({ label, value, icon, yellow }) {
   return (
     <div className="card stat-card">
@@ -307,7 +345,7 @@ function Pricing() {
   );
 }
 
-const EMPTY = { role: 'STORE', email: '', name: '', phone: '', whatsapp: '', address: '', barrio: '', cuit: '', ivaCondition: 'RESPONSABLE_INSCRIPTO', vehicleType: 'MOTO', dni: '', licenseNumber: '', insurance: '', plate: '' };
+const EMPTY = { role: 'STORE', email: '', name: '', phone: '', whatsapp: '', address: '', lat: null, lng: null, barrio: '', cuit: '', ivaCondition: 'RESPONSABLE_INSCRIPTO', vehicleType: 'MOTO', dni: '', licenseNumber: '', insurance: '', plate: '' };
 
 function AltaUsuario({ onCreated }) {
   const [f, setF] = useState(EMPTY);
@@ -320,7 +358,9 @@ function AltaUsuario({ onCreated }) {
   const isCourier = f.role === 'DELIVERY';
 
   async function submit(e) {
-    e.preventDefault(); setError(''); setLoading(true);
+    e.preventDefault(); setError('');
+    if ((isStore || isMech) && (f.lat == null || f.lng == null)) { setError('Elegí la dirección del listado de sugerencias (escribí y tocá una opción).'); return; }
+    setLoading(true);
     const res = await createUser(f); setLoading(false);
     if (res?.error) { setError(res.error); return; }
     setDone({ email: f.email.trim().toLowerCase(), tempPassword: res.tempPassword, geocoded: res.geocoded, geocodedLabel: res.geocodedLabel });
@@ -365,7 +405,15 @@ function AltaUsuario({ onCreated }) {
 
         {(isStore || isMech) && (
           <div className="grid-2 mb-12">
-            <div className="field" style={{ marginBottom: 0 }}><label>Dirección</label><input className="input" value={f.address} onChange={(e) => set('address', e.target.value)} placeholder="Av. Bustillo 1240" /></div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Dirección *</label>
+              <AddressAutocomplete
+                value={f.address}
+                picked={f.lat != null && f.lng != null}
+                onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
+                onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))}
+              />
+            </div>
             <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} placeholder="Centro" /></div>
           </div>
         )}
