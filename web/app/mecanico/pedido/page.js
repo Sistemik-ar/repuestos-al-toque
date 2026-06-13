@@ -22,6 +22,7 @@ export default function Pedido() {
   const [itemCount, setItemCount] = useState(0);
   const [added, setAdded] = useState(false); // pantalla "¿seguir comprando?"
   const [error, setError] = useState(''); // error persistente (no desaparece solo)
+  const [tried, setTried] = useState(false); // intentó avanzar con campos incompletos -> marcamos los faltantes
   const [uploading, setUploading] = useState(false);
 
   async function onPickPhoto(e) {
@@ -57,11 +58,15 @@ export default function Pedido() {
 
   function next() {
     if (!stepOk) {
-      if (step === 1) toast({ title: 'Elegí el vehículo', sub: 'Marca y modelo', icon: 'fa-car', type: 'yellow' });
-      else if (step === 3 && !st.desc.trim()) toast({ title: 'Describí el repuesto', sub: 'Contá qué pieza necesitás', icon: 'fa-pen', type: 'yellow' });
-      else toast({ title: 'Completá los datos de Factura A', sub: 'Razón social y CUIT (11 dígitos) en ambos bloques', icon: 'fa-triangle-exclamation', type: 'yellow' });
+      setTried(true); // habilita los avisos en rojo bajo cada campo faltante
+      if (step === 1) {
+        const falta = !st.brand ? 'Elegí la marca' : !(needsOther ? st.modelOther.trim() : st.model) ? 'Elegí el modelo' : 'Cargá la patente o el VIN';
+        toast({ title: falta, icon: 'fa-car', type: 'yellow' });
+      } else if (step === 3 && !st.desc.trim()) toast({ title: 'Describí el repuesto', sub: 'Contá qué pieza necesitás', icon: 'fa-pen', type: 'yellow' });
+      else toast({ title: 'Completá los datos de Factura A', sub: 'Razón social y CUIT (11 dígitos)', icon: 'fa-triangle-exclamation', type: 'yellow' });
       return;
     }
+    setTried(false);
     if (step < 5) { setStep(step + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     else submit();
   }
@@ -133,14 +138,15 @@ export default function Pedido() {
             <div className="eyebrow mb-8">Paso 1</div>
             <h2 className="h-lg mb-16">¿Para qué vehículo?</h2>
             <div className="field">
-              <label>Marca</label>
+              <label>Marca *</label>
               <select className="select" value={st.brand} onChange={(e) => set({ brand: e.target.value, model: '', modelOther: '' })}>
                 <option value="">Elegí una marca</option>
                 {data.brands.map((b) => <option key={b}>{b}</option>)}
               </select>
+              {tried && !st.brand && <div className="text-xs text-red mt-4">Elegí la marca</div>}
             </div>
             <div className="field">
-              <label>Modelo</label>
+              <label>Modelo *</label>
               {!needsOther ? (
                 <select className="select" value={st.model} disabled={!st.brand} onChange={(e) => set({ model: e.target.value })}>
                   <option value="">{st.brand ? 'Elegí un modelo' : 'Elegí primero la marca'}</option>
@@ -150,6 +156,7 @@ export default function Pedido() {
               ) : (
                 <input className="input" placeholder="Escribí el modelo" value={st.modelOther} onChange={(e) => set({ modelOther: e.target.value })} />
               )}
+              {tried && !(needsOther ? st.modelOther.trim() : st.model) && <div className="text-xs text-red mt-4">Elegí el modelo</div>}
             </div>
             <div className="field">
               <label>Año</label>
@@ -162,6 +169,7 @@ export default function Pedido() {
               <label>Patente *</label>
               <input className="input" placeholder="ABC123 o AB123CD" style={{ textTransform: 'uppercase' }} value={st.plate} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} />
               {st.plate && !plateOk(st.plate) && <div className="text-xs text-red mt-4">Formato: ABC123 o AB123CD</div>}
+              {tried && !idOk && !st.plate.trim() && !st.vin.trim() && <div className="text-xs text-red mt-4">Cargá la patente (o el VIN más abajo)</div>}
               <div className="text-xs muted mt-4"><i className="fa-solid fa-truck-fast"></i> La patente agrupa los repuestos de este auto en un solo envío. ¡Cargala bien!</div>
             </div>
             <div className="field">
@@ -198,8 +206,9 @@ export default function Pedido() {
             <div className="eyebrow mb-8">Paso 3</div>
             <h2 className="h-lg mb-16">Describí el repuesto</h2>
             <div className="field">
-              <label>Detalle</label>
+              <label>Detalle *</label>
               <textarea className="textarea" maxLength={500} placeholder="Ej: Juego de pastillas de freno delanteras, originales o equivalentes." value={st.desc} onChange={(e) => set({ desc: e.target.value })}></textarea>
+              {tried && !st.desc.trim() && <div className="text-xs text-red mt-4">Describí el repuesto que necesitás</div>}
             </div>
             <div className="field">
               <label>Foto <span className="muted">(opcional)</span></label>
@@ -221,7 +230,7 @@ export default function Pedido() {
               )}
             </div>
 
-            <InvoiceSection st={st} set={set} />
+            <InvoiceSection st={st} set={set} tried={tried} />
           </div>
         )}
 
@@ -268,8 +277,8 @@ export default function Pedido() {
       {/* Footer nav */}
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '14px 16px', background: 'linear-gradient(0deg,var(--bg-0),transparent)' }}>
         <div className="flex gap-12">
-          {step > 1 && <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={() => setStep(step - 1)}><i className="fa-solid fa-arrow-left"></i></button>}
-          <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} disabled={!stepOk} onClick={next}>
+          {step > 1 && <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={() => { setTried(false); setStep(step - 1); }}><i className="fa-solid fa-arrow-left"></i></button>}
+          <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} disabled={searching} onClick={next}>
             {step === 5 ? <><i className="fa-solid fa-paper-plane"></i> Enviar pedido</> : <>Continuar <i className="fa-solid fa-arrow-right"></i></>}
           </button>
         </div>
@@ -301,7 +310,7 @@ export default function Pedido() {
   );
 }
 
-function InvoiceSection({ st, set }) {
+function InvoiceSection({ st, set, tried }) {
   const cuitErr = (v) => v && !/^\d{11}$/.test(String(v).replace(/\D/g, ''));
   return (
     <div className="field">
@@ -323,13 +332,15 @@ function InvoiceSection({ st, set }) {
           <div className="card mb-12">
             <div className="eyebrow mb-8">Datos del solicitante de la factura</div>
             <div className="field" style={{ marginBottom: 10 }}>
-              <label>Razón Social</label>
+              <label>Razón Social *</label>
               <input className="input" value={st.solicRazon} onChange={(e) => set({ solicRazon: e.target.value })} placeholder="Tu razón social" />
+              {tried && !st.solicRazon.trim() && <div className="text-xs text-red mt-4">Completá la razón social</div>}
             </div>
             <div className="field" style={{ marginBottom: 0 }}>
-              <label>CUIT</label>
+              <label>CUIT *</label>
               <input className="input" inputMode="numeric" value={st.solicCuit} onChange={(e) => set({ solicCuit: e.target.value })} placeholder="11 dígitos" />
               {cuitErr(st.solicCuit) && <div className="text-xs text-red mt-4">El CUIT debe tener 11 dígitos</div>}
+              {tried && !st.solicCuit.trim() && <div className="text-xs text-red mt-4">Completá el CUIT</div>}
             </div>
           </div>
         </div>

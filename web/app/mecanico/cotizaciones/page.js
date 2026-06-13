@@ -25,7 +25,9 @@ export default function Cotizaciones() {
     const rid = params.get('id');
     setJobId(params.get('job'));
     setId(rid);
-    if (!rid) return;
+    // sin un pedido en la URL (ej: tocaron la pestaña "Cotizaciones" del nav) no hay nada que mostrar:
+    // mandamos al panel, donde están todos los trabajos con sus cotizaciones.
+    if (!rid) { router.replace('/mecanico'); return; }
     let alive = true;
     const load = async () => { const r = await getRequestForMechanic(rid); if (alive) setRequest(r); };
     load();
@@ -72,7 +74,7 @@ export default function Cotizaciones() {
       <div className="topbar">
         <div className="flex-center">
           <Link href="/mecanico" className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link>
-          <div><div style={{ fontWeight: 800 }}>Cotizaciones</div><div className="text-xs muted">{request ? `Pedido #${request.code}` : 'Cargando…'}</div></div>
+          <div><div style={{ fontWeight: 800 }}>Cotizaciones</div><div className="text-xs muted">{request ? `Pedido #${request.code}` : id ? 'Cargando…' : 'Sin pedido'}</div></div>
         </div>
         <div className="icon-btn"><i className="fa-solid fa-tower-broadcast text-purple"></i></div>
       </div>

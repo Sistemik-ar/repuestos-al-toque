@@ -296,6 +296,7 @@ function CreditRequestsStore() {
 
 function CotizarModal({ lead, label, veh, onClose, onSend }) {
   const [price, setPrice] = useState('');
+  const [sending, setSending] = useState(false); // evita doble-envío mientras el request está en vuelo
   const [brand, setBrand] = useState('Bosch');
   const [opcion, setOpcion] = useState('Original / OEM');
   const [note, setNote] = useState('');
@@ -339,8 +340,8 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         </div>
         <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" maxLength={300} placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">
-          <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={onClose}>Cancelar</button>
-          <button className="btn btn-yellow btn-block" disabled={!price} onClick={() => onSend({ price, partBrand: brand, optionLabel: opcion, note, photoUrls: photos })}><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</button>
+          <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} disabled={sending} onClick={onClose}>Cancelar</button>
+          <button className="btn btn-yellow btn-block" disabled={!price || sending} onClick={async () => { setSending(true); try { await onSend({ price, partBrand: brand, optionLabel: opcion, note, photoUrls: photos }); } finally { setSending(false); } }}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Enviando…</> : <><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</>}</button>
         </div>
       </div>
     </div>

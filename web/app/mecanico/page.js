@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
@@ -35,6 +35,15 @@ export default function MecanicoDashboard() {
     } catch {}
   };
   usePoll(load, 4000);
+
+  // vuelta desde Mercado Pago (?pago=ok | pend). Avisamos y limpiamos la URL.
+  useEffect(() => {
+    const pago = new URLSearchParams(window.location.search).get('pago');
+    if (!pago) return;
+    if (pago === 'ok') { ping(); toast({ title: '¡Pago confirmado!', sub: 'El trabajo quedó pago — coordinamos el envío', icon: 'fa-circle-check', type: 'green', duration: 9000 }); }
+    else if (pago === 'pend') toast({ title: 'Pago en proceso', sub: 'Estamos esperando que Mercado Pago lo acredite. Apenas se confirme, el pedido avanza solo.', icon: 'fa-clock', type: 'yellow', duration: 11000 });
+    router.replace('/mecanico');
+  }, []); // eslint-disable-line
 
   const activos = jobs.filter((jb) => ['DRAFT', 'OPEN', 'CLOSED'].includes(jb.status));
   const coordinar = jobs.filter((jb) => ['PAID', 'DONE'].includes(jb.status));

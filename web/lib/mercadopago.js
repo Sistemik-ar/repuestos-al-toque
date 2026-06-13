@@ -23,6 +23,10 @@ export async function createPaymentLink({ orderRef, title, amount, payerEmail, b
     body: JSON.stringify({
       items: [{ title, quantity: 1, unit_price: Number(amount), currency_id: 'ARS' }],
       external_reference: orderRef, // para mapear el pago a la orden en el webhook
+      // SOLO pagos instantáneos: excluimos efectivo/cupón (ticket = Rapipago/Pago Fácil) y
+      // depósito en cajero (atm). Esos se acreditan en días y dejarían el pedido "pendiente" sin
+      // poder despachar el envío. Con la ventana de 24hs y la urgencia, no aplican.
+      payment_methods: { excluded_payment_types: [{ id: 'ticket' }, { id: 'atm' }] },
       payer: payerEmail ? { email: payerEmail } : undefined,
       back_urls: backUrl ? { success: backUrl, pending: backUrl, failure: backUrl } : undefined,
       // auto_return solo con https (MP lo rechaza en localhost)
