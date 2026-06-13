@@ -6,8 +6,13 @@ import { PrismaClient } from '@prisma/client';
 let client;
 export function db() {
   if (!client) {
-    const env = fs.readFileSync(path.join(process.cwd(), '.env'), 'utf8');
-    const url = env.match(/^DATABASE_URL="?([^"\n]+)"?/m)?.[1];
+    // Prioridad: DATABASE_URL del entorno (lo setea `npm run e2e:local` con la DB local);
+    // si no está, cae al .env (DB remota). Así los tests apuntan a la misma DB que el server.
+    let url = process.env.DATABASE_URL;
+    if (!url) {
+      const env = fs.readFileSync(path.join(process.cwd(), '.env'), 'utf8');
+      url = env.match(/^DATABASE_URL="?([^"\n]+)"?/m)?.[1];
+    }
     client = new PrismaClient({ datasources: { db: { url } } });
   }
   return client;

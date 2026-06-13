@@ -1,0 +1,29 @@
+# Postgres LOCAL para desarrollo y tests E2E.
+# La DB remota (Supabase) tiene ~1s de latencia por query desde fuera de su región, lo que
+# hace lentísimos los tests. Esta corre en tu máquina (latencia ~0) y es descartable.
+#
+#   npm run db:local:up      # levanta la DB
+#   npm run db:local:setup   # crea el schema + carga cuentas de prueba
+#   npm run e2e:local        # corre los E2E contra esta DB
+#   npm run db:local:down    # la apaga (los datos quedan en el volumen)
+#   npm run db:local:reset   # la borra entera y la deja limpia
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rat_test_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: repuestos
+    ports:
+      - '5433:5432'
+    volumes:
+      - rat_test_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d repuestos']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  rat_test_pgdata:

@@ -17,7 +17,13 @@
     "db:seed": "node prisma/seed.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "db:local:up": "docker compose -f docker-compose.test.yml up -d --wait",
+    "db:local:down": "docker compose -f docker-compose.test.yml down",
+    "db:local:reset": "docker compose -f docker-compose.test.yml down -v && npm run db:local:up && npm run db:local:setup",
+    "db:local:setup": "node scripts/with-test-env.mjs npx prisma db push && node scripts/with-test-env.mjs node prisma/seed.mjs",
+    "e2e:local": "node scripts/with-test-env.mjs npx playwright test",
+    "dev:local": "node scripts/with-test-env.mjs npx next dev -H 0.0.0.0"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0",

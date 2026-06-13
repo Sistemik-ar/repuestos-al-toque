@@ -20,6 +20,12 @@ export default defineConfig({
     timeout: 120000,
     // El modo prueba de pagos (atajo de confirmación sin MP real) lo controla el harness E2E,
     // NO el .env: en producción MP_TEST_AMOUNT va apagado. Así el suite es autónomo y reproducible.
-    env: { MP_TEST_AMOUNT: process.env.MP_TEST_AMOUNT || '10' },
+    // DATABASE_URL se propaga si está en el entorno (npm run e2e:local apunta a la DB local);
+    // si no, el server usa el .env (DB remota).
+    env: {
+      MP_TEST_AMOUNT: process.env.MP_TEST_AMOUNT || '10',
+      ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
+      ...(process.env.AUTH_SECRET ? { AUTH_SECRET: process.env.AUTH_SECRET } : {}),
+    },
   },
 });

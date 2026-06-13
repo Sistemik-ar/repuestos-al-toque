@@ -91,8 +91,23 @@ repuestos-al-toque/
 ```bash
 cd web
 npm install
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3000  (usa la DB de tu .env)
 ```
+
+### DB local para desarrollo y tests (recomendado)
+La DB remota (Supabase) tiene ~1 s de latencia por query desde fuera de su región y hace
+lentísimos los tests. Para iterar local hay un Postgres en Docker (latencia ~9 ms):
+```bash
+cd web
+npm run db:local:up       # levanta Postgres en :5433 (Docker)
+npm run db:local:setup    # crea el schema + carga las cuentas de prueba
+npm run e2e:local         # corre TODOS los E2E contra la DB local
+npm run dev:local         # (opcional) levantar la app apuntando a la DB local
+npm run db:local:reset    # borrar todo y empezar de cero
+npm run db:local:down     # apagar la DB (los datos quedan en el volumen)
+```
+La config local vive en `web/.env.test` (credenciales dummy, no son secretos). Producción usa
+las variables de entorno de Vercel, no este archivo.
 
 ### Demo (`demo/`) — es estática, sin build
 ```bash
