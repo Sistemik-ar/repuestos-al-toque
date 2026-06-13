@@ -232,6 +232,7 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 }
 .bottom-nav a i { font-size: 19px; }
 .bottom-nav a.active { color: var(--purple-light); }
+.bottom-nav .nav-spacer { width: 48px; } /* equilibra el slot que ocupaba "Cotizaciones" -> "+" centrado */
 .bottom-nav a.fab {
   background: linear-gradient(135deg, var(--purple), var(--purple-light));
   color: white; width: 52px; height: 52px; border-radius: 50%; justify-content: center;
@@ -458,7 +459,7 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 @keyframes radar { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(2.4); opacity: 0; } }
 
 .animate-in { animation: pop-in .4s cubic-bezier(.2,.9,.3,1.3); }
-.spinner { width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; }
+.spinner { display: inline-block; box-sizing: border-box; width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite; }
 
 /* Searching radar */
 .radar-wrap { position: relative; width: 180px; height: 180px; margin: 0 auto; display: grid; place-items: center; }

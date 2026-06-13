@@ -15,6 +15,7 @@ export default function Repartidor() {
   const [items, setItems] = useState([]);
   const [rep, setRep] = useState(null);
   const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
+  const [busy, setBusy] = useState(null); // orderId que se está tomando (evita doble-claim + da feedback)
 
   const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); setLoaded(true); getMyReputation().then((r) => r && setRep(r)).catch(() => {}); } catch {} };
   usePoll(load, 5000);
@@ -24,9 +25,13 @@ export default function Repartidor() {
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
 
   async function tomar(o) {
-    const res = await claimDelivery(o.orderId);
-    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); load(); return; }
-    toast({ title: 'Pedido tomado', sub: 'Andá a retirarlo al comercio', icon: 'fa-hand', type: 'green' }); load();
+    if (busy) return;
+    setBusy(o.orderId);
+    try {
+      const res = await claimDelivery(o.orderId);
+      if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); load(); return; }
+      toast({ title: 'Pedido tomado', sub: 'Andá a retirarlo al comercio', icon: 'fa-hand', type: 'green' }); load();
+    } finally { setBusy(null); }
   }
   async function entregar(o, pin) {
     const r = await markDelivered(o.orderId, pin);
@@ -85,7 +90,7 @@ export default function Repartidor() {
               <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
               <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
             </div>
-            <button className="btn btn-yellow btn-block" onClick={() => tomar(o)}><i className="fa-solid fa-hand"></i> Tomar pedido</button>
+            <button className="btn btn-yellow btn-block" disabled={busy === o.orderId} onClick={() => tomar(o)}>{busy === o.orderId ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Tomando…</> : <><i className="fa-solid fa-hand"></i> Tomar pedido</>}</button>
           </div>
         ))}</div>}
 
