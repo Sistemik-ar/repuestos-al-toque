@@ -6,6 +6,7 @@ import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
 import { addJobItem, publishJob } from '@/app/actions/data';
 import { uploadPhoto } from '@/lib/upload';
+import BusyButton from '@/components/BusyButton';
 
 const plateOk = (p) => /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}\s?[A-Z]{2})$/i.test(String(p || '').trim());
 
@@ -300,8 +301,8 @@ export default function Pedido() {
               <div className="text-xs muted mt-8"><i className="fa-solid fa-circle-info"></i> Los comercios recién lo ven cuando publiques. Todo lo de este auto viaja en un solo envío por comercio.</div>
             </div>
             <button className="btn btn-primary btn-block btn-lg mb-12" onClick={otroRepuesto}><i className="fa-solid fa-plus"></i> Agregar otro repuesto a este auto</button>
-            <button className="btn btn-ghost btn-block mb-12" onClick={otroAuto}><i className="fa-solid fa-car"></i> Publicar y comprar para otro auto</button>
-            <button className="btn btn-yellow btn-block btn-lg" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · solicitar presupuesto</button>
+            <BusyButton className="btn btn-ghost btn-block mb-12" busyLabel="Publicando…" onClick={otroAuto}><i className="fa-solid fa-car"></i> Publicar y comprar para otro auto</BusyButton>
+            <BusyButton className="btn btn-yellow btn-block btn-lg" busyLabel="Publicando…" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · solicitar presupuesto</BusyButton>
           </div>
         </div>
       )}

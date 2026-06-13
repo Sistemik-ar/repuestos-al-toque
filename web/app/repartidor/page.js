@@ -7,6 +7,7 @@ import { usePoll, keep } from '@/lib/usePoll';
 import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
+import BusyButton from '@/components/BusyButton';
 
 const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
 
@@ -114,19 +115,19 @@ export default function Repartidor() {
             {o.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle">{o.issue}</span></div>}
             {o.status === 'PAID' ? (
               <div>
-                {!o.arrivedPickup && <button className="btn btn-primary btn-block mb-12" onClick={() => llegue(o, 'pickup')}><i className="fa-solid fa-location-dot"></i> Llegué al comercio</button>}
+                {!o.arrivedPickup && <BusyButton className="btn btn-primary btn-block mb-12" busyLabel="Avisando…" onClick={() => llegue(o, 'pickup')}><i className="fa-solid fa-location-dot"></i> Llegué al comercio</BusyButton>}
                 <div className="card mb-12" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.35)', textAlign: 'center', padding: 14 }}>
                   <div className="text-xs muted mb-4">Mostrale este PIN al vendedor al retirar</div>
                   <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{o.pickupPin || '— — — —'}</div>
                   <div className="text-xs muted mt-4">El vendedor lo ingresa para confirmar que te llevás la pieza</div>
                 </div>
-                <button className="btn btn-ghost btn-sm btn-block" onClick={() => nadie(o, 'pickup')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</button>
+                <BusyButton className="btn btn-ghost btn-sm btn-block" busyLabel="Avisando…" onClick={() => nadie(o, 'pickup')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</BusyButton>
               </div>
             ) : (
               <div>
-                {!o.arrivedDrop && <button className="btn btn-primary btn-block mb-12" onClick={() => llegue(o, 'drop')}><i className="fa-solid fa-location-dot"></i> Llegué al taller</button>}
+                {!o.arrivedDrop && <BusyButton className="btn btn-primary btn-block mb-12" busyLabel="Avisando…" onClick={() => llegue(o, 'drop')}><i className="fa-solid fa-location-dot"></i> Llegué al taller</BusyButton>}
                 <EntregaPin onConfirm={(pin) => entregar(o, pin)} />
-                <button className="btn btn-ghost btn-sm btn-block mt-12" onClick={() => nadie(o, 'drop')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</button>
+                <BusyButton className="btn btn-ghost btn-sm btn-block mt-12" busyLabel="Avisando…" onClick={() => nadie(o, 'drop')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</BusyButton>
               </div>
             )}
           </div>
@@ -145,12 +146,18 @@ export default function Repartidor() {
 
 function EntregaPin({ onConfirm }) {
   const [pin, setPin] = useState('');
+  const [sending, setSending] = useState(false); // evita doble-confirmación + da feedback
+  async function confirmar() {
+    if (sending) return;
+    setSending(true);
+    try { await onConfirm(pin); setPin(''); } finally { setSending(false); }
+  }
   return (
     <div>
       <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Pedile el PIN de entrega al mecánico</div>
       <div className="flex gap-12">
         <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" aria-label="PIN de entrega que te da el mecánico" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
-        <button className="btn btn-success btn-block" disabled={pin.length !== 4} onClick={() => { onConfirm(pin); setPin(''); }}><i className="fa-solid fa-check"></i> Confirmar entrega</button>
+        <button className="btn btn-success btn-block" disabled={pin.length !== 4 || sending} onClick={confirmar}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Confirmando…</> : <><i className="fa-solid fa-check"></i> Confirmar entrega</>}</button>
       </div>
     </div>
   );

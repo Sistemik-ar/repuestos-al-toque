@@ -6,6 +6,7 @@ import { money, ping, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
 import { getRequestForMechanic, acceptQuote, reopenWindow, closeWindow } from '@/app/actions/data';
 import Loading from '@/components/Loading';
+import BusyButton from '@/components/BusyButton';
 
 export default function Cotizaciones() {
   const router = useRouter();
@@ -89,7 +90,7 @@ export default function Cotizaciones() {
             <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
               <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>{revealed ? 'Ventana cerrada · ofertas' : 'Ventana de ofertas — se revelan al cerrarse'}</div>
               <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
-              {!revealed && <button className="btn btn-ghost btn-sm mt-12" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y ver ofertas</button>}
+              {!revealed && <BusyButton className="btn btn-ghost btn-sm mt-12" busyLabel="Cerrando…" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y ver ofertas</BusyButton>}
             </div>
 
             <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
@@ -105,7 +106,7 @@ export default function Cotizaciones() {
                   <div className="text-xs muted mt-4">Van a ir apareciendo acá a medida que los comercios coticen.</div>
                 </div>
               ) : (
-                <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">No llegaron ofertas</div><div className="text-xs mb-16">Podés reintentar otra ventana</div><button className="btn btn-primary btn-sm" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</button></div>
+                <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">No llegaron ofertas</div><div className="text-xs mb-16">Podés reintentar otra ventana</div><BusyButton className="btn btn-primary btn-sm" busyLabel="Reintentando…" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</BusyButton></div>
               )
             ) : (
               <>
@@ -148,7 +149,7 @@ export default function Cotizaciones() {
 
       {selected !== null && (
         <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '14px 16px', background: 'linear-gradient(0deg,var(--bg-0),transparent)' }}>
-          <button className="btn btn-yellow btn-block btn-lg" onClick={continuar}><i className="fa-solid fa-lock"></i> {jobId ? 'Confirmar elección' : 'Continuar al pago'}</button>
+          <BusyButton className="btn btn-yellow btn-block btn-lg" busyLabel="Confirmando…" onClick={continuar}><i className="fa-solid fa-lock"></i> {jobId ? 'Confirmar elección' : 'Continuar al pago'}</BusyButton>
         </div>
       )}
 

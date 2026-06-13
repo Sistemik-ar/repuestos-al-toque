@@ -5,6 +5,7 @@ import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getStoresForCredit, requestCreditAccount } from '@/app/actions/data';
 import Loading from '@/components/Loading';
+import BusyButton from '@/components/BusyButton';
 
 const BADGE = {
   NONE: null,
@@ -50,7 +51,7 @@ export default function Cuentas() {
                 <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'linear-gradient(135deg,var(--yellow),var(--purple))', color: '#0B0B0F' }}><i className="fa-solid fa-store"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{st.name}</div><div className="text-xs muted">{st.barrio || 'Bariloche'}</div></div></div>
                 <div className="flex-center gap-8">
                   {b && <span className={`badge ${b.cls}`}><i className={`fa-solid ${b.icon}`}></i> {b.txt}</span>}
-                  {canRequest && <button className="btn btn-primary btn-sm" onClick={() => solicitar(st)}><i className="fa-solid fa-id-card-clip"></i> {st.status === 'NONE' ? 'Solicitar' : 'Solicitar de nuevo'}</button>}
+                  {canRequest && <BusyButton className="btn btn-primary btn-sm" busyLabel="Enviando…" onClick={() => solicitar(st)}><i className="fa-solid fa-id-card-clip"></i> {st.status === 'NONE' ? 'Solicitar' : 'Solicitar de nuevo'}</BusyButton>}
                 </div>
               </div>
             </div>

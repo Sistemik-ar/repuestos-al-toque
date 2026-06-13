@@ -6,6 +6,7 @@ import { usePoll, keep } from '@/lib/usePoll';
 import { useRouter } from 'next/navigation';
 import { getRequestDetail, rateOrder, getMyRatingsForOrder, duplicateRequest } from '@/app/actions/data';
 import Loading from '@/components/Loading';
+import BusyButton from '@/components/BusyButton';
 
 const STEPS = [
   { key: 'OPEN', label: 'Pedido creado', icon: 'fa-clipboard-list' },
@@ -194,7 +195,7 @@ function RatingSection({ requestId }) {
       <div className="flex-between mb-12"><span className="text-sm">Producto</span><Estrellas value={product} onChange={setProduct} /></div>
       <div className="flex-between mb-12"><span className="text-sm">Delivery</span><Estrellas value={delivery} onChange={setDelivery} /></div>
       <div className="field"><textarea className="textarea" placeholder="Comentario (opcional)" value={comment} onChange={(e) => setComment(e.target.value)}></textarea></div>
-      <button className="btn btn-yellow btn-block" disabled={!seller && !product && !delivery} onClick={enviar}><i className="fa-solid fa-star"></i> {sent ? 'Actualizar calificación' : 'Enviar calificación'}</button>
+      <BusyButton className="btn btn-yellow btn-block" disabled={!seller && !product && !delivery} busyLabel="Enviando…" onClick={enviar}><i className="fa-solid fa-star"></i> {sent ? 'Actualizar calificación' : 'Enviar calificación'}</BusyButton>
     </div>
   );
 }

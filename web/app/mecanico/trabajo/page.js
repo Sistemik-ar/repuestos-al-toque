@@ -5,6 +5,7 @@ import { money, toast, fmtTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getJob, closeJobWindow, createJobCheckout, publishJob, setItemCredit, cancelItem } from '@/app/actions/data';
 import Loading from '@/components/Loading';
+import BusyButton from '@/components/BusyButton';
 
 const ITEM_BADGE = {
   OPEN: ['badge-purple', 'Cotizando'], QUOTED: ['badge-purple', 'Cotizando'],
@@ -83,7 +84,7 @@ export default function Trabajo() {
               <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
                 <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>Los comercios están cotizando todo el trabajo</div>
                 <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
-                <button className="btn btn-ghost btn-sm mt-12" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y elegir</button>
+                <BusyButton className="btn btn-ghost btn-sm mt-12" busyLabel="Cerrando…" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y elegir</BusyButton>
               </div>
             )}
 
@@ -99,7 +100,7 @@ export default function Trabajo() {
                 <div className="text-xs muted mt-4 mb-12">Los comercios todavía no lo ven. Publicalo cuando esté completo.</div>
                 <div className="flex gap-12">
                   <Link href="/mecanico/pedido" className="btn btn-ghost btn-sm">Seguir agregando</Link>
-                  <button className="btn btn-yellow btn-block btn-sm" onClick={async () => { const r = await publishJob(id); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</button>
+                  <BusyButton className="btn btn-yellow btn-block btn-sm" busyLabel="Publicando…" onClick={async () => { const r = await publishJob(id); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</BusyButton>
                 </div>
               </div>
             )}

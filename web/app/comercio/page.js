@@ -233,12 +233,17 @@ export default function Comercio() {
 
 function EntregaCard({ r, label, veh, onChanged }) {
   const [pin, setPin] = useState('');
+  const [sending, setSending] = useState(false); // evita doble-confirmación + da feedback
   async function confirmar() {
-    const res = await storeConfirmPickup(r.orderId, pin);
-    setPin('');
-    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: 'Retiro confirmado', sub: 'La pieza va en camino al taller', icon: 'fa-truck-fast', type: 'green' });
-    onChanged?.();
+    if (sending) return;
+    setSending(true);
+    try {
+      const res = await storeConfirmPickup(r.orderId, pin);
+      setPin('');
+      if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+      toast({ title: 'Retiro confirmado', sub: 'La pieza va en camino al taller', icon: 'fa-truck-fast', type: 'green' });
+      onChanged?.();
+    } finally { setSending(false); }
   }
   return (
     <div className="card mb-12">
@@ -258,7 +263,7 @@ function EntregaCard({ r, label, veh, onChanged }) {
             : <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Cuando venga el repartidor, pedile su PIN y confirmá el retiro</div>}
           <div className="flex gap-12">
             <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" aria-label="PIN de retiro que te muestra el repartidor" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
-            <button className="btn btn-yellow btn-block" disabled={pin.length !== 4} onClick={confirmar}><i className="fa-solid fa-box"></i> Confirmar retiro</button>
+            <button className="btn btn-yellow btn-block" disabled={pin.length !== 4 || sending} onClick={confirmar}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Confirmando…</> : <><i className="fa-solid fa-box"></i> Confirmar retiro</>}</button>
           </div>
         </div>
       )}
