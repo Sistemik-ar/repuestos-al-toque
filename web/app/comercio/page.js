@@ -39,8 +39,8 @@ export default function Comercio() {
       if (arrivalsRef.current) {
         for (const x of s || []) {
           if (ahora.has(x.orderId) && !arrivalsRef.current.has(x.orderId)) {
-            ping();
-            toast({ title: '🛵 ¡Llegó el repartidor!', sub: `Está en tu local por «${x.desc || x.catLabel}» — pedile su PIN y confirmá el retiro (pestaña Concretadas)`, icon: 'fa-location-dot', type: 'yellow', duration: 12000 });
+            ping(3); // sonido insistente + vibración: el repartidor está esperando en el local
+            toast({ title: '🛵 ¡Llegó el repartidor!', sub: `Está en tu local por «${x.desc || x.catLabel}» — pedile su PIN y confirmá el retiro (pestaña Concretadas)`, icon: 'fa-location-dot', type: 'yellow', duration: 20000 });
           }
         }
       }

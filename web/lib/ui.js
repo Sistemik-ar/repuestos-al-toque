@@ -11,17 +11,25 @@ export function toast(opts) {
 }
 
 let audioCtx;
-export function ping() {
+// Un beep. `beeps` repite el tono para llamar la atención (ej: el repartidor llegó).
+// Además vibra el teléfono si el navegador lo permite (móvil).
+export function ping(beeps = 1) {
   if (typeof window === 'undefined') return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
-    o.type = 'sine'; o.frequency.value = 880;
-    g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.18, audioCtx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
-    o.start(); o.stop(audioCtx.currentTime + 0.36);
+    if (audioCtx.state === 'suspended') audioCtx.resume?.(); // iOS suspende el contexto hasta una interacción
+    const n = Math.max(1, Math.min(6, beeps));
+    for (let i = 0; i < n; i++) {
+      const t0 = audioCtx.currentTime + i * 0.45;
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+      o.start(t0); o.stop(t0 + 0.36);
+    }
+    navigator.vibrate?.(n > 1 ? [200, 120, 200, 120, 200] : 200);
   } catch (e) {}
 }
 

@@ -9,6 +9,30 @@ export function inBariloche(c) {
   return !!c && c.lat >= BARILOCHE_BBOX.latMin && c.lat <= BARILOCHE_BBOX.latMax && c.lng >= BARILOCHE_BBOX.lngMin && c.lng <= BARILOCHE_BBOX.lngMax;
 }
 
+// Autocompletado de direcciones RESTRINGIDO a Bariloche (para el alta): Nominatim acotado al
+// bounding box (bounded=1 + viewbox). Devuelve candidatos [{ label, lat, lng }] ya filtrados
+// dentro del box. El admin elige uno -> guardamos sus coords exactas (sin re-geocodificar).
+export async function searchBariloche(query) {
+  const q = String(query || '').trim();
+  if (q.length < 3) return [];
+  const { lngMin, latMax, lngMax, latMin } = BARILOCHE_BBOX;
+  const viewbox = `${lngMin},${latMax},${lngMax},${latMin}`; // left,top,right,bottom
+  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&countrycodes=ar&bounded=1&viewbox=${viewbox}&q=${encodeURIComponent(q)}`;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(url, { headers: UA, signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (Array.isArray(data) ? data : [])
+      .map((d) => ({ label: d.display_name, lat: parseFloat(d.lat), lng: parseFloat(d.lon) }))
+      .filter((c) => inBariloche(c)); // doble seguro: nunca devolver algo fuera del box
+  } catch {
+    return [];
+  }
+}
+
 // Convierte una dirección en coordenadas. Devuelve { lat, lng, label } o null si no se encontró.
 // Timeout corto: si Nominatim se cuelga, el alta de usuarios no puede quedar trabada esperando.
 export async function geocode(address) {

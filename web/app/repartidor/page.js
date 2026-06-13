@@ -8,8 +8,7 @@ import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIss
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
 import BusyButton from '@/components/BusyButton';
-
-const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
+import { mapsDirUrl as mapsUrl } from '@/lib/maps';
 
 export default function Repartidor() {
   const router = useRouter();
@@ -172,7 +171,7 @@ function Punto({ icon, color, titulo, lugar, dir, barrio, maps }) {
         <div className="text-sm" style={{ fontWeight: 700 }}>{lugar || '—'}</div>
         <div className="text-xs muted">{dir ? `${dir}${barrio ? ' · ' + barrio : ''}` : 'Sin dirección cargada'}</div>
       </div>
-      {maps && <a className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} href={maps} target="_blank" rel="noopener"><i className="fa-solid fa-location-arrow"></i></a>}
+      {maps && <a className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} href={maps} target="_blank" rel="noopener"><i className="fa-solid fa-location-arrow"></i> Cómo llegar</a>}
     </div>
   );
 }

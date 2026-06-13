@@ -691,7 +691,7 @@ export const data = {
     },
     {
       "id": "lubricacion",
-      "label": "Lubricación",
+      "label": "Lubricentro",
       "icon": "fa-oil-can"
     },
     {

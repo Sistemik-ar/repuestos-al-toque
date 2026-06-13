@@ -6,7 +6,7 @@ import { getSession, invalidateStatusCache } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
 import { jobChargePlan } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
-import { geocode, inBariloche } from '@/lib/geo';
+import { geocode, inBariloche, searchBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
 import { aliasLabel } from '@/lib/alias';
@@ -291,8 +291,8 @@ export async function getMyDeliveries() {
   const storeIds = [...new Set(orders.map((o) => o.storeId))];
   const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
   const [stores, mechs] = await Promise.all([
-    prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true, address: true, barrio: true } }),
-    prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true, address: true, barrio: true } }),
+    prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true, address: true, barrio: true, lat: true, lng: true } }),
+    prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true, address: true, barrio: true, lat: true, lng: true } }),
   ]);
   const sMap = Object.fromEntries(stores.map((x) => [x.userId, x]));
   const mMap = Object.fromEntries(mechs.map((x) => [x.userId, x]));
@@ -302,8 +302,9 @@ export async function getMyDeliveries() {
     // el PIN de retiro solo lo ve el repartidor asignado (se lo muestra al vendedor)
     pickupPin: o.deliveryId === s.id ? o.pickupPin : null,
     ...reqBase(o.request),
-    pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio } : null,
-    dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio } : null,
+    // lat/lng para abrir la navegación exacta en Google Maps (no depender del texto de la dirección)
+    pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio, lat: num(sMap[o.storeId].lat), lng: num(sMap[o.storeId].lng) } : null,
+    dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio, lat: num(mMap[o.mechanicId].lat), lng: num(mMap[o.mechanicId].lng) } : null,
   }));
 }
 
@@ -474,8 +475,11 @@ export async function createUser(input) {
   let coords = null;
   if (role === 'MECHANIC' || role === 'STORE') {
     if (!String(input.address || '').trim()) return { error: 'La dirección es obligatoria para mecánicos y comercios.' };
-    coords = await geocode(`${input.address} ${input.barrio || ''}`.trim());
-    if (!coords) return { error: 'No encontramos esa dirección. Revisá calle y número (ej: "Av. Bustillo 1240").' };
+    // Si el admin eligió una dirección del autocompletado, ya viene con coords exactas: las
+    // usamos directo (no re-geocodificamos). Si tipeó a mano, geocodificamos el texto.
+    const picked = input.lat != null && input.lng != null ? { lat: Number(input.lat), lng: Number(input.lng), label: input.address } : null;
+    coords = picked || (await geocode(`${input.address} ${input.barrio || ''}`.trim()));
+    if (!coords) return { error: 'No encontramos esa dirección. Elegila del listado o revisá calle y número (ej: "Av. Bustillo 1240").' };
     if (!inBariloche(coords)) return { error: `Esa dirección no está en Bariloche (encontramos: ${coords.label?.slice(0, 80)}…). Revisala.` };
   }
 
@@ -566,6 +570,13 @@ export async function saveBusinessSettings(input) {
 export async function geocodeAddress(address) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   return geocode(address);
+}
+
+// Autocompletado de direcciones de Bariloche para el alta (admin). Devuelve candidatos
+// [{ label, lat, lng }] dentro del bounding box; el admin elige uno.
+export async function searchAddresses(query) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];
+  return searchBariloche(query);
 }
 
 // ================= Cuenta Corriente =================

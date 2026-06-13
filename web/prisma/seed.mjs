@@ -21,7 +21,7 @@ const categories = [
   ['embrague', 'Embrague y transmisión', 'fa-gears'],
   ['frenos', 'Frenos', 'fa-record-vinyl'],
   ['inyeccion', 'Inyección y combustible', 'fa-gas-pump'],
-  ['lubricacion', 'Lubricación', 'fa-oil-can'],
+  ['lubricacion', 'Lubricentro', 'fa-oil-can'],
   ['motor', 'Motor', 'fa-gear'],
   ['refrigeracion', 'Refrigeración A/C Calefa', 'fa-snowflake'],
   ['suspension', 'Suspensión y dirección', 'fa-car-burst'],

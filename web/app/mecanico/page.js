@@ -26,8 +26,8 @@ export default function MecanicoDashboard() {
       if (arrivalsRef.current) {
         for (const i of items) {
           if (ahora.has(i.id) && !arrivalsRef.current.has(i.id)) {
-            ping();
-            toast({ title: '📍 ¡El repartidor llegó a tu taller!', sub: `Trae «${i.desc || i.catLabel}» — recibí la pieza y dale tu PIN (está en el detalle del pedido)`, icon: 'fa-location-dot', type: 'yellow', duration: 12000 });
+            ping(3); // sonido insistente + vibración: el repartidor está esperando
+            toast({ title: '📍 ¡El repartidor llegó a tu taller!', sub: `Trae «${i.desc || i.catLabel}» — recibí la pieza y dale tu PIN (está en el detalle del pedido)`, icon: 'fa-location-dot', type: 'yellow', duration: 20000 });
           }
         }
       }
