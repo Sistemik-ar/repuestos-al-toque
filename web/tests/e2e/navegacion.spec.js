@@ -18,10 +18,10 @@ test('BottomNav del mecánico: todos los ítems llevan a una página real', asyn
   await page.locator('.bottom-nav').getByRole('link', { name: /Cuentas/i }).click();
   await expect(page).toHaveURL(/\/mecanico\/cuentas/);
 
-  // Cotizaciones
+  // Botón "+" (nuevo pedido) — reemplazó a la pestaña "Cotizaciones", que no aplica en Trabajos
   await page.goto('/mecanico');
-  await page.locator('.bottom-nav').getByRole('link', { name: /Cotizaciones/i }).click();
-  await expect(page).toHaveURL(/\/mecanico\/cotizaciones/);
+  await page.locator('.bottom-nav a.fab').click();
+  await expect(page).toHaveURL(/\/mecanico\/pedido/);
 
   // sigue logueado como mecánico en todas (ninguna rebotó a /login ni a la landing)
   await expect(page).not.toHaveURL(/\/login/);

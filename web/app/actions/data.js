@@ -208,11 +208,17 @@ async function ccActiveBetween(mechanicId, storeId) {
 export async function getOpenRequestsForStore() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
   await sweepExpirations();
+  // categorías que vende el comercio: solo le llegan pedidos de esas. Si no configuró ninguna,
+  // ve todas (no lo dejamos a ciegas hasta que el admin se las cargue).
+  const myCats = await prisma.storeCategory.findMany({ where: { storeId: s.id }, select: { categoryId: true } });
+  const catIds = myCats.map((c) => c.categoryId);
+  const openWhere = { status: { in: ['OPEN', 'QUOTED'] }, windowEndsAt: { not: null } };
+  if (catIds.length) openWhere.categoryId = { in: catIds };
   const rows = await prisma.request.findMany({
     where: {
       OR: [
-        // publicadas (los borradores de trabajos no tienen ventana y no se ven)
-        { status: { in: ['OPEN', 'QUOTED'] }, windowEndsAt: { not: null } },
+        // publicadas (los borradores de trabajos no tienen ventana y no se ven), filtradas por mis rubros
+        openWhere,
         // cerradas/canceladas solo si yo coticé (para ver "pendiente de pago" / "cancelado")
         { status: { in: ['CLOSED', 'CANCELLED'] }, quotes: { some: { storeId: s.id } } },
       ],
@@ -415,19 +421,35 @@ export async function getMyRatingsForOrder(requestId) {
 // ---- Admin ----
 export async function getAdminData() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
-  const [usersCount, reqCount, paid, users, recent] = await Promise.all([
+  const [usersCount, reqCount, paid, users, recent, categories, storeRows] = await Promise.all([
     prisma.user.count(),
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, email: true, name: true, role: true, status: true } }),
     prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 15, include: { category: true, order: true } }),
+    prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true } }),
+    prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
   ]);
   const commission = paid.reduce((a, o) => a + num(o.commissionAmount), 0);
   return {
     kpis: { users: usersCount, requests: reqCount, paid: paid.length, commission },
     users,
+    categories,
+    // comercios con los rubros que tienen asignados (para el editor de categorías)
+    stores: storeRows.map((st) => ({ id: st.userId, name: st.tradeName, categoryIds: st.categories.map((c) => c.categoryId) })),
     recent: recent.map((r) => ({ id: r.id, code: r.code, label: r.description || r.category?.name || 'Repuesto', vehicle: `${r.brand || ''} ${r.model || ''}`.trim(), status: r.status, total: r.order ? num(r.order.total) : null })),
   };
+}
+
+// El admin define qué rubros vende cada comercio. Solo le van a llegar pedidos de esas categorías.
+export async function setStoreCategories(storeId, categoryIds) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const ids = [...new Set((Array.isArray(categoryIds) ? categoryIds : []).map((n) => parseInt(n, 10)).filter(Boolean))];
+  await prisma.$transaction([
+    prisma.storeCategory.deleteMany({ where: { storeId } }),
+    ...(ids.length ? [prisma.storeCategory.createMany({ data: ids.map((categoryId) => ({ storeId, categoryId })), skipDuplicates: true })] : []),
+  ]);
+  return { ok: true };
 }
 // Alta de usuario desde el backoffice (admin). Crea cuenta + perfil + geocodifica dirección.
 export async function createUser(input) {

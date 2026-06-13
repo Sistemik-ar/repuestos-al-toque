@@ -660,39 +660,9 @@ export const data = {
   },
   "categories": [
     {
-      "id": "frenos",
-      "label": "Frenos",
-      "icon": "fa-record-vinyl"
-    },
-    {
-      "id": "motor",
-      "label": "Motor",
-      "icon": "fa-gear"
-    },
-    {
-      "id": "electricidad",
-      "label": "Electricidad",
-      "icon": "fa-bolt"
-    },
-    {
-      "id": "suspension",
-      "label": "Suspensión",
-      "icon": "fa-car-burst"
-    },
-    {
-      "id": "embrague",
-      "label": "Embrague",
-      "icon": "fa-gears"
-    },
-    {
-      "id": "refrigeracion",
-      "label": "Refrigeración",
-      "icon": "fa-snowflake"
-    },
-    {
-      "id": "lubricacion",
-      "label": "Lubricación",
-      "icon": "fa-oil-can"
+      "id": "accesorios",
+      "label": "Accesorios y equipamiento",
+      "icon": "fa-toolbox"
     },
     {
       "id": "carroceria",
@@ -700,9 +670,44 @@ export const data = {
       "icon": "fa-car-side"
     },
     {
-      "id": "otros",
-      "label": "Otros",
-      "icon": "fa-ellipsis"
+      "id": "electricidad",
+      "label": "Electricidad y electrónica",
+      "icon": "fa-bolt"
+    },
+    {
+      "id": "embrague",
+      "label": "Embrague y transmisión",
+      "icon": "fa-gears"
+    },
+    {
+      "id": "frenos",
+      "label": "Frenos",
+      "icon": "fa-record-vinyl"
+    },
+    {
+      "id": "inyeccion",
+      "label": "Inyección y combustible",
+      "icon": "fa-gas-pump"
+    },
+    {
+      "id": "lubricacion",
+      "label": "Lubricación",
+      "icon": "fa-oil-can"
+    },
+    {
+      "id": "motor",
+      "label": "Motor",
+      "icon": "fa-gear"
+    },
+    {
+      "id": "refrigeracion",
+      "label": "Refrigeración A/C Calefa",
+      "icon": "fa-snowflake"
+    },
+    {
+      "id": "suspension",
+      "label": "Suspensión y dirección",
+      "icon": "fa-car-burst"
     }
   ],
   "quotePool": [

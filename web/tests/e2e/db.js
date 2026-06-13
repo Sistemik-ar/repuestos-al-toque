@@ -40,6 +40,14 @@ export async function backdateJobSelection(plate) {
   return job.id;
 }
 
+// Limpia los rubros asignados al comercio (vuelve a "ve todas las categorías").
+// Se usa en afterAll del test de categorías para no afectar a los demás specs.
+export async function clearStoreCategories(email = 'vendedor@repuestosaltoque.com.ar') {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  if (u) await p.storeCategory.deleteMany({ where: { storeId: u.id } });
+}
+
 export async function storeRatingStats() {
   const p = db();
   const u = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });

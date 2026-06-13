@@ -175,14 +175,21 @@ test('doble-tap en la elección nunca deja dos cotizaciones SELECTED', async ({ 
   const sc = await browser.newContext();
   const s = await sc.newPage();
   await login(s, 'vendedor@repuestosaltoque.com.ar');
-  for (const price of ['30000', '42000']) {
-    const card = s.locator('.card', { hasText: desc });
-    await expect(card).toBeVisible({ timeout: 15000 });
-    await card.getByRole('button', { name: /Cotizar/i }).click();
-    await s.locator('input[inputmode="numeric"]').first().fill(price);
-    await s.getByRole('button', { name: /Enviar Cotización/i }).click();
-    await s.waitForTimeout(800);
-  }
+  // 1ra opción: el pedido está en "Pendientes"
+  const cardPend = s.locator('.card', { hasText: desc });
+  await expect(cardPend).toBeVisible({ timeout: 15000 });
+  await cardPend.getByRole('button', { name: /Cotizar/i }).click();
+  await s.locator('input[inputmode="numeric"]').first().fill('30000');
+  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
+  // 2da opción: al cotizar, el pedido pasó a "Cotizadas" → "Agregar otra opción"
+  await s.getByRole('button', { name: /Cotizadas/i }).click();
+  const cardCot = s.locator('.card', { hasText: desc });
+  await expect(cardCot).toBeVisible({ timeout: 15000 });
+  await cardCot.getByRole('button', { name: /Agregar otra opción/i }).click();
+  await s.locator('input[inputmode="numeric"]').first().fill('42000');
+  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
 
   // cerrar ventana y abrir las cotizaciones en DOS pestañas
   await m.bringToFront();

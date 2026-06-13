@@ -13,13 +13,20 @@ const accounts = [
   { email: 'repartidor@repuestosaltoque.com.ar', role: 'DELIVERY', name: 'Diego R.' },
 ];
 
+// Categorías del MVP (nombres definitivos, orden alfabético). slug estable; nombre/ícono por upsert.
 const categories = [
-  ['frenos', 'Frenos', 'fa-record-vinyl'], ['motor', 'Motor', 'fa-gear'],
-  ['electricidad', 'Electricidad', 'fa-bolt'], ['suspension', 'Suspensión', 'fa-car-burst'],
-  ['embrague', 'Embrague', 'fa-gears'], ['refrigeracion', 'Refrigeración', 'fa-snowflake'],
-  ['lubricacion', 'Lubricación', 'fa-oil-can'], ['carroceria', 'Carrocería', 'fa-car-side'],
-  ['otros', 'Otros', 'fa-ellipsis'],
+  ['accesorios', 'Accesorios y equipamiento', 'fa-toolbox'],
+  ['carroceria', 'Carrocería', 'fa-car-side'],
+  ['electricidad', 'Electricidad y electrónica', 'fa-bolt'],
+  ['embrague', 'Embrague y transmisión', 'fa-gears'],
+  ['frenos', 'Frenos', 'fa-record-vinyl'],
+  ['inyeccion', 'Inyección y combustible', 'fa-gas-pump'],
+  ['lubricacion', 'Lubricación', 'fa-oil-can'],
+  ['motor', 'Motor', 'fa-gear'],
+  ['refrigeracion', 'Refrigeración A/C Calefa', 'fa-snowflake'],
+  ['suspension', 'Suspensión y dirección', 'fa-car-burst'],
 ];
+// "otros" se discontinuó: si quedó de un seed viejo y no tiene pedidos asociados, se elimina.
 
 async function main() {
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
@@ -32,11 +39,18 @@ async function main() {
     });
     if (a.role === 'MECHANIC') await prisma.mechanicProfile.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id, workshopName: a.name, barrio: 'Centro' } });
     if (a.role === 'STORE') await prisma.storeProfile.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id, tradeName: a.name, barrio: 'Centro', ivaCondition: 'RESPONSABLE_INSCRIPTO' } });
-    if (a.role === 'DELIVERY') await prisma.deliveryProfile.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id, vehicleType: 'MOTO' } });
+    // docsOk: true -> repartidor habilitado para tomar pedidos (si no, claimDelivery lo bloquea)
+    if (a.role === 'DELIVERY') await prisma.deliveryProfile.upsert({ where: { userId: user.id }, update: { docsOk: true }, create: { userId: user.id, vehicleType: 'MOTO', docsOk: true } });
   }
 
   for (const [slug, name, icon] of categories) {
     await prisma.category.upsert({ where: { slug }, update: { name, icon }, create: { slug, name, icon } });
+  }
+  // baja de "otros" (discontinuada): solo si no quedó ningún pedido en esa categoría
+  const otros = await prisma.category.findUnique({ where: { slug: 'otros' } });
+  if (otros) {
+    const used = await prisma.request.count({ where: { categoryId: otros.id } });
+    if (used === 0) { await prisma.storeCategory.deleteMany({ where: { categoryId: otros.id } }); await prisma.category.delete({ where: { id: otros.id } }); }
   }
 
   console.log('✅ Seed OK');

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
 
@@ -65,6 +65,9 @@ export default function Admin() {
 
         {/* Alta de usuarios */}
         <AltaUsuario onCreated={load} />
+
+        {/* Categorías que vende cada comercio */}
+        <StoreCategories stores={d?.stores} categories={d?.categories} onSaved={load} />
 
         {/* Comisión y recargo */}
         <Pricing />
@@ -136,6 +139,51 @@ export default function Admin() {
         </div>
 
         <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Admin</p>
+      </div>
+    </div>
+  );
+}
+
+function StoreCategories({ stores, categories, onSaved }) {
+  if (!stores || !categories) return null;
+  if (stores.length === 0) return null;
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Categorías por comercio</h2><span className="text-xs muted">qué rubros cotiza cada uno</span></div>
+      <p className="text-sm muted mb-12">Tildá los rubros que vende cada comercio: solo le van a llegar pedidos de esas categorías. Si no tildás ninguno, recibe de todas.</p>
+      {stores.map((st) => <StoreCatRow key={st.id} store={st} categories={categories} onSaved={onSaved} />)}
+    </div>
+  );
+}
+
+function StoreCatRow({ store, categories, onSaved }) {
+  const [sel, setSel] = useState(() => new Set(store.categoryIds || []));
+  const [saving, setSaving] = useState(false);
+  const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  async function save() {
+    setSaving(true);
+    const r = await setStoreCategories(store.id, [...sel]);
+    setSaving(false);
+    if (r?.error) { toast({ title: r.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    toast({ title: 'Rubros guardados', sub: store.name, icon: 'fa-check', type: 'green' });
+    onSaved?.();
+  }
+  return (
+    <div className="card mb-12 store-cat-row" style={{ background: 'var(--bg-1)' }}>
+      <div className="flex-between mb-8">
+        <div className="text-sm" style={{ fontWeight: 700 }}>{store.name}</div>
+        <button className="btn btn-yellow btn-sm" disabled={saving} onClick={save}>{saving ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : <><i className="fa-solid fa-floppy-disk"></i> Guardar</>}</button>
+      </div>
+      <div className="flex" style={{ flexWrap: 'wrap', gap: 8 }}>
+        {categories.map((c) => {
+          const on = sel.has(c.id);
+          return (
+            <button key={c.id} type="button" className="chip" onClick={() => toggle(c.id)}
+              style={on ? { background: 'var(--purple)', color: '#fff', borderColor: 'var(--purple)' } : {}}>
+              {on ? '✓ ' : ''}{c.name}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
