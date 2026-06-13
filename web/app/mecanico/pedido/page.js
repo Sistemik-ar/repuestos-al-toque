@@ -199,7 +199,7 @@ export default function Pedido() {
             <h2 className="h-lg mb-16">Describí el repuesto</h2>
             <div className="field">
               <label>Detalle</label>
-              <textarea className="textarea" placeholder="Ej: Juego de pastillas de freno delanteras, originales o equivalentes." value={st.desc} onChange={(e) => set({ desc: e.target.value })}></textarea>
+              <textarea className="textarea" maxLength={500} placeholder="Ej: Juego de pastillas de freno delanteras, originales o equivalentes." value={st.desc} onChange={(e) => set({ desc: e.target.value })}></textarea>
             </div>
             <div className="field">
               <label>Foto <span className="muted">(opcional)</span></label>

@@ -39,5 +39,22 @@ export async function storeRatingStats() {
   const p = db();
   const u = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });
   const prof = await p.storeProfile.findUnique({ where: { userId: u.id } });
-  return { avg: Number(prof.ratingAvg), count: prof.ratingsCount };
+  return { avg: Number(prof.ratingAvg), count: prof.ratingsCount, points: prof.points };
+}
+
+export async function deliveryRatingStats() {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email: 'repartidor@repuestosaltoque.com.ar' } });
+  const prof = await p.deliveryProfile.findUnique({ where: { userId: u.id } });
+  return { avg: Number(prof.ratingAvg), count: prof.ratingsCount, points: prof.points };
+}
+
+// Promedio REAL según la tabla de reseñas (para verificar que el perfil quedó consistente)
+export async function avgFromRatings(email, kinds) {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  const rows = await p.rating.findMany({ where: { toId: u.id, kind: { in: kinds } }, select: { stars: true } });
+  if (!rows.length) return { avg: 0, count: 0 };
+  const avg = rows.reduce((a, r) => a + r.stars, 0) / rows.length;
+  return { avg: Math.round(avg * 10) / 10, count: rows.length };
 }

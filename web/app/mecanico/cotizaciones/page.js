@@ -36,7 +36,8 @@ export default function Cotizaciones() {
   const endsAt = request?.windowEndsAt || 0;
   const secs = endsAt ? Math.max(0, Math.round((endsAt - now) / 1000)) : 0;
   const revealed = (!!endsAt && now >= endsAt) || ['CLOSED', 'PAID'].includes(request?.status);
-  const quotes = (request?.quotes || []).slice().sort((a, b) => b.rating - a.rating);
+  // mejor calificado primero; los comercios sin reseñas (rating null) al final
+  const quotes = (request?.quotes || []).slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
 
   useEffect(() => {
     if (revealed && !announced.current && request) {
@@ -110,7 +111,7 @@ export default function Cotizaciones() {
                       <div className="flex-between mb-12">
                         <div className="flex-center gap-12">
                           <div className="store-avatar"><i className="fa-solid fa-user-secret"></i></div>
-                          <div><div style={{ fontWeight: 700, fontSize: 15 }}>{q.alias}</div><div className="text-xs muted"><Stars rating={q.rating} /> {q.rating} · Zona {q.zone}</div></div>
+                          <div><div style={{ fontWeight: 700, fontSize: 15 }}>{q.alias}</div><div className="text-xs muted">{q.rating != null ? <><Stars rating={q.rating} /> {q.rating}</> : <span className="badge badge-gray" style={{ fontSize: 11 }}>Nuevo</span>}</div></div>
                         </div>
                         <span className="badge badge-green"><i className="fa-solid fa-shield-halved"></i> {q.warranty}</span>
                       </div>

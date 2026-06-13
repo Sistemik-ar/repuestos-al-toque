@@ -11,7 +11,6 @@ import { logoutAction } from '@/app/actions/auth';
 
 export default function MecanicoDashboard() {
   const router = useRouter();
-  const badge = tierFor('mechanic', 127);
   const [me, setMe] = useState(null);
   const [jobs, setJobs] = useState([]);
 
@@ -41,6 +40,9 @@ export default function MecanicoDashboard() {
   const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-pen', 'En armado'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado'] };
   const veh = (jb) => `${jb.brand || ''} ${jb.model || ''}`.trim() || 'Vehículo';
   const initials = (me?.name || 'TP').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  // insignia por operaciones REALES (ítems entregados), no el número del mock
+  const concretados = jobs.flatMap((jb) => jb.items || []).filter((i) => i.status === 'DELIVERED').length;
+  const badge = tierFor('mechanic', concretados);
 
   async function logout() { await logoutAction(); router.push('/login'); }
 

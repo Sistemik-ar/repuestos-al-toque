@@ -4,6 +4,12 @@ import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 
 const COOKIE = 'rat_session';
+// En el deploy real (Vercel) AUTH_SECRET es OBLIGATORIO: con el default de desarrollo
+// cualquiera podría forjar sesiones. Mejor caer ruidosamente en el deploy que correr inseguro.
+// (Local con `npm run start` —el harness E2E— no exige, por eso se chequea VERCEL y no NODE_ENV.)
+if (process.env.VERCEL && !process.env.AUTH_SECRET) {
+  throw new Error('Falta AUTH_SECRET en producción (las sesiones serían forjables).');
+}
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET || 'dev-secret-cambiar');
 
 export async function createSession(user) {

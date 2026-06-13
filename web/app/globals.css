@@ -157,6 +157,10 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 }
 .btn:active { transform: scale(0.98); }
 .btn-block { width: 100%; }
+/* Foco visible para navegación con teclado (WCAG AA). Solo en :focus-visible para no
+   molestar al click con mouse. Aplica a botones, links e ítems interactivos. */
+:focus-visible { outline: 2px solid var(--purple-light); outline-offset: 2px; border-radius: 6px; }
+.btn:focus-visible, .icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .btn-primary { background: linear-gradient(135deg, var(--purple), var(--purple-light)); color: white; box-shadow: 0 8px 24px rgba(109,40,217,0.35); }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-yellow { background: var(--yellow); color: #0B0B0F; }
@@ -528,7 +532,11 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 /* ---------- Landing (root) ---------- */
 .flex-wrap { flex-wrap: wrap; }
 .nowrap { white-space: nowrap; }
-.land-nav { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; background: rgba(11,11,15,0.6); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+.land-nav { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; background: rgba(11,11,15,0.6); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+/* Links secundarios de la nav: se ocultan en pantallas chicas para que la barra no
+   desborde (siguen accesibles desde el footer). */
+.hide-mobile { display: none; }
+@media (min-width: 560px) { .hide-mobile { display: inline-flex; } }
 .land-wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
 .hero { display: grid; grid-template-columns: 1fr; gap: 36px; padding: 48px 0 40px; align-items: center; }
 .hero h1 { font-size: clamp(34px, 6vw, 60px); font-weight: 900; line-height: 1.02; letter-spacing: -0.03em; margin: 0; }

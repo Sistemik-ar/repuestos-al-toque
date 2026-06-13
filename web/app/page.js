@@ -15,8 +15,8 @@ export default function Home() {
           <span>RepuestosAlToque <small style={{ display: 'block', fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>Bariloche · Patagonia</small></span>
         </Link>
         <div className="flex-center gap-12">
-          <Link href="/demo/" className="text-sm muted nowrap" style={{ fontWeight: 600 }}>Ver demo</Link>
-          <Link href="/terminos" className="text-sm muted nowrap" style={{ fontWeight: 600 }}>Términos</Link>
+          <Link href="/demo/" className="text-sm muted nowrap hide-mobile" style={{ fontWeight: 600 }}>Ver demo</Link>
+          <Link href="/terminos" className="text-sm muted nowrap hide-mobile" style={{ fontWeight: 600 }}>Términos</Link>
           <Link href="/login" className="btn btn-primary btn-sm"><i className="fa-solid fa-right-to-bracket"></i> Ingresar</Link>
         </div>
       </header>

@@ -52,40 +52,51 @@ export async function computeShip(requestId, storeId) {
   }
 }
 
-// Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem
-// elegido; el envío se cobra UNA vez por comercio (en el primer ítem de cada comercio).
-async function confirmJobPaid(jobId, paidAmount) {
-  const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
-  if (!j) return false;
+// Plan de cobro de un Trabajo: QUÉ ítems se cobran y CUÁNTO cada uno. Es la única fuente
+// de verdad del desglose: la usan tanto la generación del link (createJobCheckout) como la
+// confirmación del pago (confirmJobPaid). Si ambos calcularan por su cuenta, podrían divergir
+// y se cobraría una cosa y se registraría otra.
+// El envío se cobra UNA vez por comercio (en el primer ítem de cada comercio).
+export async function jobChargePlan(jobId) {
+  const job = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
+  if (!job) return null;
   const settings = await getSettings();
-  // primera pasada: calcular el total esperado de los ítems a confirmar para verificar el monto pagado
   const seenShip = new Set();
-  let expectedTotal = 0;
-  const plan = [];
-  for (const r of j.requests) {
+  const items = [];
+  const totals = { parts: 0, creditParts: 0, commission: 0, ship: 0, mpFee: 0, total: 0 };
+  for (const r of job.requests) {
     const sel = r.quotes.find((q) => q.status === 'SELECTED');
     if (!sel || ['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) continue;
     const part = num(sel.price);
     const commission = Math.round(part * (Number(settings.commissionPct) / 100));
     const ship = seenShip.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);
     seenShip.add(sel.storeId);
-    const cobrableItem = (r.useCredit ? 0 : part) + commission + ship;
-    const mpFeeItem = settings.mpFeeEnabled ? Math.round(cobrableItem * (Number(settings.mpFeePct) / 100)) : 0;
-    const cobrado = cobrableItem + mpFeeItem;
-    expectedTotal += cobrado;
-    plan.push({ r, sel, part, commission, ship, mpFeeItem, cobrado });
+    // ítem a cuenta corriente: el repuesto se imputa a la CC (lo liquida el comercio),
+    // la plataforma solo cobra comisión + envío
+    const cobrable = (r.useCredit ? 0 : part) + commission + ship;
+    const mpFee = settings.mpFeeEnabled ? Math.round(cobrable * (Number(settings.mpFeePct) / 100)) : 0;
+    items.push({ requestId: r.id, quoteId: sel.id, storeId: sel.storeId, useCredit: !!r.useCredit, part, commission, ship, mpFee, cobrado: cobrable + mpFee });
+    if (r.useCredit) totals.creditParts += part; else totals.parts += part;
+    totals.commission += commission; totals.ship += ship; totals.mpFee += mpFee; totals.total += cobrable + mpFee;
   }
+  return { job, settings, items, totals, stores: seenShip.size };
+}
+
+// Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem elegido.
+async function confirmJobPaid(jobId, paidAmount) {
+  const plan = await jobChargePlan(jobId);
+  if (!plan) return false;
   // verificación de monto: si el pago real no cubre lo esperado, NO confirmar (posible manipulación)
-  if (!paidCoversExpected(paidAmount, expectedTotal)) return false;
-  for (const { r, sel, part, commission, ship, mpFeeItem, cobrado } of plan) {
+  if (!paidCoversExpected(paidAmount, plan.totals.total)) return false;
+  for (const it of plan.items) {
     try {
       await prisma.order.upsert({
-        where: { requestId: r.id },
+        where: { requestId: it.requestId },
         update: { status: 'PAID' },
-        create: { requestId: r.id, quoteId: sel.id, mechanicId: j.mechanicId, storeId: sel.storeId, partAmount: part, commissionPct: Number(settings.commissionPct), commissionAmount: commission, freightAmount: ship, mpFeeAmount: mpFeeItem, creditAccount: !!r.useCredit, total: cobrado, status: 'PAID' },
+        create: { requestId: it.requestId, quoteId: it.quoteId, mechanicId: plan.job.mechanicId, storeId: it.storeId, partAmount: it.part, commissionPct: Number(plan.settings.commissionPct), commissionAmount: it.commission, freightAmount: it.ship, mpFeeAmount: it.mpFee, creditAccount: it.useCredit, total: it.cobrado, status: 'PAID' },
       });
     } catch (e) { if (e?.code !== 'P2002') throw e; }
-    await prisma.request.update({ where: { id: r.id }, data: { status: 'PAID' } }).catch(() => {});
+    await prisma.request.update({ where: { id: it.requestId }, data: { status: 'PAID' } }).catch(() => {});
   }
   // los ítems sin cotización elegida quedan "sin compra" (el vendedor deja de esperar decisión)
   await prisma.request.updateMany({

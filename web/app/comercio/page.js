@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 
@@ -17,10 +17,15 @@ export default function Comercio() {
   const [modal, setModal] = useState(null);
   const [dismissed, setDismissed] = useState([]);
   const [zoom, setZoom] = useState(null);
-  const badge = tierFor('store', 312);
+  const [rep, setRep] = useState(null);
+  // la insignia sale de los PUNTOS reales (ventas concretadas), no del mock
+  const badge = tierFor('store', rep?.points ?? 0);
 
   const arrivalsRef = useRef(null); // para avisar UNA vez cuando llega el repartidor
   const load = async () => {
+    // la reputación es un badge secundario: va FUERA del Promise.all crítico para que su
+    // fallo (o presión del pool) no congele el refresco de solicitudes/ventas.
+    getMyReputation().then((r) => r && setRep((p) => keep(p, r))).catch(() => {});
     try {
       const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
       setMe((p) => keep(p, m || null));
@@ -105,7 +110,10 @@ export default function Comercio() {
               <div className="avatar" style={{ width: 46, height: 46, fontSize: 16, background: 'linear-gradient(135deg,var(--yellow),var(--purple))' }}>{initials}</div>
               <div><div style={{ fontWeight: 800 }}>{me?.name || 'Comercio'}</div><div className="mt-4"><span className={`rep-badge ${badge.cls}`}><i className={`fa-solid ${badge.icon}`}></i> {badge.label}</span></div></div>
             </div>
-            <div style={{ textAlign: 'right' }}><div className="text-xs muted">Puntos</div><div className="h-md text-yellow">6.180</div></div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="text-xs muted">Puntos</div><div className="h-md text-yellow">{(rep?.points ?? 0).toLocaleString('es-AR')}</div>
+              <div className="text-xs muted mt-4">{rep?.rating != null ? <><i className="fa-solid fa-star text-yellow"></i> {rep.rating} ({rep.count} {rep.count === 1 ? 'reseña' : 'reseñas'})</> : 'Sin reseñas aún'}</div>
+            </div>
           </div>
           <div className="rep-stats card" style={{ background: 'var(--bg-1)', padding: 12 }}>
             <div><div className="v">{pend.length}</div><div className="l">Solicitudes</div></div>
@@ -246,7 +254,7 @@ function EntregaCard({ r, label, veh, onChanged }) {
             ? <div className="float-notif mb-8" style={{ padding: '8px 12px', borderColor: 'rgba(250,204,21,0.45)' }}><i className="fa-solid fa-location-dot text-yellow"></i><span className="text-xs subtle"><b>El repartidor está en tu local</b> — pedile su PIN y confirmá el retiro</span></div>
             : <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Cuando venga el repartidor, pedile su PIN y confirmá el retiro</div>}
           <div className="flex gap-12">
-            <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
+            <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" aria-label="PIN de retiro que te muestra el repartidor" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
             <button className="btn btn-yellow btn-block" disabled={pin.length !== 4} onClick={confirmar}><i className="fa-solid fa-box"></i> Confirmar retiro</button>
           </div>
         </div>
@@ -326,7 +334,7 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
             {photos.length < 3 && <button type="button" className="upload-area" style={{ width: 64, height: 64, padding: 0, display: 'grid', placeItems: 'center' }} onClick={() => fileRef.current?.click()}><i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`}></i></button>}
           </div>
         </div>
-        <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
+        <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" maxLength={300} placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">
           <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={onClose}>Cancelar</button>
           <button className="btn btn-yellow btn-block" disabled={!price} onClick={() => onSend({ price, partBrand: brand, optionLabel: opcion, note, photoUrls: photos })}><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</button>

@@ -50,19 +50,23 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="float-notif mt-24">
-          <i className="fa-solid fa-flask text-purple"></i>
-          <div className="text-sm subtle">
-            <b>Cuentas de prueba</b> (contraseña: <code>repuestos123</code>):
-            <div className="text-xs muted mt-8" style={{ lineHeight: 1.7 }}>
-              {TEST_ACCOUNTS.map(([mail, label]) => (
-                <div key={mail}>
-                  <button type="button" className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => { setEmail(mail); setPass('repuestos123'); }}>{mail}</button> · {label}
-                </div>
-              ))}
+        {/* Cuentas de prueba: SOLO con el flag explícito (oculto en producción para no
+            exponer credenciales ni datos mock en el login público). */}
+        {process.env.NEXT_PUBLIC_SHOW_TEST_ACCOUNTS === '1' && (
+          <div className="float-notif mt-24">
+            <i className="fa-solid fa-flask text-purple"></i>
+            <div className="text-sm subtle">
+              <b>Cuentas de prueba</b> (contraseña: <code>repuestos123</code>):
+              <div className="text-xs muted mt-8" style={{ lineHeight: 1.7 }}>
+                {TEST_ACCOUNTS.map(([mail, label]) => (
+                  <div key={mail}>
+                    <button type="button" className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => { setEmail(mail); setPass('repuestos123'); }}>{mail}</button> · {label}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <p className="text-center text-sm muted mt-24">
           ¿Solo querés ver el producto? <Link href="/demo/" className="text-purple" style={{ fontWeight: 700 }}>Recorré la demo →</Link>

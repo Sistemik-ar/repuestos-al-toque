@@ -16,10 +16,10 @@ export default function BottomNav() {
       <Link href="/mecanico/pedido" className="fab">
         <i className="fa-solid fa-plus"></i>
       </Link>
-      <Link href="/mecanico" className="">
-        <i className="fa-solid fa-map-location-dot"></i>Envíos
+      <Link href="/mecanico/cuentas" className={is('/mecanico/cuentas')}>
+        <i className="fa-solid fa-id-card-clip"></i>Cuentas
       </Link>
-      <Link href="/" className="">
+      <Link href="/mecanico/perfil" className={is('/mecanico/perfil')}>
         <i className="fa-solid fa-user"></i>Perfil
       </Link>
     </nav>

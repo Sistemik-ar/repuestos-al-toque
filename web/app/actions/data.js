@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { getSession, invalidateStatusCache } from '@/lib/session';
 import { createPaymentLink } from '@/lib/mercadopago';
-import { computeShip, computePricing } from '@/lib/orders';
+import { jobChargePlan } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, inBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
@@ -13,6 +13,10 @@ import { aliasLabel } from '@/lib/alias';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
+
+// Texto libre con tope: estos campos viajan en cada poll de cada panel; sin tope,
+// un texto gigante (pegado por error) engorda todas las respuestas.
+const txt = (v, max) => { const t = String(v ?? '').trim(); return t ? t.slice(0, max) : null; };
 
 
 const num = (d) => (d == null ? null : Number(d));
@@ -31,8 +35,9 @@ function reqBase(r) {
   };
 }
 // Para el mecánico: sin identidad del vendedor (anónimo)
+// rating null = comercio todavía sin calificaciones (la UI muestra "Nuevo", no un número inventado)
 function quotePublic(q, creditEligible = false) {
-  return { id: q.id, alias: q.alias, optionLabel: q.optionLabel, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: num(q.ratingSnapshot) || 4.8, zone: 'Centro', status: q.status, creditEligible };
+  return { id: q.id, alias: q.alias, optionLabel: q.optionLabel, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: q.ratingSnapshot == null ? null : num(q.ratingSnapshot), status: q.status, creditEligible };
 }
 
 export async function getMe() {
@@ -49,8 +54,8 @@ export async function createRequest(input) {
   if (!categoryId && input.cat) { const c = await prisma.category.findUnique({ where: { slug: input.cat } }); categoryId = c?.id ?? null; }
   const data = {
     mechanicId: s.id,
-    brand: input.brand || null, model: input.model || null, year: input.year ? parseInt(input.year, 10) : null, vin: input.vin || null,
-    categoryId, description: input.desc || null,
+    brand: txt(input.brand, 60), model: txt(input.model, 60), year: input.year ? parseInt(input.year, 10) : null, vin: txt(input.vin, 17),
+    categoryId, description: txt(input.desc, 500),
     urgency: URGENCY[input.urgency] || 'AHORA',
     photoUrls: input.photoUrls || [],
     invoiceType: input.invoiceType === 'factura_a' ? 'FACTURA_A' : 'CONSUMIDOR_FINAL',
@@ -77,14 +82,15 @@ export async function createRequest(input) {
 
 export async function getMyRequests() {
   const s = await getSession(); if (!s) return [];
-  await expireUnpaid();
+  await sweepExpirations();
   const rows = await prisma.request.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' }, include: { category: true } });
   return rows.map(reqBase);
 }
 
 export async function getRequestForMechanic(id) {
   const s = await getSession(); if (!s) return null;
-  const r = await prisma.request.findUnique({ where: { id }, include: { category: true, quotes: { orderBy: { ratingSnapshot: 'desc' } } } });
+  // mejor calificado primero; los comercios sin calificaciones (snapshot null) van al final
+  const r = await prisma.request.findUnique({ where: { id }, include: { category: true, quotes: { orderBy: { ratingSnapshot: { sort: 'desc', nulls: 'last' } } } } });
   if (!r || r.mechanicId !== s.id) return null;
   // cuentas corrientes activas del mecánico (para etiquetar ofertas sin revelar identidad)
   const cc = await prisma.creditAccount.findMany({ where: { mechanicId: s.id, active: true }, select: { storeId: true } });
@@ -124,21 +130,23 @@ export async function acceptQuote(quoteId) {
   return { ok: true, requestId: q.requestId, quoteId };
 }
 
-// Si el mecánico eligió una oferta pero no pagó en 24hs, el pedido pasa a CANCELADO.
-// Se evalúa de forma perezosa en cada lectura (sin cron).
+// Expiraciones perezosas (sin cron): si no se pagó en 24hs, se cancela. Corre al leer.
+// Son tres updateMany con WHERE indexado que en el caso normal no matchean nada (no-op
+// barato); a escala piloto es despreciable. Post-MVP esto debería ser un cron.
 const PAY_TTL_MS = 24 * 60 * 60 * 1000;
-async function expireUnpaid() {
+async function sweepExpirations() {
+  const cutoff = new Date(Date.now() - PAY_TTL_MS);
   try {
-    // NO tocar ítems cuyo trabajo ya tiene link generado (job CLOSED): ese reloj lo maneja
-    // el trabajo en getMyJobs, para no descalzar (ítem cancelado pero link aún pagable).
+    // ítem elegido y sin pagar -> cancelado. NO toca ítems cuyo trabajo ya tiene link generado
+    // (job CLOSED): ese reloj corre por el trabajo (abajo); si no, se descalzan los dos relojes
+    // y queda un ítem cancelado con un link todavía pagable.
     await prisma.request.updateMany({
-      where: {
-        status: 'CLOSED',
-        selectedAt: { lt: new Date(Date.now() - PAY_TTL_MS) },
-        OR: [{ jobId: null }, { job: { status: { not: 'CLOSED' } } }],
-      },
+      where: { status: 'CLOSED', selectedAt: { lt: cutoff }, OR: [{ jobId: null }, { job: { status: { not: 'CLOSED' } } }] },
       data: { status: 'CANCELLED' },
     });
+    // borradores sin tocar por 24hs -> cancelados; con link generado y sin pagar 24hs -> cancelados
+    await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: cutoff } }, data: { status: 'CANCELLED' } });
+    await prisma.job.updateMany({ where: { status: 'CLOSED', selectedAt: { lt: cutoff } }, data: { status: 'CANCELLED' } });
   } catch {}
 }
 
@@ -199,7 +207,7 @@ async function ccActiveBetween(mechanicId, storeId) {
 // ---- Comercio (vendedor) ----
 export async function getOpenRequestsForStore() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
-  await expireUnpaid();
+  await sweepExpirations();
   const rows = await prisma.request.findMany({
     where: {
       OR: [
@@ -251,9 +259,10 @@ export async function createQuote(requestId, input) {
     data: {
       requestId, storeId: s.id, alias,
       optionLabel: input.optionLabel || null,
-      partBrand: input.partBrand || null, price: parsePrice(input.price),
-      warranty: input.warranty || '6 meses', note: input.note || null,
-      ratingSnapshot: store?.ratingAvg ?? 4.8, photoUrls: input.photoUrls || [],
+      partBrand: txt(input.partBrand, 80), price: parsePrice(input.price),
+      warranty: txt(input.warranty, 60) || '6 meses', note: txt(input.note, 300),
+      // snapshot honesto: solo si el comercio tiene calificaciones reales (si no, null = "Nuevo")
+      ratingSnapshot: store && store.ratingsCount > 0 ? store.ratingAvg : null, photoUrls: input.photoUrls || [],
     },
   });
   await prisma.request.update({ where: { id: requestId }, data: { status: 'QUOTED' } }).catch(() => {});
@@ -336,12 +345,17 @@ export async function storeConfirmPickup(orderId, pin) {
 // El REPARTIDOR confirma la entrega ingresando el PIN que le da el mecánico en mano.
 export async function markDelivered(orderId, pin) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, status: true, deliveryPin: true, requestId: true } });
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, status: true, deliveryPin: true, requestId: true, storeId: true } });
   if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
   if (o.status !== 'SHIPPED') return { error: 'Primero el vendedor tiene que confirmar el retiro' };
   if (String(pin).trim() !== o.deliveryPin) return { error: 'PIN incorrecto. Pedíselo al mecánico.' };
-  await prisma.order.update({ where: { id: orderId }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
+  // transición atómica: los puntos se suman UNA sola vez aunque haya doble-tap
+  const upd = await prisma.order.updateMany({ where: { id: orderId, status: 'SHIPPED' }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
+  if (upd.count === 0) return { error: 'Este pedido ya fue entregado' };
   await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
+  // venta concretada: +1 punto al vendedor y +1 al repartidor (de acá salen niveles/insignias)
+  await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { points: { increment: 1 } } }).catch(() => {});
+  await prisma.deliveryProfile.update({ where: { userId: s.id }, data: { points: { increment: 1 } } }).catch(() => {});
   return { ok: true };
 }
 
@@ -359,8 +373,8 @@ export async function rateOrder(requestId, ratings) {
   for (const it of items) {
     await prisma.rating.upsert({
       where: { orderId_fromId_kind: { orderId: o.id, fromId: s.id, kind: it.kind } },
-      update: { stars: Math.min(5, Number(it.stars)), comment: ratings?.comment || null },
-      create: { orderId: o.id, fromId: s.id, toId: it.toId, kind: it.kind, stars: Math.min(5, Number(it.stars)), comment: ratings?.comment || null },
+      update: { stars: Math.min(5, Number(it.stars)), comment: txt(ratings?.comment, 300) },
+      create: { orderId: o.id, fromId: s.id, toId: it.toId, kind: it.kind, stars: Math.min(5, Number(it.stars)), comment: txt(ratings?.comment, 300) },
     });
   }
   // actualizar promedio del vendedor (snapshot que ordena las cotizaciones)
@@ -369,7 +383,25 @@ export async function rateOrder(requestId, ratings) {
     const avg = sellerRatings.reduce((a, r) => a + r.stars, 0) / sellerRatings.length;
     await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { ratingAvg: Math.round(avg * 10) / 10, ratingsCount: sellerRatings.length } }).catch(() => {});
   }
+  // actualizar promedio del repartidor (su reputación, visible en su panel)
+  if (o.deliveryId) {
+    const dRatings = await prisma.rating.findMany({ where: { toId: o.deliveryId, kind: 'DELIVERY' }, select: { stars: true } });
+    if (dRatings.length) {
+      const dAvg = dRatings.reduce((a, r) => a + r.stars, 0) / dRatings.length;
+      await prisma.deliveryProfile.update({ where: { userId: o.deliveryId }, data: { ratingAvg: Math.round(dAvg * 10) / 10, ratingsCount: dRatings.length } }).catch(() => {});
+    }
+  }
   return { ok: true };
+}
+
+// Reputación propia (vendedor o repartidor): promedio, cantidad de reseñas y puntos por ventas concretadas.
+export async function getMyReputation() {
+  const s = await getSession(); if (!s) return null;
+  const table = s.role === 'STORE' ? prisma.storeProfile : s.role === 'DELIVERY' ? prisma.deliveryProfile : null;
+  if (!table) return null;
+  const p = await table.findUnique({ where: { userId: s.id }, select: { ratingAvg: true, ratingsCount: true, points: true } });
+  if (!p) return null;
+  return { rating: p.ratingsCount > 0 ? num(p.ratingAvg) : null, count: p.ratingsCount, points: p.points };
 }
 
 export async function getMyRatingsForOrder(requestId) {
@@ -652,10 +684,7 @@ export async function closeJobWindow(jobId) {
 
 export async function getMyJobs() {
   const s = await getSession(); if (!s) return [];
-  await expireUnpaid();
-  // borradores sin tocar por 24hs -> cancelados; trabajos con link generado y sin pagar 24hs -> cancelados
-  await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
-  await prisma.job.updateMany({ where: { status: 'CLOSED', selectedAt: { lt: new Date(Date.now() - 86400000) } }, data: { status: 'CANCELLED' } }).catch(() => {});
+  await sweepExpirations(); // cancela borradores viejos y trabajos sin pagar (24hs)
   const jobs = await prisma.job.findMany({ where: { mechanicId: s.id }, orderBy: { createdAt: 'desc' }, include: { requests: { include: { category: true, order: { select: { arrivedDropAt: true, status: true } } } } } });
   return jobs.map(jobBase);
 }
@@ -697,41 +726,22 @@ export async function setItemCredit(itemId, on) {
 }
 
 // Checkout del trabajo: UN link por todos los ítems elegidos.
-// Envío: UNO por comercio involucrado (consolidación básica del DeliveryGroup).
+// El desglose sale de jobChargePlan, el MISMO cálculo que usa la confirmación del pago:
+// lo que se cobra en el link es exactamente lo que se registra al confirmar.
 export async function createJobCheckout(jobId) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
-  const j = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
-  if (!j || j.mechanicId !== s.id) return { error: 'No autorizado' };
+  const plan = await jobChargePlan(jobId);
+  if (!plan || plan.job.mechanicId !== s.id) return { error: 'No autorizado' };
+  const j = plan.job;
   if (['CANCELLED', 'PAID', 'DONE'].includes(j.status)) return { error: 'Este trabajo ya no admite pagos' };
-  const chosen = [];
-  for (const r of j.requests) {
-    const sel = r.quotes.find((q) => q.status === 'SELECTED');
-    if (sel && !['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) chosen.push({ req: r, quote: sel });
-  }
-  if (chosen.length === 0) return { error: 'Elegí al menos una cotización' };
+  if (plan.items.length === 0) return { error: 'Elegí al menos una cotización' };
 
-  const settings = await readSettings();
-  let parts = 0, creditParts = 0, commission = 0;
-  for (const c of chosen) {
-    const part = num(c.quote.price) || 0;
-    // ítems a cuenta corriente: el repuesto NO se cobra por la app (lo liquida el comercio),
-    // pero la comisión y el envío sí
-    if (c.req.useCredit) creditParts += part; else parts += part;
-    commission += Math.round(part * (Number(settings.commissionPct) / 100));
-  }
-  // un envío por comercio distinto
-  const stores = [...new Set(chosen.map((c) => c.quote.storeId))];
-  let ship = 0;
-  for (const storeId of stores) ship += await computeShip(chosen.find((c) => c.quote.storeId === storeId).req.id, storeId);
-  const sub = parts + commission + ship;
-  const mpFee = settings.mpFeeEnabled ? Math.round(sub * (Number(settings.mpFeePct) / 100)) : 0;
-  const total = sub + mpFee;
-  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : total;
-
-  const breakdown = { parts, creditParts, commission, ship, mpFee, total, stores: stores.length, items: chosen.length };
+  const { parts, creditParts, commission, ship, mpFee, total } = plan.totals;
+  const breakdown = { parts, creditParts, commission, ship, mpFee, total, stores: plan.stores, items: plan.items.length };
   // si el link ya fue generado, se REUTILIZA: dos links distintos = riesgo de cobro doble
   if (j.status === 'CLOSED' && j.paymentLink) return { link: j.paymentLink, breakdown };
 
+  const amount = process.env.MP_TEST_AMOUNT ? Number(process.env.MP_TEST_AMOUNT) : total;
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
   const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue } from '@/app/actions/data';
+import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 
 const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
@@ -12,8 +12,9 @@ const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&
 export default function Repartidor() {
   const router = useRouter();
   const [items, setItems] = useState([]);
+  const [rep, setRep] = useState(null);
 
-  const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); } catch {} };
+  const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); getMyReputation().then((r) => r && setRep(r)).catch(() => {}); } catch {} };
   usePoll(load, 5000);
 
   const disponibles = items.filter((d) => !d.mine);
@@ -50,6 +51,7 @@ export default function Repartidor() {
       <div className="topbar">
         <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Repartidor</span></Link>
         <div className="topbar-actions">
+          {rep && <span className="badge badge-yellow" title="Tu reputación: promedio de reseñas · entregas concretadas"><i className="fa-solid fa-star"></i> {rep.rating != null ? `${rep.rating} (${rep.count})` : 'Nuevo'} · {rep.points} {rep.points === 1 ? 'entrega' : 'entregas'}</span>}
           <span className="badge badge-green"><i className="fa-solid fa-circle" style={{ fontSize: 7 }}></i> En línea</span>
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
         </div>
@@ -136,7 +138,7 @@ function EntregaPin({ onConfirm }) {
     <div>
       <div className="text-xs muted mb-8"><i className="fa-solid fa-key"></i> Pedile el PIN de entrega al mecánico</div>
       <div className="flex gap-12">
-        <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
+        <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" aria-label="PIN de entrega que te da el mecánico" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
         <button className="btn btn-success btn-block" disabled={pin.length !== 4} onClick={() => { onConfirm(pin); setPin(''); }}><i className="fa-solid fa-check"></i> Confirmar entrega</button>
       </div>
     </div>

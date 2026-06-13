@@ -96,7 +96,7 @@ export default function Trabajo() {
                 <div className="text-xs muted mt-4 mb-12">Los comercios todavía no lo ven. Publicalo cuando esté completo.</div>
                 <div className="flex gap-12">
                   <Link href="/mecanico/pedido" className="btn btn-ghost btn-sm">Seguir agregando</Link>
-                  <button className="btn btn-yellow btn-block btn-sm" onClick={async () => { await publishJob(id); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</button>
+                  <button className="btn btn-yellow btn-block btn-sm" onClick={async () => { const r = await publishJob(id); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</button>
                 </div>
               </div>
             )}

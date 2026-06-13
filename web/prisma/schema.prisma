@@ -180,6 +180,9 @@ model DeliveryProfile {
   licenseNumber    String?         @map("license_number")
   insurance        String? // aseguradora / nro de póliza
   docsOk           Boolean         @default(false) @map("docs_ok")
+  ratingAvg        Decimal         @default(0) @map("rating_avg") @db.Decimal(2, 1)
+  ratingsCount     Int             @default(0) @map("ratings_count")
+  points           Int             @default(0)
 
   @@map("delivery_profiles")
 }

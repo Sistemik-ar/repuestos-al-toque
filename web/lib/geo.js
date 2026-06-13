@@ -10,12 +10,16 @@ export function inBariloche(c) {
 }
 
 // Convierte una dirección en coordenadas. Devuelve { lat, lng, label } o null si no se encontró.
+// Timeout corto: si Nominatim se cuelga, el alta de usuarios no puede quedar trabada esperando.
 export async function geocode(address) {
   if (!address) return null;
   const q = encodeURIComponent(address.includes('Bariloche') ? address : `${address}, Bariloche, Río Negro, Argentina`);
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ar&q=${q}`;
   try {
-    const res = await fetch(url, { headers: UA });
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(url, { headers: UA, signal: ctrl.signal });
+    clearTimeout(t);
     if (!res.ok) return null;
     const data = await res.json();
     if (!data?.[0]) return null;

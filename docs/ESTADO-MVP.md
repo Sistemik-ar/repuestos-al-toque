@@ -1,9 +1,10 @@
 # Estado real del MVP — código vs. reglas de negocio
 
-> Actualizado: 12/06/2026. Este doc corrige las discrepancias entre
+> Actualizado: 12/06/2026 (3ª tanda: consolidación por patente, alias rotativo, sistema de
+> puntos completo). Este doc corrige las discrepancias entre
 > `RepuestosAlToque-Reglas-de-Negocio.md` (previo al desarrollo) y lo implementado.
 
-## ✅ Implementado y testeado (38 unit + 37 E2E)
+## ✅ Implementado y testeado (47 unit + 40 E2E)
 
 - **Trabajos por vehículo**: patente/VIN obligatorio, multi-ítem, borrador → publicar,
   ventana única de 10 min, agrupación anti-"patente trucha".
@@ -21,8 +22,15 @@
 - **Reparto**: habilitación estilo Uber (DNI/licencia/seguro), "Tomar pedido" atómico,
   aviso de llegada con toast+sonido, PIN de retiro (valida el vendedor) y de entrega
   (valida el mecánico), incidencia "nadie me atendió".
-- **Calificaciones**: vendedor/producto/delivery al entregar; el promedio del comercio
-  ordena sus cotizaciones futuras.
+- **Calificaciones y puntos**: vendedor/producto/delivery al entregar. El promedio del
+  comercio ordena sus cotizaciones futuras; el del repartidor se ve en su panel. Cada venta
+  concretada (entrega con PIN) suma +1 punto al vendedor y al repartidor — de los puntos
+  salen las insignias (antes eran números del mock). Un comercio sin reseñas cotiza como
+  "Nuevo" (sin promedio inventado) y ordena después de los calificados.
+- **Reparto consolidado por patente**: "Tomar pedido" se lleva TODAS las órdenes pagadas
+  del mismo auto + comercio + taller en un claim atómico (un viaje, un par de PINs).
+- **Alias rotativo**: "Proveedor A/B/C" por orden de llegada dentro del trabajo; el mismo
+  comercio no es siempre "A" (no se puede aprender el mapeo).
 - **Envío**: dirección validada (real + en Bariloche) al alta, distancia de manejo real
   (OSRM), tabla de bandas por km + mínimo configurables, 1 envío por comercio por trabajo.
 - **Backoffice**: alta de usuarios con geocodificación, comisión/recargo MP/envío mínimo,
@@ -53,6 +61,11 @@
 
 ## 🔧 Config pendiente para salir (no es código)
 
-1. Vercel: quitar `MP_TEST_AMOUNT` · `DATABASE_URL` → pooler 6543 con `pgbouncer=true&connection_limit=1`.
+1. Vercel: quitar `MP_TEST_AMOUNT` (además de habilitar el cobro real, ACTIVA la verificación
+   de monto del webhook) · `DATABASE_URL` → pooler 6543 con `pgbouncer=true&connection_limit=1`.
 2. Admin: pricing real (comisión/recargo) + envío mínimo a $5.000 + tarifas reales por km.
-3. Altas reales con direcciones exactas. AUTH_SECRET propio en prod (ya seteado).
+3. Altas reales con direcciones exactas. AUTH_SECRET propio en prod (ya seteado; si falta,
+   el deploy ahora FALLA a propósito en vez de correr con el secreto de desarrollo).
+4. Antes del go-live: una compra real chica de punta a punta en prod (pago con tarjeta real,
+   webhook visible en logs de Vercel, reembolso manual desde el panel de MP como ensayo del
+   protocolo de devoluciones).
