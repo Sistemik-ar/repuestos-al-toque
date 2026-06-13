@@ -243,7 +243,6 @@ export default function Pedido() {
               {[
                 { v: 'Necesito ahora', d: 'Auto parado · máxima prioridad', i: 'fa-bolt', bg: 'rgba(239,68,68,0.16)', c: '#FCA5A5' },
                 { v: 'Hoy', d: 'En el día', i: 'fa-sun', bg: 'rgba(250,204,21,0.16)', c: 'var(--yellow)' },
-                { v: 'Mañana', d: 'Sin apuro', i: 'fa-calendar-day', bg: 'rgba(109,40,217,0.18)', c: 'var(--purple-light)' },
               ].map((o) => (
                 <div key={o.v} className={`card hoverable ${st.urgency === o.v ? 'glow' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }} onClick={() => set({ urgency: o.v })}>
                   <div className="store-avatar" style={{ background: o.bg, color: o.c }}><i className={`fa-solid ${o.i}`}></i></div>
