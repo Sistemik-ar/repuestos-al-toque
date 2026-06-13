@@ -19,6 +19,15 @@ describe('createPaymentLink', () => {
     expect(body.auto_return).toBe('approved'); // https -> sí
   });
 
+  it('excluye efectivo/cupón (ticket) y cajero (atm) -> el pago siempre confirma o rechaza, nunca queda pendiente', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'p', init_point: 'x' }) });
+    await createPaymentLink({ orderRef: 'r1::q1', title: 'Repuesto', amount: 45000, backUrl: 'https://app/api/mp/return' });
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    const excluded = (body.payment_methods?.excluded_payment_types || []).map((t) => t.id);
+    expect(excluded).toContain('ticket'); // Rapipago / Pago Fácil / efectivo
+    expect(excluded).toContain('atm');    // depósito en cajero
+  });
+
   it('falla si no hay token', async () => {
     delete process.env.MP_ACCESS_TOKEN;
     await expect(createPaymentLink({ title: 'x', amount: 1 })).rejects.toThrow();
