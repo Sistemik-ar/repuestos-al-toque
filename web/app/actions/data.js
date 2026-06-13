@@ -130,11 +130,15 @@ export async function acceptQuote(quoteId) {
   return { ok: true, requestId: q.requestId, quoteId };
 }
 
-// Expiraciones perezosas (sin cron): si no se pagó en 24hs, se cancela. Corre al leer.
-// Son tres updateMany con WHERE indexado que en el caso normal no matchean nada (no-op
-// barato); a escala piloto es despreciable. Post-MVP esto debería ser un cron.
+// Expiraciones perezosas (sin cron): si no se pagó en 24hs, se cancela. Corre al leer, pero
+// como mucho 1 vez cada 30s por instancia para no hacer 3 writes en CADA poll de CADA cliente
+// (con TTL de 24hs, 30s de atraso es irrelevante). En modo test (MP_TEST_AMOUNT) NO throttlea,
+// así los E2E que adelantan el reloj ven la cancelación al instante. Post-MVP: pasar a un cron.
 const PAY_TTL_MS = 24 * 60 * 60 * 1000;
+let lastSweepAt = 0;
 async function sweepExpirations() {
+  if (!process.env.MP_TEST_AMOUNT && Date.now() - lastSweepAt < 30000) return;
+  lastSweepAt = Date.now();
   const cutoff = new Date(Date.now() - PAY_TTL_MS);
   try {
     // ítem elegido y sin pagar -> cancelado. NO toca ítems cuyo trabajo ya tiene link generado
