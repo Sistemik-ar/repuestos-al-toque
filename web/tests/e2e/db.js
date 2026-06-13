@@ -1,6 +1,7 @@
 // Acceso directo a la base desde los E2E (para simular paso del tiempo, leer estados, etc).
 import fs from 'fs';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 
 let client;
@@ -46,6 +47,13 @@ export async function clearStoreCategories(email = 'vendedor@repuestosaltoque.co
   const p = db();
   const u = await p.user.findUnique({ where: { email } });
   if (u) await p.storeCategory.deleteMany({ where: { storeId: u.id } });
+}
+
+// Restaura la contraseña de las cuentas seed (tras probar el reseteo desde el admin).
+export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.com.ar']) {
+  const p = db();
+  const passwordHash = await bcrypt.hash('repuestos123', 10);
+  await p.user.updateMany({ where: { email: { in: emails } }, data: { passwordHash } });
 }
 
 export async function storeRatingStats() {

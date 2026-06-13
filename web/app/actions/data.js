@@ -501,6 +501,34 @@ export async function setUserStatus(userId, status) {
   return { ok: true };
 }
 
+// El admin le pone una contraseña TEMPORAL a un usuario (ej: un comercio que la perdió o recién entra).
+// Si no se pasa una, se genera al azar. Devuelve la pass en claro para que el admin se la pase.
+export async function setUserTempPassword(userId, password) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true } });
+  if (!u) return { error: 'Usuario no encontrado' };
+  if (u.role === 'ADMIN') return { error: 'No se puede resetear la contraseña de un administrador desde acá.' };
+  const pwd = String(password || '').trim() || Math.random().toString(36).slice(2, 10);
+  if (pwd.length < 6) return { error: 'La contraseña temporal debe tener al menos 6 caracteres.' };
+  const passwordHash = await bcrypt.hash(pwd, 10);
+  await prisma.user.update({ where: { id: u.id }, data: { passwordHash } });
+  return { ok: true, email: u.email, tempPassword: pwd };
+}
+
+// El admin corrige/cambia el email de un usuario (ej: un comercio cargado con un typo).
+export async function setUserEmail(userId, email) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
+  if (!u) return { error: 'Usuario no encontrado' };
+  if (u.role === 'ADMIN') return { error: 'No se puede cambiar el email de un administrador desde acá.' };
+  const next = String(email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) return { error: 'Email inválido.' };
+  const dup = await prisma.user.findUnique({ where: { email: next }, select: { id: true } });
+  if (dup && dup.id !== userId) return { error: 'Ya existe un usuario con ese email.' };
+  await prisma.user.update({ where: { id: userId }, data: { email: next } });
+  return { ok: true, email: next };
+}
+
 // ---- Tarifas de envío (backoffice) ----
 export async function getShippingTariffs() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
 
@@ -22,10 +22,27 @@ export default function Admin() {
   usePoll(load, 6000);
   useEffect(() => { getShippingTariffs().then(setTariffs); }, []);
 
+  const [cred, setCred] = useState(null); // { email, pass } recién seteada para mostrar/copiar
+
   async function logout() { await logoutAction(); router.push('/login'); }
   async function toggleUser(u) {
     const next = u.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
     await setUserStatus(u.id, next); toast({ title: next === 'ACTIVE' ? 'Reactivado' : 'Suspendido', sub: u.email, icon: 'fa-user', type: 'green' }); load();
+  }
+  async function resetPass(u) {
+    const typed = window.prompt(`Contraseña temporal para ${u.email}\n(dejá vacío para generar una al azar):`);
+    if (typed === null) return; // canceló
+    const res = await setUserTempPassword(u.id, typed);
+    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    setCred({ email: res.email, pass: res.tempPassword });
+    toast({ title: 'Contraseña temporal lista', sub: res.email, icon: 'fa-key', type: 'green' });
+  }
+  async function editEmail(u) {
+    const next = window.prompt(`Nuevo email para ${u.name || u.email}:`, u.email);
+    if (next === null || next.trim() === u.email) return;
+    const res = await setUserEmail(u.id, next);
+    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    toast({ title: 'Email actualizado', sub: res.email, icon: 'fa-envelope', type: 'green' }); load();
   }
 
   // editor de tarifas
@@ -103,6 +120,18 @@ export default function Admin() {
         {/* Usuarios */}
         <div className="card mb-16">
           <div className="section-title"><h2>Usuarios</h2><span className="text-xs muted">{d?.users?.length || 0}</span></div>
+          {cred && (
+            <div className="float-notif mb-12" style={{ borderColor: 'rgba(250,204,21,0.4)', background: 'linear-gradient(135deg,rgba(250,204,21,0.10),rgba(31,41,55,0.5))' }}>
+              <i className="fa-solid fa-key text-yellow"></i>
+              <div className="text-sm subtle">
+                <b>Contraseña temporal lista.</b> Pasásela al usuario:
+                <div className="text-xs mt-4">Email: <b>{cred.email}</b> · Contraseña: <b className="text-yellow">{cred.pass}</b>
+                  {' · '}<button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${cred.email} / ${cred.pass}`)}>copiar</button>
+                  {' · '}<button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => setCred(null)}>ocultar</button>
+                </div>
+              </div>
+            </div>
+          )}
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
@@ -113,7 +142,13 @@ export default function Admin() {
                     <td className="text-xs">{u.email}</td>
                     <td><span className="badge badge-gray">{ROLE_LABEL[u.role] || u.role}</span></td>
                     <td><span className={`badge ${ST_BADGE[u.status] || 'badge-gray'}`}>{u.status}</span></td>
-                    <td>{u.role !== 'ADMIN' && <button className={`btn btn-sm ${u.status === 'SUSPENDED' ? 'btn-success' : 'btn-ghost'}`} onClick={() => toggleUser(u)}>{u.status === 'SUSPENDED' ? 'Reactivar' : 'Suspender'}</button>}</td>
+                    <td>{u.role !== 'ADMIN' && (
+                      <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => editEmail(u)} title="Cambiar email"><i className="fa-solid fa-envelope"></i> Email</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => resetPass(u)} title="Setear contraseña temporal"><i className="fa-solid fa-key"></i> Pass</button>
+                        <button className={`btn btn-sm ${u.status === 'SUSPENDED' ? 'btn-success' : 'btn-ghost'}`} onClick={() => toggleUser(u)}>{u.status === 'SUSPENDED' ? 'Reactivar' : 'Suspender'}</button>
+                      </div>
+                    )}</td>
                   </tr>
                 ))}
               </tbody>
