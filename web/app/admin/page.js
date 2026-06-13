@@ -6,6 +6,7 @@ import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
+import Loading from '@/components/Loading';
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
 const ST_BADGE = { ACTIVE: 'badge-green', PENDING: 'badge-yellow', SUSPENDED: 'badge-red' };
@@ -51,12 +52,16 @@ export default function Admin() {
       <div className="container">
         <div className="mb-16"><div className="eyebrow">Panel de control</div><h1 className="h-lg">Resumen</h1></div>
 
-        <div className="dash-grid grid-2 mb-16">
-          <Kpi label="Pedidos" value={String(k.requests)} icon="fa-receipt" />
-          <Kpi label="Pagados" value={String(k.paid)} icon="fa-circle-check" />
-          <Kpi label="Ingresos (comisión)" value={money(k.commission)} icon="fa-coins" yellow />
-          <Kpi label="Usuarios" value={String(k.users)} icon="fa-users" />
-        </div>
+        {d === null ? (
+          <Loading label="Cargando el resumen…" />
+        ) : (
+          <div className="dash-grid grid-2 mb-16">
+            <Kpi label="Pedidos" value={String(k.requests)} icon="fa-receipt" />
+            <Kpi label="Pagados" value={String(k.paid)} icon="fa-circle-check" />
+            <Kpi label="Ingresos (comisión)" value={money(k.commission)} icon="fa-coins" yellow />
+            <Kpi label="Usuarios" value={String(k.users)} icon="fa-users" />
+          </div>
+        )}
 
         {/* Alta de usuarios */}
         <AltaUsuario onCreated={load} />
@@ -120,7 +125,8 @@ export default function Admin() {
             <table className="table">
               <thead><tr><th>#</th><th>Repuesto</th><th>Vehículo</th><th>Total</th><th>Estado</th></tr></thead>
               <tbody>
-                {(d?.recent || []).length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin pedidos todavía</td></tr>}
+                {d === null && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
+                {d !== null && (d?.recent || []).length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin pedidos todavía</td></tr>}
                 {(d?.recent || []).map((r) => (
                   <tr key={r.id}><td>{r.code}</td><td>{r.label}</td><td>{r.vehicle}</td><td>{r.total ? money(r.total) : '—'}</td><td><span className="badge badge-gray">{r.status}</span></td></tr>
                 ))}

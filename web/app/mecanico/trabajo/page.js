@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { money, toast, fmtTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getJob, closeJobWindow, createJobCheckout, publishJob, setItemCredit, cancelItem } from '@/app/actions/data';
+import Loading from '@/components/Loading';
 
 const ITEM_BADGE = {
   OPEN: ['badge-purple', 'Cotizando'], QUOTED: ['badge-purple', 'Cotizando'],
@@ -14,7 +15,7 @@ const ITEM_BADGE = {
 
 export default function Trabajo() {
   const [id, setId] = useState(null);
-  const [j, setJ] = useState(null);
+  const [j, setJ] = useState(undefined); // undefined = cargando · null = no encontrado · obj = ok
   const [now, setNow] = useState(0);
   const [paying, setPaying] = useState(false);
   const [link, setLink] = useState(null); // { link, breakdown }
@@ -71,7 +72,9 @@ export default function Trabajo() {
       </div>
 
       <div className="container form-narrow">
-        {!j ? (
+        {j === undefined ? (
+          <Loading label="Cargando el trabajo…" />
+        ) : !j ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-car"></i></div><div className="text-sm">No encontramos el trabajo</div></div>
         ) : (
           <>

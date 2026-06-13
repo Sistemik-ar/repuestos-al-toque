@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import Loading from '@/components/Loading';
 import { tierFor, toast, ping } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useRef } from 'react';
@@ -13,12 +14,13 @@ export default function MecanicoDashboard() {
   const router = useRouter();
   const [me, setMe] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
 
   const arrivalsRef = useRef(null); // avisar UNA vez cuando el repartidor llega al taller
   const load = async () => {
     try {
       const [m, js] = await Promise.all([getMe(), getMyJobs()]);
-      setMe((p) => keep(p, m || null)); setJobs((p) => keep(p, js || []));
+      setMe((p) => keep(p, m || null)); setJobs((p) => keep(p, js || [])); setLoaded(true);
       const items = (js || []).flatMap((jb) => jb.items || []);
       const ahora = new Set(items.filter((i) => i.arrivedDrop).map((i) => i.id));
       if (arrivalsRef.current) {
@@ -95,7 +97,9 @@ export default function MecanicoDashboard() {
 
         <div className="section">
           <div className="section-title"><h2>Trabajos activos</h2></div>
-          {activos.length === 0 ? (
+          {!loaded ? (
+            <Loading label="Cargando tus trabajos…" />
+          ) : activos.length === 0 ? (
             <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-list"></i></div><div className="text-sm">Todavía no tenés trabajos</div><div className="text-xs">Tocá “Solicitar Repuesto” para crear el primero</div></div>
           ) : <div className="cards-grid">{activos.map((jb) => {
             const [cls, icon, txt] = JOB_BADGE[jb.status] || ['badge-gray', 'fa-circle', jb.status];

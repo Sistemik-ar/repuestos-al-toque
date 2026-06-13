@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { money, ping, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
 import { getRequestForMechanic, acceptQuote, reopenWindow, closeWindow } from '@/app/actions/data';
+import Loading from '@/components/Loading';
 
 export default function Cotizaciones() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [id, setId] = useState(null);
-  const [request, setRequest] = useState(null);
+  const [request, setRequest] = useState(undefined); // undefined = cargando · null = sin pedido · obj = ok
   const [now, setNow] = useState(0);
   const [selected, setSelected] = useState(null);
   const [zoom, setZoom] = useState(null);
@@ -77,7 +78,9 @@ export default function Cotizaciones() {
       </div>
 
       <div className="container form-narrow">
-        {!request ? (
+        {!mounted || (id && request === undefined) ? (
+          <Loading label="Cargando las cotizaciones…" />
+        ) : !request ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-question"></i></div><div className="text-sm">No hay un pedido para mostrar</div><div className="text-xs mb-16">Creá un pedido para empezar</div><Link href="/mecanico/pedido" className="btn btn-primary btn-sm"><i className="fa-solid fa-plus"></i> Nuevo pedido</Link></div>
         ) : (
           <>

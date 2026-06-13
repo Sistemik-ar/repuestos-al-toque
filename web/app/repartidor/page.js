@@ -6,6 +6,7 @@ import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
+import Loading from '@/components/Loading';
 
 const mapsUrl = (p) => (p?.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.address} ${p.barrio || ''} Bariloche`)}` : null);
 
@@ -13,8 +14,9 @@ export default function Repartidor() {
   const router = useRouter();
   const [items, setItems] = useState([]);
   const [rep, setRep] = useState(null);
+  const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
 
-  const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); getMyReputation().then((r) => r && setRep(r)).catch(() => {}); } catch {} };
+  const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); setLoaded(true); getMyReputation().then((r) => r && setRep(r)).catch(() => {}); } catch {} };
   usePoll(load, 5000);
 
   const disponibles = items.filter((d) => !d.mine);
@@ -68,7 +70,9 @@ export default function Repartidor() {
 
         {/* Pedidos disponibles para tomar */}
         <div className="section-title"><h2>Pedidos disponibles</h2><span className="text-xs muted">primero en tomar, se lo lleva</span></div>
-        {disponibles.length === 0 ? (
+        {!loaded ? (
+          <Loading label="Cargando pedidos…" />
+        ) : disponibles.length === 0 ? (
           <div className="empty-state" style={{ padding: 24 }}><div className="text-sm muted">No hay pedidos esperando flete</div></div>
         ) : <div className="cards-grid mb-16">{disponibles.map((o) => (
           <div className="card mb-12" key={o.orderId}>
@@ -87,7 +91,9 @@ export default function Repartidor() {
 
         {/* Mis entregas en curso */}
         <div className="section-title"><h2>Mis entregas</h2></div>
-        {mias.length === 0 ? (
+        {!loaded ? (
+          <Loading label="Cargando tus entregas…" />
+        ) : mias.length === 0 ? (
           <div className="empty-state" style={{ padding: 24 }}><div className="text-sm muted">Todavía no tomaste ningún pedido</div></div>
         ) : <div className="cards-grid">{mias.map((o) => (
           <div className="card mb-12" key={o.orderId}>

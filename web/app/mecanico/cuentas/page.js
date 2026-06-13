@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getStoresForCredit, requestCreditAccount } from '@/app/actions/data';
+import Loading from '@/components/Loading';
 
 const BADGE = {
   NONE: null,
@@ -15,7 +16,8 @@ const BADGE = {
 
 export default function Cuentas() {
   const [stores, setStores] = useState([]);
-  const load = async () => { try { const d = await getStoresForCredit(); setStores((p) => keep(p, d || [])); } catch {} };
+  const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
+  const load = async () => { try { const d = await getStoresForCredit(); setStores((p) => keep(p, d || [])); setLoaded(true); } catch {} };
   usePoll(load, 6000);
 
   async function solicitar(st) {
@@ -35,7 +37,9 @@ export default function Cuentas() {
         <div className="float-notif mb-16"><i className="fa-solid fa-circle-info text-purple"></i><div className="text-xs subtle">Pedí cuenta corriente con los comercios donde ya tenés cuenta. Cuando esté aprobada, en las cotizaciones vas a ver la etiqueta <b>“Cuenta Corriente disponible”</b> y vas a poder pagar solo comisión + envío.</div></div>
 
         <div className="section-title"><h2>Comercios adheridos</h2></div>
-        {stores.length === 0 ? (
+        {!loaded ? (
+          <Loading label="Cargando comercios…" />
+        ) : stores.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-store"></i></div><div className="text-sm">Todavía no hay comercios cargados</div></div>
         ) : stores.map((st) => {
           const b = BADGE[st.status];

@@ -5,6 +5,7 @@ import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useRouter } from 'next/navigation';
 import { getRequestDetail, rateOrder, getMyRatingsForOrder, duplicateRequest } from '@/app/actions/data';
+import Loading from '@/components/Loading';
 
 const STEPS = [
   { key: 'OPEN', label: 'Pedido creado', icon: 'fa-clipboard-list' },
@@ -18,7 +19,7 @@ const ORDER_OF = { OPEN: 0, CLOSED: 1, QUOTED: 1, PAID: 2, SHIPPED: 3, DELIVERED
 export default function Detalle() {
   const router = useRouter();
   const [id, setId] = useState(null);
-  const [r, setR] = useState(null);
+  const [r, setR] = useState(undefined); // undefined = cargando · null = no encontrado · obj = ok
   const [zoom, setZoom] = useState(null);
   const [duping, setDuping] = useState(false);
 
@@ -48,7 +49,9 @@ export default function Detalle() {
       </div>
 
       <div className="container form-narrow">
-        {!r ? (
+        {r === undefined ? (
+          <Loading label="Cargando el pedido…" />
+        ) : !r ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-question"></i></div><div className="text-sm">No encontramos el pedido</div></div>
         ) : (
           <>

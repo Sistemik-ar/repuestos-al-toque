@@ -7,6 +7,7 @@ import { usePoll, keep } from '@/lib/usePoll';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
+import Loading from '@/components/Loading';
 
 export default function Comercio() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function Comercio() {
   const [dismissed, setDismissed] = useState([]);
   const [zoom, setZoom] = useState(null);
   const [rep, setRep] = useState(null);
+  const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
   // la insignia sale de los PUNTOS reales (ventas concretadas), no del mock
   const badge = tierFor('store', rep?.points ?? 0);
 
@@ -31,6 +33,7 @@ export default function Comercio() {
       setMe((p) => keep(p, m || null));
       setOpen((p) => keep(p, o || []));
       setSales((p) => keep(p, s || []));
+      setLoaded(true);
       // aviso emergente: el repartidor llegó al local (transición de estado)
       const ahora = new Set((s || []).filter((x) => x.orderStatus === 'PAID' && x.arrivedPickup).map((x) => x.orderId));
       if (arrivalsRef.current) {
@@ -153,7 +156,7 @@ export default function Comercio() {
           <button className={tab === 'ent' ? 'active' : ''} onClick={() => setTab('ent')}>Concretadas</button>
         </div>
 
-        {tab === 'pend' && (pend.length === 0 ? (
+        {tab === 'pend' && (!loaded ? <Loading label="Cargando solicitudes…" /> : pend.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">Sin solicitudes pendientes</div><div className="text-xs">Cuando un mecánico pida un repuesto, aparece acá</div></div>
         ) : <div className="cards-grid">{pend.map((r) => (
           <div className="card mb-12" key={r.id}>
@@ -181,7 +184,7 @@ export default function Comercio() {
           </div>
         ))}</div>)}
 
-        {tab === 'cot' && (cot.length === 0 ? (
+        {tab === 'cot' && (!loaded ? <Loading label="Cargando tus cotizaciones…" /> : cot.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
         ) : (
           // agrupado por estado; cada grupo con el orden que le sirve al comerciante
@@ -217,7 +220,7 @@ export default function Comercio() {
           ))
         ))}
 
-        {tab === 'ent' && (sales.length === 0 ? (
+        {tab === 'ent' && (!loaded ? <Loading label="Cargando tus ventas…" /> : sales.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box"></i></div><div className="text-sm">Sin ventas concretadas todavía</div></div>
         ) : <div className="cards-grid">{sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} onChanged={load} />)}</div>)}
       </div>
