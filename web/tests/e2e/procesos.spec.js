@@ -147,7 +147,7 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await dCard.getByRole('button', { name: /Tomar viaje/i }).click();
   const miCard = d.locator('.card', { hasText: desc }).first();
   await expect(miCard.getByText(/Mostrale este PIN al vendedor/i)).toBeVisible({ timeout: 15000 });
-  const pickupPin = (await miCard.locator('.h-lg').innerText()).replace(/\D/g, '');
+  const pickupPin = (await miCard.locator('.pickup-pin').innerText()).replace(/\D/g, '');
   expect(pickupPin).toHaveLength(4);
   await miCard.getByRole('button', { name: /Llegué al comercio/i }).click();
 

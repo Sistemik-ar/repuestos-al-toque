@@ -54,7 +54,7 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
   await dCard.getByRole('button', { name: /Tomar viaje/i }).click();
   const miCard = d.locator('.card', { hasText: desc }).first();
   await expect(miCard.getByText(/Mostrale este PIN al vendedor/i)).toBeVisible({ timeout: 15000 });
-  const pickupPin = (await miCard.locator('.h-lg').innerText()).replace(/\D/g, '');
+  const pickupPin = (await miCard.locator('.pickup-pin').innerText()).replace(/\D/g, '');
 
   await s.reload();
   await s.getByRole('button', { name: /Concretadas/i }).click();

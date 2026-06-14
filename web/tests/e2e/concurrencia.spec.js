@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login, uniquePlate, crearItem, publicarTrabajo } from './helpers';
-import { db } from './db';
+import { login, uniquePlate, crearItem, publicarTrabajo, cotizar } from './helpers';
+import { db, ensureStore2 } from './db';
 
 // Escenarios de concurrencia y pestañas viejas — los que rompen plata en producción.
 
@@ -305,4 +305,60 @@ test('regenerar el link de pago devuelve EL MISMO link (no cobra doble)', async 
   expect(link2).toBe(link1); // mismo link: imposible pagar dos preferencias distintas
 
   await mc.close(); await sc.close();
+});
+
+test('multi-comercio: un auto junta repuestos de 2 comercios -> 1 viaje, 1 flete, 2 retiros', async ({ browser }) => {
+  test.setTimeout(150000);
+  const stamp = Date.now();
+  const plate = uniquePlate();
+  const d1 = `Multi1 E2E ${stamp}`, d2 = `Multi2 E2E ${stamp}`;
+  const store2 = await ensureStore2();
+
+  // mecánico: 2 repuestos para el MISMO auto (un solo trabajo)
+  const mc = await browser.newContext(); const m = await mc.newPage();
+  await login(m, 'mecanico@repuestosaltoque.com.ar');
+  await crearItem(m, d1, plate);
+  await crearItem(m, d2, plate);
+  await publicarTrabajo(m);
+
+  // comercio 1 cotiza el ítem 1; comercio 2 cotiza el ítem 2
+  const sc = await browser.newContext(); const s = await sc.newPage();
+  await login(s, 'vendedor@repuestosaltoque.com.ar');
+  await cotizar(s, d1, '30000');
+  const s2c = await browser.newContext(); const s2 = await s2c.newPage();
+  await login(s2, store2);
+  await cotizar(s2, d2, '40000');
+
+  // mecánico cierra y elige una oferta por ítem (cada una de un comercio distinto)
+  await m.bringToFront();
+  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
+  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
+  const jobId = new URL(m.url()).searchParams.get('id');
+  for (const d of [d1, d2]) {
+    await m.locator('.card', { hasText: d }).getByRole('link', { name: /Ver cotizaciones/i }).click();
+    await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
+    await m.getByRole('button', { name: /Elegir oferta/i }).first().click();
+    await m.getByRole('button', { name: /Confirmar elección/i }).click();
+    await expect(m).toHaveURL(/\/mecanico\/trabajo/);
+  }
+  // pagar el trabajo
+  await m.request.get(`/api/mp/return?status=approved&external_reference=${encodeURIComponent('job::' + jobId)}`);
+  await expect.poll(async () =>
+    db().order.count({ where: { request: { description: { in: [d1, d2] } }, status: 'PAID' } }),
+    { timeout: 10000 }).toBe(2);
+
+  // UN SOLO FLETE por patente: exactamente UNA orden con flete > 0 (no una por comercio)
+  const conFlete = await db().order.count({ where: { request: { description: { in: [d1, d2] } }, freightAmount: { gt: 0 } } });
+  expect(conFlete).toBe(1);
+
+  // repartidor: UN viaje con AMBOS ítems y DOS retiros (un comercio cada uno)
+  const dc = await browser.newContext(); const dd = await dc.newPage();
+  await login(dd, 'repartidor@repuestosaltoque.com.ar');
+  const viaje = dd.locator('.card').filter({ hasText: d1 }).filter({ hasText: d2 }).first();
+  await expect(viaje).toBeVisible({ timeout: 15000 });
+  await expect(viaje.getByRole('button', { name: /Tomar viaje/i })).toHaveCount(1); // un solo viaje
+  await expect(viaje.getByText(/Retiro 1/i)).toBeVisible();
+  await expect(viaje.getByText(/Retiro 2/i)).toBeVisible(); // dos comercios distintos
+
+  await mc.close(); await sc.close(); await s2c.close(); await dc.close();
 });

@@ -49,6 +49,24 @@ export async function clearStoreCategories(email = 'vendedor@repuestosaltoque.co
   if (u) await p.storeCategory.deleteMany({ where: { storeId: u.id } });
 }
 
+// Crea (o reutiliza) un SEGUNDO comercio para los tests multi-comercio, sin pasar por el alta
+// con Nominatim (evita flakiness). Devuelve su email. Le pone coords de Bariloche.
+export async function ensureStore2(email = 'e2e-store2@rat.test') {
+  const p = db();
+  const passwordHash = await bcrypt.hash('repuestos123', 10);
+  const u = await p.user.upsert({
+    where: { email },
+    update: { status: 'ACTIVE', passwordHash, role: 'STORE', name: 'Repuestos Dos' },
+    create: { email, status: 'ACTIVE', passwordHash, role: 'STORE', name: 'Repuestos Dos' },
+  });
+  await p.storeProfile.upsert({
+    where: { userId: u.id },
+    update: {},
+    create: { userId: u.id, tradeName: 'Repuestos Dos', barrio: 'Centro', address: 'Mitre 200', lat: -41.134, lng: -71.31, ivaCondition: 'RESPONSABLE_INSCRIPTO' },
+  });
+  return email;
+}
+
 // Restaura la contraseña de las cuentas seed (tras probar el reseteo desde el admin).
 export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.com.ar']) {
   const p = db();

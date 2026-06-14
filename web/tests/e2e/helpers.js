@@ -36,6 +36,16 @@ export async function crearItem(m, desc, plate) {
   await expect(m.getByText(/Repuesto agregado/i)).toBeVisible({ timeout: 30000 });
 }
 
+// el comercio cotiza un ítem (desde Pendientes) y cierra el modal
+export async function cotizar(s, desc, price) {
+  const card = s.locator('.card', { hasText: desc });
+  await expect(card).toBeVisible({ timeout: 15000 });
+  await card.getByRole('button', { name: /Cotizar/i }).click();
+  await s.locator('input[inputmode="numeric"]').first().fill(price);
+  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
+}
+
 // publica el trabajo y queda en /mecanico/trabajo
 export async function publicarTrabajo(m) {
   await m.getByRole('button', { name: /Eso es todo/i }).click();

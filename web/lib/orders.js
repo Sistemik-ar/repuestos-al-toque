@@ -61,25 +61,32 @@ export async function jobChargePlan(jobId) {
   const job = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
   if (!job) return null;
   const settings = await getSettings();
-  const seenShip = new Set();
-  const items = [];
-  const totals = { parts: 0, creditParts: 0, commission: 0, ship: 0, mpFee: 0, total: 0 };
+  // 1) ítems a cobrar (repuesto + comisión), y el flete de la pata de CADA comercio (comercio->taller)
+  const base = [];
+  const storeShip = new Map(); // storeId -> flete de su pata
   for (const r of job.requests) {
     const sel = r.quotes.find((q) => q.status === 'SELECTED');
     if (!sel || ['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) continue;
     const part = num(sel.price);
     const commission = Math.round(part * (Number(settings.commissionPct) / 100));
-    const ship = seenShip.has(sel.storeId) ? 0 : await computeShip(r.id, sel.storeId);
-    seenShip.add(sel.storeId);
-    // ítem a cuenta corriente: el repuesto se imputa a la CC (lo liquida el comercio),
-    // la plataforma solo cobra comisión + envío
-    const cobrable = (r.useCredit ? 0 : part) + commission + ship;
-    const mpFee = settings.mpFeeEnabled ? Math.round(cobrable * (Number(settings.mpFeePct) / 100)) : 0;
-    items.push({ requestId: r.id, quoteId: sel.id, storeId: sel.storeId, useCredit: !!r.useCredit, part, commission, ship, mpFee, cobrado: cobrable + mpFee });
-    if (r.useCredit) totals.creditParts += part; else totals.parts += part;
-    totals.commission += commission; totals.ship += ship; totals.mpFee += mpFee; totals.total += cobrable + mpFee;
+    if (!storeShip.has(sel.storeId)) storeShip.set(sel.storeId, await computeShip(r.id, sel.storeId));
+    base.push({ requestId: r.id, quoteId: sel.id, storeId: sel.storeId, useCredit: !!r.useCredit, part, commission });
   }
-  return { job, settings, items, totals, stores: seenShip.size };
+  // 2) FLETE ÚNICO por patente = la pata MÁS LARGA (comercio más lejano -> taller). El cliente del
+  // mecánico paga un solo flete aunque el auto junte repuestos de varios comercios (un solo viaje).
+  const tripShip = storeShip.size ? Math.max(...storeShip.values()) : 0;
+  const items = [];
+  const totals = { parts: 0, creditParts: 0, commission: 0, ship: 0, mpFee: 0, total: 0 };
+  base.forEach((b, i) => {
+    const ship = i === 0 ? tripShip : 0; // el flete único se imputa al primer ítem
+    // ítem a cuenta corriente: el repuesto lo liquida el comercio; la plataforma cobra comisión + flete
+    const cobrable = (b.useCredit ? 0 : b.part) + b.commission + ship;
+    const mpFee = settings.mpFeeEnabled ? Math.round(cobrable * (Number(settings.mpFeePct) / 100)) : 0;
+    items.push({ ...b, ship, mpFee, cobrado: cobrable + mpFee });
+    if (b.useCredit) totals.creditParts += b.part; else totals.parts += b.part;
+    totals.commission += b.commission; totals.ship += ship; totals.mpFee += mpFee; totals.total += cobrable + mpFee;
+  });
+  return { job, settings, items, totals, stores: storeShip.size };
 }
 
 // Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem elegido.
