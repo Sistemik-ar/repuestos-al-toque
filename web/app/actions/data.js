@@ -286,7 +286,7 @@ export async function getMyDeliveries() {
   const orders = await prisma.order.findMany({
     where: { OR: [{ status: 'PAID', deliveryId: null }, { deliveryId: s.id, status: { in: ['PAID', 'SHIPPED'] } }] },
     orderBy: { createdAt: 'desc' },
-    include: { request: { include: { category: true } } },
+    include: { request: { include: { category: true, job: { select: { plate: true } } } } },
   });
   const storeIds = [...new Set(orders.map((o) => o.storeId))];
   const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
@@ -296,19 +296,48 @@ export async function getMyDeliveries() {
   ]);
   const sMap = Object.fromEntries(stores.map((x) => [x.userId, x]));
   const mMap = Object.fromEntries(mechs.map((x) => [x.userId, x]));
-  return orders.map((o) => ({
-    orderId: o.id, status: o.status, mine: o.deliveryId === s.id, freight: num(o.freightAmount),
-    arrivedPickup: !!o.arrivedPickupAt, arrivedDrop: !!o.arrivedDropAt, issue: o.issue || null,
-    // el PIN de retiro solo lo ve el repartidor asignado (se lo muestra al vendedor)
-    pickupPin: o.deliveryId === s.id ? o.pickupPin : null,
-    ...reqBase(o.request),
-    // lat/lng para abrir la navegación exacta en Google Maps (no depender del texto de la dirección)
-    pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio, lat: num(sMap[o.storeId].lat), lng: num(sMap[o.storeId].lng) } : null,
-    dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio, lat: num(mMap[o.mechanicId].lat), lng: num(mMap[o.mechanicId].lng) } : null,
-  }));
+  // VIAJE CONSOLIDADO: agrupamos por patente + comercio + mecánico (un auto, de un comercio, a un taller).
+  // El repartidor ve 1 tarjeta por viaje con todos sus ítems y un solo par de PINs.
+  const trips = new Map();
+  for (const o of orders) {
+    const mine = o.deliveryId === s.id;
+    const plate = o.request?.job?.plate || o.requestId; // sin patente -> la orden es su propio viaje
+    const key = `${mine ? 'mine' : 'avail'}::${plate}::${o.storeId}::${o.mechanicId}`;
+    if (!trips.has(key)) {
+      trips.set(key, {
+        tripId: key, mine, plate: o.request?.job?.plate || null,
+        veh: `${o.request?.brand || ''} ${o.request?.model || ''}`.trim() || 'Vehículo',
+        orderIds: [], items: [], freight: 0, anyPaid: false, anyShipped: false,
+        arrivedPickup: false, arrivedDrop: false, issue: null,
+        pickupPin: mine ? o.pickupPin : null,
+        pickup: sMap[o.storeId] ? { name: sMap[o.storeId].tradeName, address: sMap[o.storeId].address, barrio: sMap[o.storeId].barrio, lat: num(sMap[o.storeId].lat), lng: num(sMap[o.storeId].lng) } : null,
+        dropoff: mMap[o.mechanicId] ? { name: mMap[o.mechanicId].workshopName, address: mMap[o.mechanicId].address, barrio: mMap[o.mechanicId].barrio, lat: num(mMap[o.mechanicId].lat), lng: num(mMap[o.mechanicId].lng) } : null,
+      });
+    }
+    const t = trips.get(key);
+    t.orderIds.push(o.id);
+    t.items.push({ orderId: o.id, label: o.request?.description || o.request?.category?.name || 'Repuesto', code: o.request?.code });
+    t.freight += num(o.freightAmount) || 0;
+    if (o.status === 'PAID') t.anyPaid = true; else if (o.status === 'SHIPPED') t.anyShipped = true;
+    if (o.arrivedPickupAt) t.arrivedPickup = true;
+    if (o.arrivedDropAt) t.arrivedDrop = true;
+    if (o.issue && !t.issue) t.issue = o.issue;
+  }
+  // estado del viaje: si queda algo "a retirar" (PAID) manda ese estado; si todo retirado -> "en camino"
+  return [...trips.values()].map((t) => ({ ...t, status: t.anyPaid ? 'PAID' : 'SHIPPED' }));
 }
 
 const newPin = () => String(Math.floor(1000 + Math.random() * 9000)); // 4 dígitos
+
+// Órdenes del MISMO viaje consolidado: misma patente + comercio + mecánico + repartidor
+// (el claim ya las agrupa con el mismo deliveryId y los mismos PINs). Las acciones del flujo de
+// entrega operan sobre TODO el viaje, no orden por orden. Sin patente válida, cae a la orden sola.
+function tripWhere(o) {
+  const plate = o.request?.job?.plate;
+  if (plate && o.deliveryId) return { deliveryId: o.deliveryId, storeId: o.storeId, mechanicId: o.mechanicId, request: { job: { plate } } };
+  return { id: o.id };
+}
+const TRIP_INCLUDE = { request: { select: { jobId: true, job: { select: { plate: true } } } } };
 
 // Tomar pedido — claim ATÓMICO: el updateMany con deliveryId:null garantiza que
 // solo UN repartidor puede quedárselo aunque varios toquen el botón a la vez.
@@ -343,37 +372,40 @@ export async function claimDelivery(orderId) {
 // que le muestra el repartidor (garantiza que es el que tomó el pedido).
 export async function storeConfirmPickup(orderId, pin) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { storeId: true, status: true, deliveryId: true, pickupPin: true, requestId: true } });
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { storeId: true, mechanicId: true, deliveryId: true, status: true, pickupPin: true, requestId: true, ...TRIP_INCLUDE } });
   if (!o || o.storeId !== s.id) return { error: 'No autorizado' };
   if (!o.deliveryId) return { error: 'Ningún repartidor tomó este pedido todavía' };
   if (o.status !== 'PAID') return { error: 'Este pedido ya fue retirado' };
   if (String(pin).trim() !== o.pickupPin) return { error: 'PIN incorrecto. Pedile el PIN al repartidor.' };
-  await prisma.order.update({ where: { id: orderId }, data: { status: 'SHIPPED', pickedAt: new Date() } });
-  await prisma.request.update({ where: { id: o.requestId }, data: { status: 'SHIPPED' } }).catch(() => {});
+  // un solo PIN confirma el RETIRO de TODO el viaje (todos los ítems de ese auto en este comercio)
+  const where = { ...tripWhere(o), status: 'PAID', storeId: s.id };
+  const trip = await prisma.order.findMany({ where, select: { requestId: true } });
+  await prisma.order.updateMany({ where, data: { status: 'SHIPPED', pickedAt: new Date() } });
+  await prisma.request.updateMany({ where: { id: { in: trip.map((t) => t.requestId) } }, data: { status: 'SHIPPED' } }).catch(() => {});
   return { ok: true };
 }
 
 // El REPARTIDOR confirma la entrega ingresando el PIN que le da el mecánico en mano.
 export async function markDelivered(orderId, pin) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, status: true, deliveryPin: true, requestId: true, storeId: true } });
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, mechanicId: true, status: true, deliveryPin: true, requestId: true, storeId: true, ...TRIP_INCLUDE } });
   if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
   if (o.status !== 'SHIPPED') return { error: 'Primero el vendedor tiene que confirmar el retiro' };
   if (String(pin).trim() !== o.deliveryPin) return { error: 'PIN incorrecto. Pedíselo al mecánico.' };
-  // transición atómica: los puntos se suman UNA sola vez aunque haya doble-tap
-  const upd = await prisma.order.updateMany({ where: { id: orderId, status: 'SHIPPED' }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
+  // un solo PIN entrega TODO el viaje (todos los ítems del auto). Comparten el deliveryPin.
+  const where = { ...tripWhere(o), deliveryId: s.id, status: 'SHIPPED', deliveryPin: o.deliveryPin };
+  const trip = await prisma.order.findMany({ where, select: { id: true, requestId: true } });
+  const upd = await prisma.order.updateMany({ where, data: { status: 'DELIVERED', deliveredAt: new Date() } });
   if (upd.count === 0) return { error: 'Este pedido ya fue entregado' };
-  await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
-  // si ya se entregaron TODOS los ítems comprados del trabajo, el trabajo pasa a ENTREGADO (DONE).
-  // Sin esto quedaba "Pagado" para siempre del lado del mecánico.
-  const reqRow = await prisma.request.findUnique({ where: { id: o.requestId }, select: { jobId: true } });
-  if (reqRow?.jobId) {
-    const pendientes = await prisma.request.count({ where: { jobId: reqRow.jobId, status: { in: ['PAID', 'SHIPPED'] } } });
-    if (pendientes === 0) await prisma.job.update({ where: { id: reqRow.jobId }, data: { status: 'DONE' } }).catch(() => {});
+  await prisma.request.updateMany({ where: { id: { in: trip.map((t) => t.requestId) } }, data: { status: 'DELIVERED' } }).catch(() => {});
+  // si ya se entregaron TODOS los ítems comprados del trabajo, pasa a ENTREGADO (DONE).
+  if (o.request?.jobId) {
+    const pendientes = await prisma.request.count({ where: { jobId: o.request.jobId, status: { in: ['PAID', 'SHIPPED'] } } });
+    if (pendientes === 0) await prisma.job.update({ where: { id: o.request.jobId }, data: { status: 'DONE' } }).catch(() => {});
   }
-  // venta concretada: +1 punto al vendedor y +1 al repartidor (de acá salen niveles/insignias)
-  await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { points: { increment: 1 } } }).catch(() => {});
-  await prisma.deliveryProfile.update({ where: { userId: s.id }, data: { points: { increment: 1 } } }).catch(() => {});
+  // venta concretada: +1 punto por ítem entregado, al vendedor y al repartidor (atómico: solo lo recién entregado)
+  await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { points: { increment: upd.count } } }).catch(() => {});
+  await prisma.deliveryProfile.update({ where: { userId: s.id }, data: { points: { increment: upd.count } } }).catch(() => {});
   return { ok: true };
 }
 
@@ -835,19 +867,21 @@ export async function createJobCheckout(jobId) {
 // ---- Repartidor: aviso de llegada e incidencias ----
 export async function reportArrival(orderId, stage) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, status: true } });
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, storeId: true, mechanicId: true, status: true, ...TRIP_INCLUDE } });
   if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
-  if (stage === 'pickup' && o.status === 'PAID') await prisma.order.update({ where: { id: orderId }, data: { arrivedPickupAt: new Date() } });
-  else if (stage === 'drop' && o.status === 'SHIPPED') await prisma.order.update({ where: { id: orderId }, data: { arrivedDropAt: new Date() } });
+  // la llegada es del VIAJE entero (avisa una vez por todos los ítems del auto)
+  if (stage === 'pickup' && o.status === 'PAID') await prisma.order.updateMany({ where: { ...tripWhere(o), deliveryId: s.id, status: 'PAID' }, data: { arrivedPickupAt: new Date() } });
+  else if (stage === 'drop' && o.status === 'SHIPPED') await prisma.order.updateMany({ where: { ...tripWhere(o), deliveryId: s.id, status: 'SHIPPED' }, data: { arrivedDropAt: new Date() } });
   else return { error: 'Etapa inválida' };
   return { ok: true };
 }
 
 export async function reportIssue(orderId, text) {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return { error: 'No autorizado' };
-  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true } });
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { deliveryId: true, storeId: true, mechanicId: true, ...TRIP_INCLUDE } });
   if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
-  await prisma.order.update({ where: { id: orderId }, data: { issue: String(text || 'Nadie me atendió').slice(0, 200), issueAt: new Date() } });
+  // la incidencia es del viaje (es un solo retiro/entrega)
+  await prisma.order.updateMany({ where: { ...tripWhere(o), deliveryId: s.id }, data: { issue: String(text || 'Nadie me atendió').slice(0, 200), issueAt: new Date() } });
   return { ok: true };
 }
 

@@ -20,33 +20,33 @@ export default function Repartidor() {
   const load = async () => { try { const d = await getMyDeliveries(); setItems((p) => keep(p, d || [])); setLoaded(true); getMyReputation().then((r) => r && setRep(r)).catch(() => {}); } catch {} };
   usePoll(load, 5000);
 
-  const disponibles = items.filter((d) => !d.mine);
-  const mias = items.filter((d) => d.mine);
-  const label = (r) => r.desc || r.catLabel || 'Repuesto';
+  const disponibles = items.filter((d) => !d.mine); // viajes sin tomar
+  const mias = items.filter((d) => d.mine); // mis viajes en curso
 
-  async function tomar(o) {
+  // cada acción opera sobre el VIAJE entero (el server consolida por patente+comercio+mecánico).
+  async function tomar(t) {
     if (busy) return;
-    setBusy(o.orderId);
+    setBusy(t.tripId);
     try {
-      const res = await claimDelivery(o.orderId);
+      const res = await claimDelivery(t.orderIds[0]);
       if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); load(); return; }
-      toast({ title: 'Pedido tomado', sub: 'Andá a retirarlo al comercio', icon: 'fa-hand', type: 'green' }); load();
+      toast({ title: 'Viaje tomado', sub: 'Andá a retirar al comercio', icon: 'fa-hand', type: 'green' }); load();
     } finally { setBusy(null); }
   }
-  async function entregar(o, pin) {
-    const r = await markDelivered(o.orderId, pin);
+  async function entregar(t, pin) {
+    const r = await markDelivered(t.orderIds[0], pin);
     if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
     else toast({ title: 'Entrega confirmada 🎉', sub: 'Ciclo completado', icon: 'fa-check', type: 'green' });
     load();
   }
-  async function llegue(o, stage) {
-    const r = await reportArrival(o.orderId, stage);
+  async function llegue(t, stage) {
+    const r = await reportArrival(t.orderIds[0], stage);
     if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
     else toast({ title: 'Llegada avisada', sub: stage === 'pickup' ? 'El comercio ya sabe que estás ahí — pedile que confirme con tu PIN' : 'El mecánico ya sabe que llegaste — pedile su PIN', icon: 'fa-location-dot', type: 'green' });
     load();
   }
-  async function nadie(o, stage) {
-    const r = await reportIssue(o.orderId, stage === 'pickup' ? 'Nadie me atendió en el comercio' : 'Nadie me atendió en el taller');
+  async function nadie(t, stage) {
+    const r = await reportIssue(t.orderIds[0], stage === 'pickup' ? 'Nadie me atendió en el comercio' : 'Nadie me atendió en el taller');
     if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' });
     else toast({ title: 'Incidencia registrada', sub: 'Queda avisado para el comercio y el admin', icon: 'fa-flag', type: 'purple' });
     load();
@@ -79,18 +79,19 @@ export default function Repartidor() {
           <Loading label="Cargando pedidos…" />
         ) : disponibles.length === 0 ? (
           <div className="empty-state" style={{ padding: 24 }}><div className="text-sm muted">No hay pedidos esperando flete</div></div>
-        ) : <div className="cards-grid mb-16">{disponibles.map((o) => (
-          <div className="card mb-12" key={o.orderId}>
+        ) : <div className="cards-grid mb-16">{disponibles.map((t) => (
+          <div className="card mb-12" key={t.tripId}>
             <div className="flex-between mb-12">
-              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(250,204,21,0.16)', color: '#FACC15' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(o)}</div><div className="text-xs muted">Pedido #{o.code}</div></div></div>
-              {o.freight ? <span className="badge badge-green">{'$' + o.freight.toLocaleString('es-AR')}</span> : null}
+              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(250,204,21,0.16)', color: '#FACC15' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{t.veh}{t.plate ? ` · ${t.plate}` : ''}</div><div className="text-xs muted">{t.items.length} repuesto{t.items.length === 1 ? '' : 's'} · 1 viaje</div></div></div>
+              {t.freight ? <span className="badge badge-green">{'$' + t.freight.toLocaleString('es-AR')}</span> : null}
             </div>
+            <ItemsViaje items={t.items} />
             <div className="card mb-12" style={{ background: 'var(--bg-1)', padding: 12 }}>
-              <Punto icon="fa-store" color="#FACC15" titulo="Retiro" lugar={o.pickup?.name} dir={o.pickup?.address} barrio={o.pickup?.barrio} maps={mapsUrl(o.pickup)} />
+              <Punto icon="fa-store" color="#FACC15" titulo="Retiro" lugar={t.pickup?.name} dir={t.pickup?.address} barrio={t.pickup?.barrio} maps={mapsUrl(t.pickup)} />
               <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
-              <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
+              <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={t.dropoff?.name} dir={t.dropoff?.address} barrio={t.dropoff?.barrio} maps={mapsUrl(t.dropoff)} />
             </div>
-            <button className="btn btn-yellow btn-block" disabled={busy === o.orderId} onClick={() => tomar(o)}>{busy === o.orderId ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Tomando…</> : <><i className="fa-solid fa-hand"></i> Tomar pedido</>}</button>
+            <button className="btn btn-yellow btn-block" disabled={busy === t.tripId} onClick={() => tomar(t)}>{busy === t.tripId ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Tomando…</> : <><i className="fa-solid fa-hand"></i> Tomar viaje</>}</button>
           </div>
         ))}</div>}
 
@@ -100,33 +101,34 @@ export default function Repartidor() {
           <Loading label="Cargando tus entregas…" />
         ) : mias.length === 0 ? (
           <div className="empty-state" style={{ padding: 24 }}><div className="text-sm muted">Todavía no tomaste ningún pedido</div></div>
-        ) : <div className="cards-grid">{mias.map((o) => (
-          <div className="card mb-12" key={o.orderId}>
+        ) : <div className="cards-grid">{mias.map((t) => (
+          <div className="card mb-12" key={t.tripId}>
             <div className="flex-between mb-12">
-              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(o)}</div><div className="text-xs muted">Pedido #{o.code}</div></div></div>
-              <span className="badge badge-yellow">{o.status === 'SHIPPED' ? 'En camino' : 'A retirar'}</span>
+              <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-box"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{t.veh}{t.plate ? ` · ${t.plate}` : ''}</div><div className="text-xs muted">{t.items.length} repuesto{t.items.length === 1 ? '' : 's'} · 1 viaje</div></div></div>
+              <span className="badge badge-yellow">{t.status === 'SHIPPED' ? 'En camino' : 'A retirar'}</span>
             </div>
+            <ItemsViaje items={t.items} />
             <div className="card mb-12" style={{ background: 'var(--bg-1)', padding: 12 }}>
-              <Punto icon="fa-store" color="#FACC15" titulo="Retiro" lugar={o.pickup?.name} dir={o.pickup?.address} barrio={o.pickup?.barrio} maps={mapsUrl(o.pickup)} />
+              <Punto icon="fa-store" color="#FACC15" titulo="Retiro" lugar={t.pickup?.name} dir={t.pickup?.address} barrio={t.pickup?.barrio} maps={mapsUrl(t.pickup)} />
               <div style={{ borderLeft: '2px dashed var(--border)', height: 14, marginLeft: 17 }}></div>
-              <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={o.dropoff?.name} dir={o.dropoff?.address} barrio={o.dropoff?.barrio} maps={mapsUrl(o.dropoff)} />
+              <Punto icon="fa-screwdriver-wrench" color="#6D28D9" titulo="Entrega" lugar={t.dropoff?.name} dir={t.dropoff?.address} barrio={t.dropoff?.barrio} maps={mapsUrl(t.dropoff)} />
             </div>
-            {o.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle">{o.issue}</span></div>}
-            {o.status === 'PAID' ? (
+            {t.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle">{t.issue}</span></div>}
+            {t.status === 'PAID' ? (
               <div>
-                {!o.arrivedPickup && <BusyButton className="btn btn-primary btn-block mb-12" busyLabel="Avisando…" onClick={() => llegue(o, 'pickup')}><i className="fa-solid fa-location-dot"></i> Llegué al comercio</BusyButton>}
+                {!t.arrivedPickup && <BusyButton className="btn btn-primary btn-block mb-12" busyLabel="Avisando…" onClick={() => llegue(t, 'pickup')}><i className="fa-solid fa-location-dot"></i> Llegué al comercio</BusyButton>}
                 <div className="card mb-12" style={{ background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.35)', textAlign: 'center', padding: 14 }}>
-                  <div className="text-xs muted mb-4">Mostrale este PIN al vendedor al retirar</div>
-                  <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{o.pickupPin || '— — — —'}</div>
-                  <div className="text-xs muted mt-4">El vendedor lo ingresa para confirmar que te llevás la pieza</div>
+                  <div className="text-xs muted mb-4">Mostrale este PIN al vendedor al retirar {t.items.length > 1 ? '(todos los ítems)' : ''}</div>
+                  <div className="h-lg text-yellow" style={{ letterSpacing: '0.3em' }}>{t.pickupPin || '— — — —'}</div>
+                  <div className="text-xs muted mt-4">El vendedor lo ingresa para confirmar que te llevás {t.items.length > 1 ? 'las piezas' : 'la pieza'}</div>
                 </div>
-                <BusyButton className="btn btn-ghost btn-sm btn-block" busyLabel="Avisando…" onClick={() => nadie(o, 'pickup')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</BusyButton>
+                <BusyButton className="btn btn-ghost btn-sm btn-block" busyLabel="Avisando…" onClick={() => nadie(t, 'pickup')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</BusyButton>
               </div>
             ) : (
               <div>
-                {!o.arrivedDrop && <BusyButton className="btn btn-primary btn-block mb-12" busyLabel="Avisando…" onClick={() => llegue(o, 'drop')}><i className="fa-solid fa-location-dot"></i> Llegué al taller</BusyButton>}
-                <EntregaPin onConfirm={(pin) => entregar(o, pin)} />
-                <BusyButton className="btn btn-ghost btn-sm btn-block mt-12" busyLabel="Avisando…" onClick={() => nadie(o, 'drop')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</BusyButton>
+                {!t.arrivedDrop && <BusyButton className="btn btn-primary btn-block mb-12" busyLabel="Avisando…" onClick={() => llegue(t, 'drop')}><i className="fa-solid fa-location-dot"></i> Llegué al taller</BusyButton>}
+                <EntregaPin onConfirm={(pin) => entregar(t, pin)} />
+                <BusyButton className="btn btn-ghost btn-sm btn-block mt-12" busyLabel="Avisando…" onClick={() => nadie(t, 'drop')}><i className="fa-solid fa-user-slash"></i> Nadie me atendió</BusyButton>
               </div>
             )}
           </div>
@@ -158,6 +160,22 @@ function EntregaPin({ onConfirm }) {
         <input className="input" inputMode="numeric" maxLength={4} placeholder="PIN" aria-label="PIN de entrega que te da el mecánico" value={pin} onChange={(e) => setPin(e.target.value)} style={{ maxWidth: 110, textAlign: 'center', letterSpacing: '0.2em', fontWeight: 800 }} />
         <button className="btn btn-success btn-block" disabled={pin.length !== 4 || sending} onClick={confirmar}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Confirmando…</> : <><i className="fa-solid fa-check"></i> Confirmar entrega</>}</button>
       </div>
+    </div>
+  );
+}
+
+function ItemsViaje({ items }) {
+  if (!items?.length) return null;
+  return (
+    <div className="card mb-12" style={{ background: 'var(--bg-1)', padding: '10px 12px' }}>
+      <div className="text-xs muted mb-4"><i className="fa-solid fa-boxes-stacked"></i> {items.length === 1 ? 'Pieza a llevar' : `Piezas a llevar (${items.length})`}</div>
+      {items.map((it) => (
+        <div key={it.orderId} className="flex-center gap-8" style={{ padding: '3px 0' }}>
+          <i className="fa-solid fa-circle text-purple" style={{ fontSize: 5 }}></i>
+          <span className="text-sm" style={{ fontWeight: 600 }}>{it.label}</span>
+          {it.code ? <span className="text-xs muted">#{it.code}</span> : null}
+        </div>
+      ))}
     </div>
   );
 }

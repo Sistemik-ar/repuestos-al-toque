@@ -127,8 +127,8 @@ test('dos repartidores tocan "Tomar pedido" a la vez: gana uno solo', async ({ b
 
   // click simultáneo
   await Promise.all([
-    d1.locator('.card', { hasText: desc }).first().getByRole('button', { name: /Tomar pedido/i }).click(),
-    d2.locator('.card', { hasText: desc }).first().getByRole('button', { name: /Tomar pedido/i }).click(),
+    d1.locator('.card', { hasText: desc }).first().getByRole('button', { name: /Tomar viaje/i }).click(),
+    d2.locator('.card', { hasText: desc }).first().getByRole('button', { name: /Tomar viaje/i }).click(),
   ]);
 
   // invariante en la base: el pedido quedó asignado UNA sola vez (claim atómico),
@@ -266,12 +266,23 @@ test('claim consolida por patente: un repartidor toma TODO el auto (no se parte 
   const rep = await db().user.findUnique({ where: { email: 'repartidor@repuestosaltoque.com.ar' }, select: { id: true } });
   const dc = await browser.newContext(); const dd = await dc.newPage();
   await login(dd, 'repartidor@repuestosaltoque.com.ar');
-  await dd.locator('.card', { hasText: d1 }).first().getByRole('button', { name: /Tomar pedido/i }).click();
+
+  // DISPLAY consolidado: UNA sola card de viaje contiene AMBOS ítems (antes eran 2 cards),
+  // con un solo botón "Tomar viaje".
+  const viajeDisp = dd.locator('.card').filter({ hasText: d1 }).filter({ hasText: d2 }).first();
+  await expect(viajeDisp).toBeVisible({ timeout: 15000 });
+  await expect(viajeDisp.getByRole('button', { name: /Tomar viaje/i })).toHaveCount(1);
+  await viajeDisp.getByRole('button', { name: /Tomar viaje/i }).click();
 
   await expect.poll(async () => {
     const ords = await db().order.findMany({ where: { request: { description: { in: [d1, d2] } } }, select: { deliveryId: true } });
     return ords.every((o) => o.deliveryId === rep.id) ? ords.length : -1;
   }, { timeout: 10000 }).toBe(2); // las DOS quedaron asignadas al MISMO repartidor
+
+  // ya tomado: sigue siendo UN viaje con ambos ítems y UN solo PIN de retiro
+  const viajeMio = dd.locator('.card').filter({ hasText: d1 }).filter({ hasText: d2 }).first();
+  await expect(viajeMio).toBeVisible({ timeout: 15000 });
+  await expect(viajeMio.getByText(/Mostrale este PIN/i)).toHaveCount(1);
 
   await mc.close(); await sc.close(); await dc.close();
 });

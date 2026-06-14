@@ -144,7 +144,7 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await login(d, 'repartidor@repuestosaltoque.com.ar');
   const dCard = d.locator('.card', { hasText: desc }).first();
   await expect(dCard).toBeVisible({ timeout: 15000 });
-  await dCard.getByRole('button', { name: /Tomar pedido/i }).click();
+  await dCard.getByRole('button', { name: /Tomar viaje/i }).click();
   const miCard = d.locator('.card', { hasText: desc }).first();
   await expect(miCard.getByText(/Mostrale este PIN al vendedor/i)).toBeVisible({ timeout: 15000 });
   const pickupPin = (await miCard.locator('.h-lg').innerText()).replace(/\D/g, '');
