@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { pickAddress } from './helpers';
 
 async function login(page, email, home) {
   await page.goto('/login');
@@ -23,7 +24,7 @@ test.describe('Backoffice (admin)', () => {
     const email = `e2e-store-${Date.now()}@rat.test`;
     await page.getByPlaceholder('Repuestos Centro').fill('E2E Store');
     await page.getByPlaceholder('cuenta@email.com').fill(email);
-    await page.getByPlaceholder('Av. Bustillo 1240').fill('Mitre 100');
+    await pickAddress(page); // dirección obligatoria por autocompletado
     await page.getByRole('button', { name: /Crear usuario/i }).click();
 
     const box = page.locator('.float-notif', { hasText: 'Usuario creado' });

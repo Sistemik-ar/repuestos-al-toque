@@ -15,7 +15,7 @@ export default function Home() {
           <span>RepuestosAlToque <small style={{ display: 'block', fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>Bariloche · Patagonia</small></span>
         </Link>
         <div className="flex-center gap-12">
-          <Link href="/demo/" className="text-sm muted nowrap hide-mobile" style={{ fontWeight: 600 }}>Ver demo</Link>
+          <Link href="/demo/" prefetch={false} className="text-sm muted nowrap hide-mobile" style={{ fontWeight: 600 }}>Ver demo</Link>
           <Link href="/terminos" className="text-sm muted nowrap hide-mobile" style={{ fontWeight: 600 }}>Términos</Link>
           <Link href="/login" className="btn btn-primary btn-sm"><i className="fa-solid fa-right-to-bracket"></i> Ingresar</Link>
         </div>
@@ -117,7 +117,7 @@ export default function Home() {
           <div className="card glow text-center" style={{ padding: '40px 24px' }}>
             <h2 className="h-xl mb-8">Probá el producto</h2>
             <p className="subtle mb-24" style={{ maxWidth: 480, margin: '0 auto' }}>Recorré el flujo completo con cualquiera de los roles. Datos simulados, sin compromiso.</p>
-            <Link href="/demo/" className="btn btn-yellow btn-lg"><i className="fa-solid fa-play"></i> Ver la demo</Link>
+            <Link href="/demo/" prefetch={false} className="btn btn-yellow btn-lg"><i className="fa-solid fa-play"></i> Ver la demo</Link>
           </div>
         </section>
       </main>

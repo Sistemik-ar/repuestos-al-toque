@@ -184,10 +184,13 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await m.reload();
   await expect(m.getByText(/Entregado/i).first()).toBeVisible({ timeout: 15000 }); // timeline al final
   await expect(m.getByRole('heading', { name: /Calificá tu experiencia/i })).toBeVisible();
+  const ratingCard = m.locator('.card', { hasText: 'Calificá tu experiencia' });
   for (const fila of ['Vendedor', 'Producto', 'Delivery']) {
-    await m.locator('.flex-between', { hasText: fila }).locator('button').nth(4).click(); // 5 estrellas
+    await ratingCard.locator('.flex-between', { hasText: fila }).locator('button').nth(4).click(); // 5 estrellas
   }
-  await m.getByRole('button', { name: /Enviar calificación/i }).click();
+  const enviarCalif = m.getByRole('button', { name: /Enviar calificación/i });
+  await expect(enviarCalif).toBeEnabled(); // las 3 estrellas quedaron seteadas
+  await enviarCalif.click();
   await expect(m.getByText(/Gracias por calificar/i)).toBeVisible({ timeout: 10000 });
   // la escritura de la reseña puede tardar un instante en verse en la base -> poll
   await expect.poll(async () => (await storeRatingStats()).count, { timeout: 10000 }).toBeGreaterThan(before.count);

@@ -56,6 +56,14 @@ export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.c
   await p.user.updateMany({ where: { email: { in: emails } }, data: { passwordHash } });
 }
 
+// Restaura el email del comercio seed (lo identifica por su tradeName 'Repuestos Centro'),
+// tras probar el cambio de email desde el admin.
+export async function restoreSeedEmail() {
+  const p = db();
+  const prof = await p.storeProfile.findFirst({ where: { tradeName: 'Repuestos Centro' }, select: { userId: true } });
+  if (prof) await p.user.update({ where: { id: prof.userId }, data: { email: 'vendedor@repuestosaltoque.com.ar' } }).catch(() => {});
+}
+
 export async function storeRatingStats() {
   const p = db();
   const u = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });

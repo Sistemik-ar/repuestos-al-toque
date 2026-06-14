@@ -76,8 +76,15 @@ export default function Pedido() {
     setError('');
     const payload = { ...st, model: needsOther ? st.modelOther : st.model, jobId };
     setSearching(true);
-    const res = await addJobItem(payload);
-    setSearching(false);
+    let res;
+    try {
+      res = await addJobItem(payload);
+    } catch (e) {
+      // si la acción falla (red/DB), NO dejamos el spinner colgado: mostramos error y se puede reintentar
+      res = { error: 'No se pudo enviar el pedido. Revisá la conexión y reintentá.' };
+    } finally {
+      setSearching(false);
+    }
     if (res?.error) { setError(res.error); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     setJobId(res.jobId);
     setItemCount((c) => c + 1);

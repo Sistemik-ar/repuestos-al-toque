@@ -12,6 +12,16 @@ export async function login(page, email) {
 // patente única por corrida para no agrupar con trabajos de tests anteriores
 export const uniquePlate = () => 'AB' + String(Date.now() % 1000).padStart(3, '0') + 'CD';
 
+// Alta admin: la dirección es un autocompletado obligatorio (Nominatim). Escribe y elige la 1ra
+// sugerencia de Bariloche. Timeout amplio porque depende del servicio externo.
+export async function pickAddress(page, query = 'Mitre 100') {
+  await page.getByPlaceholder(/Escribí la calle/i).fill(query);
+  const opt = page.locator('.address-suggest button').first();
+  await expect(opt).toBeVisible({ timeout: 25000 });
+  await opt.click();
+  await expect(page.getByText(/Dirección validada en Bariloche/i)).toBeVisible({ timeout: 10000 });
+}
+
 // arma un trabajo con 1 ítem y deja la pantalla en "¿seguir comprando?"
 export async function crearItem(m, desc, plate) {
   await m.goto('/mecanico/pedido');
@@ -23,7 +33,7 @@ export async function crearItem(m, desc, plate) {
   await m.getByRole('button', { name: /Continuar/i }).click(); // urgencia
   await m.getByRole('button', { name: /Continuar/i }).click(); // confirmar
   await m.getByRole('button', { name: /Enviar pedido/i }).click();
-  await expect(m.getByText(/Repuesto agregado/i)).toBeVisible({ timeout: 15000 });
+  await expect(m.getByText(/Repuesto agregado/i)).toBeVisible({ timeout: 30000 });
 }
 
 // publica el trabajo y queda en /mecanico/trabajo

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, uniquePlate, crearItem, publicarTrabajo } from './helpers';
+import { login, uniquePlate, crearItem, publicarTrabajo, pickAddress } from './helpers';
 import { db, storeRatingStats, deliveryRatingStats, avgFromRatings } from './db';
 
 // Sistema de puntos y reputación:
@@ -131,7 +131,7 @@ test('comercio sin reseñas cotiza como "Nuevo" y ordena después del calificado
   await login(a, 'admin@repuestosaltoque.com.ar');
   await a.getByPlaceholder('Repuestos Centro').fill('E2E Nuevo Store');
   await a.getByPlaceholder('cuenta@email.com').fill(email);
-  await a.getByPlaceholder('Av. Bustillo 1240').fill('Mitre 100');
+  await pickAddress(a); // dirección obligatoria por autocompletado
   await a.getByRole('button', { name: /Crear usuario/i }).click();
   const box = a.locator('.float-notif', { hasText: 'Usuario creado' });
   await expect(box).toBeVisible({ timeout: 20000 });

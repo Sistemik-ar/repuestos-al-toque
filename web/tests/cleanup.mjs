@@ -17,6 +17,20 @@ if (jobIds.length) await p.job.deleteMany({ where: { id: { in: jobIds }, request
 // borradores de prueba sin ítems
 await p.job.deleteMany({ where: { requests: { none: {} }, status: 'DRAFT' } });
 
+// Reputación: ratingsCount/ratingAvg/points son SNAPSHOTS denormalizados. Al borrar reseñas E2E
+// quedan desincronizados con la tabla `rating` y eso hacía fallar el primer intento de procesos-reparto
+// (before=stale, after=recalculado). Los resincronizamos con lo que realmente quedó en la tabla.
+for (const m of ['storeProfile', 'deliveryProfile']) {
+  const kinds = m === 'storeProfile' ? ['SELLER', 'PRODUCT'] : ['DELIVERY'];
+  const profs = await p[m].findMany({ select: { userId: true } });
+  for (const { userId } of profs) {
+    const rows = await p.rating.findMany({ where: { toId: userId, kind: { in: kinds } }, select: { stars: true } });
+    const count = rows.length;
+    const avg = count ? Math.round((rows.reduce((a, r) => a + r.stars, 0) / count) * 10) / 10 : 0;
+    await p[m].update({ where: { userId }, data: { ratingsCount: count, ratingAvg: avg } }).catch(() => {});
+  }
+}
+
 // La CC entre cuentas seed SOLO se resetea con --full (el equipo la usa para probar)
 if (process.argv.includes('--full')) {
   const mech = await p.user.findUnique({ where: { email: 'mecanico@repuestosaltoque.com.ar' } });

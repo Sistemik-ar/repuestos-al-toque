@@ -69,7 +69,7 @@ export default function Login() {
         )}
 
         <p className="text-center text-sm muted mt-24">
-          ¿Solo querés ver el producto? <Link href="/demo/" className="text-purple" style={{ fontWeight: 700 }}>Recorré la demo →</Link>
+          ¿Solo querés ver el producto? <Link href="/demo/" prefetch={false} className="text-purple" style={{ fontWeight: 700 }}>Recorré la demo →</Link>
         </p>
       </div>
     </div>

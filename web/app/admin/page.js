@@ -249,7 +249,7 @@ function AddressAutocomplete({ value, picked, onType, onPick }) {
         ? <div className="text-xs text-green mt-4"><i className="fa-solid fa-circle-check"></i> Dirección validada en Bariloche</div>
         : value.trim().length >= 4 && <div className="text-xs muted mt-4">{loading ? 'Buscando…' : 'Elegí una opción del listado ↓'}</div>}
       {open && !picked && sug.length > 0 && (
-        <div className="card" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: 'auto', padding: 6 }}>
+        <div className="card address-suggest" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: 'auto', padding: 6 }}>
           {sug.map((c, i) => (
             <button key={i} type="button" className="btn btn-ghost btn-sm btn-block" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }}
               onClick={() => { onPick(c); setSug([]); setOpen(false); }}>
