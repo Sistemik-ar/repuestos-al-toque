@@ -46,7 +46,8 @@ export default function MecanicoDashboard() {
   }, []); // eslint-disable-line
 
   const activos = jobs.filter((jb) => ['DRAFT', 'OPEN', 'CLOSED'].includes(jb.status));
-  const coordinar = jobs.filter((jb) => ['PAID', 'DONE'].includes(jb.status));
+  const enEntrega = jobs.filter((jb) => jb.status === 'PAID'); // pagado, en tránsito
+  const entregados = jobs.filter((jb) => jb.status === 'DONE'); // todos los ítems entregados
   const cancelados = jobs.filter((jb) => jb.status === 'CANCELLED');
   const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-pen', 'En armado'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado'] };
   const veh = (jb) => `${jb.brand || ''} ${jb.model || ''}`.trim() || 'Vehículo';
@@ -88,7 +89,7 @@ export default function MecanicoDashboard() {
           <div className="rep-stats card" style={{ background: 'var(--bg-1)', padding: 12 }}>
             <div><div className="v">{jobs.length}</div><div className="l">Trabajos</div></div>
             <div><div className="v">⭐ 4.9</div><div className="l">Calificación</div></div>
-            <div><div className="v">{coordinar.length}</div><div className="l">Concretados</div></div>
+            <div><div className="v">{entregados.length}</div><div className="l">Concretados</div></div>
           </div>
         </div>
 
@@ -130,13 +131,25 @@ export default function MecanicoDashboard() {
           })}</div>}
         </div>
 
-        {coordinar.length > 0 && (
+        {enEntrega.length > 0 && (
           <div className="section">
             <div className="section-title"><h2>En entrega</h2></div>
-            <div className="cards-grid">{coordinar.map((jb) => (
+            <div className="cards-grid">{enEntrega.map((jb) => (
               <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
                 <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate} · #{jb.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
                 <div className="flex-between"><span className="text-xs muted">{jb.items.length} repuesto{jb.items.length === 1 ? '' : 's'} · seguilos desde el trabajo</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span></div>
+              </Link>
+            ))}</div>
+          </div>
+        )}
+
+        {entregados.length > 0 && (
+          <div className="section">
+            <div className="section-title"><h2>Entregados</h2><span className="text-xs muted">{entregados.length}</span></div>
+            <div className="cards-grid">{entregados.map((jb) => (
+              <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
+                <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate} · #{jb.code}</div><span className="badge badge-green"><i className="fa-solid fa-box-open"></i> Entregado</span></div>
+                <div className="flex-between"><span className="text-xs muted">{jb.items.length} repuesto{jb.items.length === 1 ? '' : 's'} · entregado</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span></div>
               </Link>
             ))}</div>
           </div>

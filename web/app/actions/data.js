@@ -364,6 +364,13 @@ export async function markDelivered(orderId, pin) {
   const upd = await prisma.order.updateMany({ where: { id: orderId, status: 'SHIPPED' }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
   if (upd.count === 0) return { error: 'Este pedido ya fue entregado' };
   await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
+  // si ya se entregaron TODOS los ítems comprados del trabajo, el trabajo pasa a ENTREGADO (DONE).
+  // Sin esto quedaba "Pagado" para siempre del lado del mecánico.
+  const reqRow = await prisma.request.findUnique({ where: { id: o.requestId }, select: { jobId: true } });
+  if (reqRow?.jobId) {
+    const pendientes = await prisma.request.count({ where: { jobId: reqRow.jobId, status: { in: ['PAID', 'SHIPPED'] } } });
+    if (pendientes === 0) await prisma.job.update({ where: { id: reqRow.jobId }, data: { status: 'DONE' } }).catch(() => {});
+  }
   // venta concretada: +1 punto al vendedor y +1 al repartidor (de acá salen niveles/insignias)
   await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { points: { increment: 1 } } }).catch(() => {});
   await prisma.deliveryProfile.update({ where: { userId: s.id }, data: { points: { increment: 1 } } }).catch(() => {});

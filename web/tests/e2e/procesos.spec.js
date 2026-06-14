@@ -200,5 +200,12 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await s.getByRole('button', { name: /Concretadas/i }).click();
   await expect(s.locator('.card', { hasText: desc }).getByText(/Entregado al mecánico/i)).toBeVisible({ timeout: 15000 });
 
+  // 9) el MECÁNICO ve el trabajo como ENTREGADO (pasó de "Pagado" a "Entregado", sección "Entregados")
+  await m.goto('/mecanico');
+  const jobCard = m.locator('.card', { hasText: plate });
+  await expect(jobCard.first()).toBeVisible({ timeout: 15000 });
+  await expect(jobCard.getByText(/Entregado/i).first()).toBeVisible({ timeout: 15000 });
+  await expect(jobCard.getByText('Pagado')).toHaveCount(0); // ya no figura "Pagado"
+
   await mc.close(); await sc.close(); await dc.close();
 });
