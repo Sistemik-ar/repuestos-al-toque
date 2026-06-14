@@ -74,6 +74,12 @@ export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.c
   await p.user.updateMany({ where: { email: { in: emails } }, data: { passwordHash } });
 }
 
+// Reactiva las cuentas seed (tras probar la suspensión desde el admin).
+export async function reactivateSeed(emails = ['vendedor@repuestosaltoque.com.ar']) {
+  const p = db();
+  await p.user.updateMany({ where: { email: { in: emails } }, data: { status: 'ACTIVE' } });
+}
+
 // Restaura el email del comercio seed (lo identifica por su tradeName 'Repuestos Centro'),
 // tras probar el cambio de email desde el admin.
 export async function restoreSeedEmail() {

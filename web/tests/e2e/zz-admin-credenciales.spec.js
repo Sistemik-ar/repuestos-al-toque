@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
-import { restoreSeedPassword, restoreSeedEmail } from './db';
+import { restoreSeedPassword, restoreSeedEmail, reactivateSeed } from './db';
 
 const VENDEDOR = 'vendedor@repuestosaltoque.com.ar';
 
-// Corre al final (zz-) y restaura pass + email seed, para no afectar a los demás specs que loguean como vendedor.
-test.afterAll(async () => { await restoreSeedEmail(); await restoreSeedPassword([VENDEDOR]); });
+// Corre al final (zz-) y restaura pass + email + estado seed, para no afectar a los demás specs.
+test.afterAll(async () => { await restoreSeedEmail(); await restoreSeedPassword([VENDEDOR]); await reactivateSeed([VENDEDOR]); });
 
 test('el admin setea una contraseña temporal a un comercio y este entra con ella', async ({ browser }) => {
   test.setTimeout(90000);
@@ -30,6 +30,7 @@ test('el admin setea una contraseña temporal a un comercio y este entra con ell
   await s.getByRole('button', { name: /Ingresar/i }).click();
   await expect(s).toHaveURL(/\/comercio/, { timeout: 15000 }); // entró a su panel
 
+  await restoreSeedPassword([VENDEDOR]); // restaurar ya (no esperar al afterAll) para no romper los tests siguientes
   await ac.close(); await sc.close();
 });
 
@@ -44,6 +45,35 @@ test('el admin cambia el email de un comercio', async ({ browser }) => {
   await row.getByRole('button', { name: /Email/i }).click();
   await expect(a.getByText(/Email actualizado/i)).toBeVisible({ timeout: 10000 });
   await expect(a.locator('tr', { hasText: nuevo })).toBeVisible({ timeout: 10000 }); // la tabla refleja el nuevo email
-  // (el afterAll restaura el email seed)
+  await restoreSeedEmail(); // restaurar ya para no romper los tests siguientes
   await ac.close();
+});
+
+test('el admin suspende un comercio: no puede entrar; al reactivarlo, sí', async ({ browser }) => {
+  test.setTimeout(60000);
+  const ac = await browser.newContext(); const a = await ac.newPage();
+  await login(a, 'admin@repuestosaltoque.com.ar');
+  const row = a.locator('tr', { hasText: VENDEDOR });
+  await expect(row).toBeVisible({ timeout: 15000 });
+
+  // suspender
+  await row.getByRole('button', { name: /Suspender/i }).click();
+  await expect(a.locator('tr', { hasText: VENDEDOR }).getByText(/SUSPENDED/)).toBeVisible({ timeout: 10000 });
+
+  // el comercio NO puede entrar
+  const sc = await browser.newContext(); const s = await sc.newPage();
+  await s.goto('/login');
+  await s.fill('input[type="email"]', VENDEDOR);
+  await s.fill('input[type="password"]', 'repuestos123');
+  await s.getByRole('button', { name: /Ingresar/i }).click();
+  await expect(s.getByText(/suspendida/i)).toBeVisible({ timeout: 10000 });
+  await expect(s).not.toHaveURL(/\/comercio/);
+
+  // reactivar y ahora SÍ entra
+  await a.locator('tr', { hasText: VENDEDOR }).getByRole('button', { name: /Reactivar/i }).click();
+  await expect(a.locator('tr', { hasText: VENDEDOR }).getByText(/ACTIVE/)).toBeVisible({ timeout: 10000 });
+  await s.getByRole('button', { name: /Ingresar/i }).click();
+  await expect(s).toHaveURL(/\/comercio/, { timeout: 15000 });
+
+  await ac.close(); await sc.close();
 });
