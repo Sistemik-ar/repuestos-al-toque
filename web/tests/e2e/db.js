@@ -74,6 +74,18 @@ export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.c
   await p.user.updateMany({ where: { email: { in: emails } }, data: { passwordHash } });
 }
 
+// Crea/activa una cuenta corriente entre el mecánico y el comercio seed (para probar el checkout con CC).
+export async function ensureCC(mechEmail = 'mecanico@repuestosaltoque.com.ar', storeEmail = 'vendedor@repuestosaltoque.com.ar') {
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: mechEmail } });
+  const store = await p.user.findUnique({ where: { email: storeEmail } });
+  await p.creditAccount.upsert({
+    where: { mechanicId_storeId: { mechanicId: mech.id, storeId: store.id } },
+    update: { active: true, adminStatus: 'APPROVED', storeStatus: 'APPROVED' },
+    create: { mechanicId: mech.id, storeId: store.id, active: true, adminStatus: 'APPROVED', storeStatus: 'APPROVED' },
+  });
+}
+
 // Reactiva las cuentas seed (tras probar la suspensión desde el admin).
 export async function reactivateSeed(emails = ['vendedor@repuestosaltoque.com.ar']) {
   const p = db();

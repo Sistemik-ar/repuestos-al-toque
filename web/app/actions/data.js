@@ -922,5 +922,10 @@ export async function cancelItem(itemId) {
   if (['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) return { error: 'Este ítem ya fue pagado' };
   if (r.job && ['CLOSED', 'PAID'].includes(r.job.status)) return { error: 'El link de pago ya fue generado; cancelá el trabajo completo' };
   await prisma.request.update({ where: { id: itemId }, data: { status: 'CANCELLED' } });
+  // si no queda NINGÚN ítem vivo en el trabajo, el trabajo entero pasa a CANCELADO (no queda zombie activo)
+  if (r.jobId) {
+    const vivos = await prisma.request.count({ where: { jobId: r.jobId, status: { not: 'CANCELLED' } } });
+    if (vivos === 0) await prisma.job.update({ where: { id: r.jobId }, data: { status: 'CANCELLED' } }).catch(() => {});
+  }
   return { ok: true };
 }
