@@ -1,5 +1,6 @@
 import './globals.css';
 import Toaster from '@/components/Toaster';
+import EnvBadge from '@/components/EnvBadge';
 
 const SITE = 'https://www.repuestosaltoque.com.ar';
 
@@ -66,6 +67,7 @@ export default function RootLayout({ children }) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body>
+        <EnvBadge />
         <Toaster />
         {children}
       </body>
