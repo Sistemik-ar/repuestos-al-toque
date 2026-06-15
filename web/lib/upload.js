@@ -3,7 +3,9 @@
 // formatos (HEIC de iPhone incluido, si el navegador puede decodificarlo) y reduce peso.
 import { supabase } from '@/lib/supabaseClient';
 
-const BUCKET = 'uploads';
+// En staging se usa otro bucket (NEXT_PUBLIC_UPLOAD_BUCKET="staging_uploads") para no
+// mezclar fotos con prod. En prod la var no está y cae a "uploads".
+const BUCKET = process.env.NEXT_PUBLIC_UPLOAD_BUCKET || 'uploads';
 const MAX_DIM = 1600;
 
 async function toJpeg(file) {
