@@ -29,7 +29,10 @@ async function toJpeg(file) {
 export async function uploadPhoto(file, folder = 'pedidos') {
   if (!supabase) throw new Error('Supabase no configurado.');
   const body = await toJpeg(file);
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  // En staging (NEXT_PUBLIC_UPLOAD_PREFIX="staging") las fotos van a "staging/..." para no
+  // mezclarse con las de prod en el mismo bucket. En prod la var no está y el prefijo es "".
+  const prefix = process.env.NEXT_PUBLIC_UPLOAD_PREFIX;
+  const path = `${prefix ? prefix.replace(/\/+$/, '') + '/' : ''}${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, body, {
     upsert: false,
     contentType: 'image/jpeg',
