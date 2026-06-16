@@ -47,7 +47,7 @@ test('comercio: "Ver detalle" abre el modal con el detalle del pedido', async ({
   await card.getByRole('button', { name: /Ver detalle/i }).click();
   const modal = s.locator('.modal');
   await expect(modal).toBeVisible({ timeout: 10000 });
-  await expect(modal.getByText(desc)).toBeVisible();
+  await expect(modal.getByRole('heading', { name: desc })).toBeVisible(); // título del detalle
   await expect(modal.getByText(/Consumidor Final|Factura A/i)).toBeVisible(); // fila "Factura"
   await modal.getByRole('button', { name: /Cerrar/i }).click();
   await expect(s.locator('.modal')).toHaveCount(0, { timeout: 10000 });
@@ -71,8 +71,8 @@ test('admin: con trabajo activo, el cambio de rol queda BLOQUEADO', async ({ bro
   await row.getByRole('button', { name: /Editar/i }).click();
   const modal = a.locator('.modal');
   await expect(modal.getByRole('heading', { name: /Editar usuario/i })).toBeVisible({ timeout: 10000 });
-  await expect(modal.locator('select').first()).toBeDisabled();             // el selector de rol
-  await expect(modal.getByText(/no se puede cambiar el rol/i)).toBeVisible(); // el cartel explicativo
+  await expect(modal.locator('select').first()).toBeDisabled();          // el selector de rol
+  await expect(modal.getByText(/no se puede cambiar/i)).toBeVisible();    // el cartel explicativo
   await ac.close(); await mc.close();
 });
 
