@@ -37,6 +37,19 @@ export function fmtTime(s) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// Fecha+hora de Bariloche (UTC-3 fijo, Argentina no tiene DST) en formato dd/mm/aaaa hh:mm,
+// sin importar el huso del dispositivo. Recibe epoch ms (o Date). Devuelve '—' si no hay fecha.
+export function fmtDateTime(ms) {
+  if (ms == null || ms === '') return '—';
+  const d = ms instanceof Date ? ms : new Date(Number(ms));
+  if (isNaN(d.getTime())) return '—';
+  const p = new Intl.DateTimeFormat('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(d).reduce((a, x) => ((a[x.type] = x.value), a), {});
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
+}
+
 // Reputación / badges (mismas reglas que el mock)
 const tiers = {
   mechanic: [

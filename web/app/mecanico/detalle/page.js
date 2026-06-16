@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { money, toast } from '@/lib/ui';
+import { money, toast, fmtDateTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useRouter } from 'next/navigation';
 import { getRequestDetail, rateOrder, getMyRatingsForOrder, duplicateRequest } from '@/app/actions/data';
@@ -85,6 +85,7 @@ export default function Detalle() {
               <Row k="Repuesto" v={r.desc || r.catLabel} />
               <Row k="Vehículo" v={veh || '—'} />
               <Row k="Categoría" v={r.catLabel || '—'} />
+              <Row k="Fecha del pedido" v={fmtDateTime(r.createdAt)} />
               <Row k="Urgencia" v={r.urgency} />
               <Row k="Factura" v={r.invoiceType === 'factura_a' ? `Factura A · ${r.solicRazon || ''} ${r.solicCuit ? '(CUIT ' + r.solicCuit + ')' : ''}` : 'Consumidor Final'} />
               {r.photoUrls?.length > 0 && (

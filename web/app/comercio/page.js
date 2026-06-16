@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { toast, ping, tierFor } from '@/lib/ui';
+import { toast, ping, tierFor, fmtDateTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
@@ -158,6 +158,7 @@ export default function Comercio() {
               <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-file-invoice text-yellow"></i><div className="text-xs subtle"><b>Factura A</b> a nombre de: {r.solicRazon || '—'} {r.solicCuit ? `(CUIT ${r.solicCuit})` : ''}. Emitís vos con tu CUIT.</div></div>
             )}
             {r.photoUrls?.length > 0 && <div className="flex gap-8 mb-12">{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" onClick={() => setZoom(u)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />)}</div>}
+            <div className="text-xs muted mb-12"><i className="fa-regular fa-clock"></i> {fmtDateTime(r.createdAt)}</div>
             <div className="locked-info mb-12"><i className="fa-solid fa-user-secret"></i> Mecánico anónimo hasta concretar</div>
             <button className="btn btn-ghost btn-sm btn-block mb-8" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
             <div className="flex gap-12">
@@ -194,7 +195,7 @@ export default function Comercio() {
                     ) : (
                       <div className="flex-between text-sm mb-8"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
                     )}
-                    <div className="text-xs muted mb-8"><i className="fa-regular fa-clock"></i> {esPago ? `eligió ${timeAgo(r.selectedAt)}` : timeAgo(r.createdAt)}</div>
+                    <div className="text-xs muted mb-8"><i className="fa-regular fa-clock"></i> {esPago ? `eligió ${timeAgo(r.selectedAt)}` : timeAgo(r.createdAt)} · {fmtDateTime(esPago ? r.selectedAt : r.createdAt)}</div>
                     <button className="btn btn-ghost btn-block btn-sm mb-8" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
                     {g.titulo === 'Esperando decisión' && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
                   </div>
@@ -238,6 +239,7 @@ function DetalleModal({ r, onClose }) {
           <DRow k="Vehículo" v={veh || '—'} />
           {r.vin && <DRow k="VIN / Chasis" v={r.vin} />}
           <DRow k="Urgencia" v={r.urgency || '—'} />
+          <DRow k="Fecha del pedido" v={fmtDateTime(r.createdAt)} />
           <DRow k="Factura" v={r.invoiceType === 'factura_a' ? 'Factura A' : 'Consumidor Final'} />
           {r.invoiceType === 'factura_a' && <DRow k="A nombre de" v={`${r.solicRazon || '—'}${r.solicCuit ? ` · CUIT ${r.solicCuit}` : ''}`} />}
         </div>
@@ -245,6 +247,7 @@ function DetalleModal({ r, onClose }) {
         {isSale && (
           <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
             <DRow k="Mecánico" v={r.mechanicName || '—'} />
+            <DRow k="Fecha de venta" v={fmtDateTime(r.soldAt)} />
             <DRow k="Monto de la venta" v={r.part ? '$' + r.part.toLocaleString('es-AR') : '—'} />
             <DRow k="Estado" v={ESTADO[r.orderStatus] || r.orderStatus || '—'} />
             {r.creditAccount && <DRow k="Cuenta corriente" v={r.creditSettledAt ? 'Sí · procesada' : 'Sí · pendiente de procesar'} />}
@@ -270,7 +273,6 @@ function PorCobrar({ sales, onChanged }) {
   const cc = sales.filter((r) => r.creditAccount);
   const sum = (xs) => xs.reduce((a, r) => a + (r.part || 0), 0);
   const pendientes = cc.filter((r) => !r.creditSettledAt);
-  const fmt = (ms) => (ms ? new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—');
 
   async function marcar(r, on) {
     const res = await markCreditSettled(r.orderId, on);
@@ -299,7 +301,7 @@ function PorCobrar({ sales, onChanged }) {
                 {cc.map((r) => (
                   <tr key={r.orderId} style={r.creditSettledAt ? { opacity: 0.5 } : {}}>
                     <td className="text-xs">{r.desc || r.catLabel || 'Repuesto'}{r.desc && r.catLabel ? <span className="muted"> · {r.catLabel}</span> : null}</td>
-                    <td className="text-xs">{fmt(r.soldAt)}</td>
+                    <td className="text-xs">{fmtDateTime(r.soldAt)}</td>
                     <td className="text-xs">{r.mechanicName}</td>
                     <td className="text-xs" style={{ fontWeight: 800 }}>{r.part ? '$' + r.part.toLocaleString('es-AR') : '—'}</td>
                     <td>{r.creditSettledAt
@@ -347,6 +349,7 @@ function EntregaCard({ r, label, veh, onChanged, onDetail }) {
         {r.orderStatus === 'PAID' && !r.hasDelivery && <span className="badge badge-gray"><i className="fa-solid fa-clock"></i> Esperando repartidor</span>}
         {r.orderStatus === 'PAID' && r.hasDelivery && <span className="badge badge-yellow"><i className="fa-solid fa-motorcycle"></i> Repartidor en camino a tu local</span>}
       </div>
+      <div className="text-xs muted mb-12"><i className="fa-regular fa-clock"></i> {fmtDateTime(r.soldAt)}</div>
       {r.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle"><b>Incidencia:</b> {r.issue}</span></div>}
       {r.orderStatus === 'PAID' && r.hasDelivery && (
         <div>

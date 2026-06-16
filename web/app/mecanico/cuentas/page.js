@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { toast } from '@/lib/ui';
+import { toast, fmtDateTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { getStoresForCredit, requestCreditAccount, getMyCreditPurchases } from '@/app/actions/data';
 import Loading from '@/components/Loading';
@@ -78,7 +78,7 @@ export default function Cuentas() {
                 {compras.map((c) => (
                   <tr key={c.orderId}>
                     <td className="text-xs">{c.producto}{c.brand || c.model ? <span className="muted"> · {`${c.brand || ''} ${c.model || ''}`.trim()}</span> : null}</td>
-                    <td className="text-xs">{c.soldAt ? new Date(c.soldAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}</td>
+                    <td className="text-xs">{fmtDateTime(c.soldAt)}</td>
                     <td className="text-xs">{c.storeName}</td>
                     <td className="text-xs" style={{ fontWeight: 800 }}>{c.part ? '$' + c.part.toLocaleString('es-AR') : '—'}</td>
                     <td>{c.settled
