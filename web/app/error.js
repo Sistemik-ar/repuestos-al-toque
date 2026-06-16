@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 // Error boundary global. Caso principal: después de un deploy, una pestaña vieja pide un
 // chunk de JS que ya no existe en el server (cambió el hash) -> "client-side exception".
@@ -9,7 +10,7 @@ export default function Error({ error, reset }) {
   useEffect(() => {
     const msg = `${error?.name || ''} ${error?.message || ''}`;
     const staleChunk = /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported|Failed to fetch dynamically|importing a module script failed/i.test(msg);
-    if (!staleChunk) return;
+    if (!staleChunk) { Sentry.captureException(error); return; } // error real -> a Sentry (si hay DSN)
     const KEY = 'rat_reload_at';
     const last = Number(sessionStorage.getItem(KEY) || 0);
     if (Date.now() - last > 10000) {
