@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getStoresForCredit, requestCreditAccount } from '@/app/actions/data';
+import { getStoresForCredit, requestCreditAccount, getMyCreditPurchases } from '@/app/actions/data';
 import Loading from '@/components/Loading';
 import BusyButton from '@/components/BusyButton';
 
@@ -17,8 +17,14 @@ const BADGE = {
 
 export default function Cuentas() {
   const [stores, setStores] = useState([]);
+  const [compras, setCompras] = useState([]); // compras hechas en cuenta corriente
   const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
-  const load = async () => { try { const d = await getStoresForCredit(); setStores((p) => keep(p, d || [])); setLoaded(true); } catch {} };
+  const load = async () => {
+    try {
+      const [d, c] = await Promise.all([getStoresForCredit(), getMyCreditPurchases()]);
+      setStores((p) => keep(p, d || [])); setCompras((p) => keep(p, c || [])); setLoaded(true);
+    } catch {}
+  };
   usePoll(load, 6000);
 
   async function solicitar(st) {
@@ -57,6 +63,33 @@ export default function Cuentas() {
             </div>
           );
         })}
+
+        {/* Control de las compras hechas en cuenta corriente (lo que el mecánico le debe a cada comercio) */}
+        <div className="section-title mt-24"><h2>Mis compras en cuenta corriente</h2>{compras.length > 0 && <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + compras.reduce((a, c) => a + (c.part || 0), 0).toLocaleString('es-AR')}</span>}</div>
+        {!loaded ? (
+          <Loading label="Cargando compras…" />
+        ) : compras.length === 0 ? (
+          <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-id-card-clip"></i></div><div className="text-sm">Todavía no compraste con cuenta corriente</div><div className="text-xs">Cuando elijas pagar un repuesto con CC, aparece acá</div></div>
+        ) : (
+          <div className="card" style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead><tr><th>Producto</th><th>Fecha</th><th>Comercio</th><th>Monto</th><th>Estado</th></tr></thead>
+              <tbody>
+                {compras.map((c) => (
+                  <tr key={c.orderId}>
+                    <td className="text-xs">{c.producto}{c.brand || c.model ? <span className="muted"> · {`${c.brand || ''} ${c.model || ''}`.trim()}</span> : null}</td>
+                    <td className="text-xs">{c.soldAt ? new Date(c.soldAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'}</td>
+                    <td className="text-xs">{c.storeName}</td>
+                    <td className="text-xs" style={{ fontWeight: 800 }}>{c.part ? '$' + c.part.toLocaleString('es-AR') : '—'}</td>
+                    <td>{c.settled
+                      ? <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Procesada por el comercio</span>
+                      : <span className="badge badge-yellow"><i className="fa-solid fa-clock"></i> Pendiente</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

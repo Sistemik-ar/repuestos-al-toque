@@ -243,7 +243,28 @@ export async function getOpenRequestsForStore() {
 export async function getStoreSales() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return [];
   const orders = await prisma.order.findMany({ where: { storeId: s.id, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
-  return orders.map((o) => ({ orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount, arrivedPickup: !!o.arrivedPickupAt, issue: o.issue || null, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request) }));
+  // nombre del mecánico (taller): en ventas ya concretadas no hay anonimato — el comercio necesita
+  // saber a quién le vendió, sobre todo para las que van a cuenta corriente.
+  const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
+  const mechs = await prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true } });
+  const mechName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
+  return orders.map((o) => ({
+    orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount,
+    creditSettledAt: o.creditSettledAt ? o.creditSettledAt.getTime() : null,
+    soldAt: o.createdAt?.getTime() || 0, mechanicName: mechName[o.mechanicId] || 'Taller',
+    arrivedPickup: !!o.arrivedPickupAt, issue: o.issue || null, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request),
+  }));
+}
+
+// El comercio marca (o desmarca) una venta en cuenta corriente como "procesada internamente"
+// en su sistema/contabilidad. No mueve plata: es un control de seguimiento del cobro al taller.
+export async function markCreditSettled(orderId, settled = true) {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { storeId: true, creditAccount: true } });
+  if (!o || o.storeId !== s.id) return { error: 'Venta no encontrada' };
+  if (!o.creditAccount) return { error: 'Esta venta no es en cuenta corriente.' };
+  await prisma.order.update({ where: { id: orderId }, data: { creditSettledAt: settled ? new Date() : null } });
+  return { ok: true };
 }
 
 export async function createQuote(requestId, input) {
@@ -751,6 +772,22 @@ export async function getMyCreditAccounts() {
   const stores = await prisma.storeProfile.findMany({ where: { userId: { in: ccs.map((c) => c.storeId) } }, select: { userId: true, tradeName: true } });
   const nameOf = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
   return ccs.map((c) => ({ id: c.id, storeName: nameOf[c.storeId] || 'Comercio', status: creditStatus(c) }));
+}
+
+// Control del mecánico: las compras que hizo en cuenta corriente (repuesto no cobrado por la
+// plataforma, lo debe al comercio). Producto · fecha · comercio · monto · si el comercio ya lo procesó.
+export async function getMyCreditPurchases() {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return [];
+  const orders = await prisma.order.findMany({ where: { mechanicId: s.id, creditAccount: true, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } });
+  const storeIds = [...new Set(orders.map((o) => o.storeId))];
+  const stores = await prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } });
+  const nameOf = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
+  return orders.map((o) => ({
+    orderId: o.id, soldAt: o.createdAt?.getTime() || 0, part: num(o.partAmount),
+    storeName: nameOf[o.storeId] || 'Comercio', settled: !!o.creditSettledAt,
+    producto: o.request?.description || o.request?.category?.name || 'Repuesto',
+    code: o.request?.code, brand: o.request?.brand, model: o.request?.model, year: o.request?.year,
+  }));
 }
 
 // Comercios disponibles para solicitar CC + estado actual con este mecánico.

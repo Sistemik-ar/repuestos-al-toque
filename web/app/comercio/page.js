@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 import Loading from '@/components/Loading';
@@ -127,28 +127,8 @@ export default function Comercio() {
 
         <CreditRequestsStore />
 
-        {/* Por cobrar: quién le debe plata al vendedor */}
-        {sales.length > 0 && (() => {
-          const plataforma = sales.filter((r) => !r.creditAccount);
-          const cc = sales.filter((r) => r.creditAccount);
-          const sum = (xs) => xs.reduce((a, r) => a + (r.part || 0), 0);
-          return (
-            <div className="card mb-16">
-              <div className="section-title"><h2>Por cobrar</h2></div>
-              <div className="flex-between mb-8">
-                <span className="text-sm subtle"><i className="fa-solid fa-building-columns text-purple"></i> Te liquida RepuestosAlToque</span>
-                <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(plataforma).toLocaleString('es-AR')} <span className="text-xs muted">({plataforma.length} venta{plataforma.length === 1 ? '' : 's'})</span></span>
-              </div>
-              {cc.length > 0 && (
-                <div className="flex-between">
-                  <span className="text-sm subtle"><i className="fa-solid fa-id-card-clip text-yellow"></i> En cuenta corriente (te debe el taller)</span>
-                  <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(cc).toLocaleString('es-AR')} <span className="text-xs muted">({cc.length})</span></span>
-                </div>
-              )}
-              <div className="text-xs muted mt-8">Liquidación semanal de las ventas cobradas por la plataforma.</div>
-            </div>
-          );
-        })()}
+        {/* Por cobrar: quién le debe plata al vendedor (con detalle de cuenta corriente) */}
+        {sales.length > 0 && <PorCobrar sales={sales} onChanged={load} />}
 
         <div className="pill-tabs mb-16">
           <button className={tab === 'pend' ? 'active' : ''} onClick={() => setTab('pend')}>Pendientes <span className="badge badge-yellow" style={{ marginLeft: 4 }}>{pend.length}</span></button>
@@ -231,6 +211,58 @@ export default function Comercio() {
   );
 }
 
+function PorCobrar({ sales, onChanged }) {
+  const plataforma = sales.filter((r) => !r.creditAccount);
+  const cc = sales.filter((r) => r.creditAccount);
+  const sum = (xs) => xs.reduce((a, r) => a + (r.part || 0), 0);
+  const pendientes = cc.filter((r) => !r.creditSettledAt);
+  const fmt = (ms) => (ms ? new Date(ms).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—');
+
+  async function marcar(r, on) {
+    const res = await markCreditSettled(r.orderId, on);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: on ? 'Marcado como procesado' : 'Vuelto a pendiente', icon: on ? 'fa-check' : 'fa-rotate-left', type: 'green' });
+    onChanged?.();
+  }
+
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Por cobrar</h2></div>
+      <div className="flex-between mb-8">
+        <span className="text-sm subtle"><i className="fa-solid fa-building-columns text-purple"></i> Te liquida RepuestosAlToque</span>
+        <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(plataforma).toLocaleString('es-AR')} <span className="text-xs muted">({plataforma.length} venta{plataforma.length === 1 ? '' : 's'})</span></span>
+      </div>
+      {cc.length > 0 && (
+        <>
+          <div className="flex-between mb-8">
+            <span className="text-sm subtle"><i className="fa-solid fa-id-card-clip text-yellow"></i> En cuenta corriente (te debe el taller)</span>
+            <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(cc).toLocaleString('es-AR')} <span className="text-xs muted">({pendientes.length} sin procesar)</span></span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
+              <thead><tr><th>Producto</th><th>Fecha</th><th>Mecánico</th><th>Monto</th><th></th></tr></thead>
+              <tbody>
+                {cc.map((r) => (
+                  <tr key={r.orderId} style={r.creditSettledAt ? { opacity: 0.5 } : {}}>
+                    <td className="text-xs">{r.desc || r.catLabel || 'Repuesto'}{r.desc && r.catLabel ? <span className="muted"> · {r.catLabel}</span> : null}</td>
+                    <td className="text-xs">{fmt(r.soldAt)}</td>
+                    <td className="text-xs">{r.mechanicName}</td>
+                    <td className="text-xs" style={{ fontWeight: 800 }}>{r.part ? '$' + r.part.toLocaleString('es-AR') : '—'}</td>
+                    <td>{r.creditSettledAt
+                      ? <button className="btn btn-ghost btn-sm" onClick={() => marcar(r, false)} title="Volver a pendiente"><i className="fa-solid fa-circle-check text-green"></i> Procesado</button>
+                      : <button className="btn btn-yellow btn-sm" onClick={() => marcar(r, true)}><i className="fa-solid fa-check"></i> Marcar procesado</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      <div className="text-xs muted mt-8">Las ventas por plataforma te las liquida RepuestosAlToque (semanal). Las de cuenta corriente se las cobrás vos al taller — marcalas cuando las proceses internamente.</div>
+    </div>
+  );
+}
+
 function EntregaCard({ r, label, veh, onChanged }) {
   const [pin, setPin] = useState('');
   const [sending, setSending] = useState(false); // evita doble-confirmación + da feedback
@@ -247,7 +279,13 @@ function EntregaCard({ r, label, veh, onChanged }) {
   }
   return (
     <div className="card mb-12">
-      <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
+      <div className="flex-between mb-8">
+        <div><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div>
+        <div className="flex-center gap-8" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {r.creditAccount && <span className="badge badge-yellow"><i className="fa-solid fa-id-card-clip"></i> Cta. corriente{r.creditSettledAt ? ' · procesada' : ''}</span>}
+          <span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span>
+        </div>
+      </div>
       <div className="flex-between mb-12">
         <span className="text-sm muted">Venta <b className="text-green">{r.part ? '$' + r.part.toLocaleString('es-AR') : ''}</b></span>
         {r.orderStatus === 'SHIPPED' && <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retirado · en camino al taller</span>}
