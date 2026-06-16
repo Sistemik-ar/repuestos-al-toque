@@ -100,6 +100,40 @@ export async function restoreSeedEmail() {
   if (prof) await p.user.update({ where: { id: prof.userId }, data: { email: 'vendedor@repuestosaltoque.com.ar' } }).catch(() => {});
 }
 
+// Siembra una venta YA CONCRETADA (Order) directo en la base, sin pasar por el flujo de pago/MP.
+// Sirve para probar "Por cobrar" / cuenta corriente sin depender de Mercado Pago.
+export async function seedCreditSale({ mechEmail = 'mecanico@repuestosaltoque.com.ar', storeEmail = 'vendedor@repuestosaltoque.com.ar', desc = 'Pastillas E2E CC', amount = 45000, status = 'DELIVERED', creditAccount = true } = {}) {
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: mechEmail } });
+  const store = await p.user.findUnique({ where: { email: storeEmail } });
+  const stamp = Date.now() + Math.floor(Math.random() * 1000);
+  const job = await p.job.create({ data: { code: 'JCC' + stamp, mechanicId: mech.id, plate: 'CC' + (stamp % 100000), brand: 'Toyota', model: 'Hilux', status: status === 'DELIVERED' ? 'DONE' : 'PAID' } });
+  const req = await p.request.create({ data: { code: 'RCC' + stamp, mechanicId: mech.id, jobId: job.id, description: desc, status: status === 'DELIVERED' ? 'DELIVERED' : 'PAID', photoUrls: [] } });
+  const quote = await p.requestQuote.create({ data: { requestId: req.id, storeId: store.id, alias: 'Casa A', price: amount, status: 'SELECTED', photoUrls: [] } });
+  const order = await p.order.create({ data: { requestId: req.id, quoteId: quote.id, mechanicId: mech.id, storeId: store.id, partAmount: amount, commissionAmount: 0, total: 0, creditAccount, status } });
+  return { jobId: job.id, requestId: req.id, quoteId: quote.id, orderId: order.id };
+}
+
+// Borra una venta sembrada (orden -> request[cascada quote] -> job).
+export async function removeSeededSale({ orderId, requestId, jobId } = {}) {
+  const p = db();
+  if (orderId) await p.order.delete({ where: { id: orderId } }).catch(() => {});
+  if (requestId) await p.request.delete({ where: { id: requestId } }).catch(() => {});
+  if (jobId) await p.job.delete({ where: { id: jobId } }).catch(() => {});
+}
+
+// Borra los trabajos (y sus requests/orders) de una patente — limpieza de tests que crean pedidos por UI.
+export async function removeJobByPlate(plate) {
+  const p = db();
+  const jobs = await p.job.findMany({ where: { plate }, select: { id: true } });
+  for (const j of jobs) {
+    const reqs = await p.request.findMany({ where: { jobId: j.id }, select: { id: true } });
+    for (const r of reqs) await p.order.deleteMany({ where: { requestId: r.id } }).catch(() => {});
+    await p.request.deleteMany({ where: { jobId: j.id } }).catch(() => {});
+    await p.job.delete({ where: { id: j.id } }).catch(() => {});
+  }
+}
+
 export async function storeRatingStats() {
   const p = db();
   const u = await p.user.findUnique({ where: { email: 'vendedor@repuestosaltoque.com.ar' } });

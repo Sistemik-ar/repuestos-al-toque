@@ -725,7 +725,8 @@ export async function updateUser(userId, input) {
       const up = { workshopName: input.name ?? exMech?.workshopName ?? null, barrio: input.barrio ?? exMech?.barrio ?? null, ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
       await prisma.mechanicProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
     } else if (role === 'STORE') {
-      const up = { tradeName: input.name || exStore?.tradeName || 'Comercio', cuit: input.cuit ?? exStore?.cuit ?? null, ivaCondition: input.ivaCondition ?? exStore?.ivaCondition ?? null, barrio: input.barrio ?? exStore?.barrio ?? null, ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
+      // cuit es @unique: vacío DEBE ir como null (si no, dos comercios sin CUIT chocan con '' duplicado).
+      const up = { tradeName: input.name || exStore?.tradeName || 'Comercio', cuit: input.cuit != null ? txt(input.cuit, 20) : (exStore?.cuit ?? null), ivaCondition: input.ivaCondition || exStore?.ivaCondition || null, barrio: input.barrio != null ? txt(input.barrio, 80) : (exStore?.barrio ?? null), ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
       await prisma.storeProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
     } else if (role === 'DELIVERY') {
       const dni = input.dni ?? exDel?.dni; const licenseNumber = input.licenseNumber ?? exDel?.licenseNumber; const insurance = input.insurance ?? exDel?.insurance;
