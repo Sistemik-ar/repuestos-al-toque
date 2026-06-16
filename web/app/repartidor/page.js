@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
+import { useTitleBell } from '@/lib/useTitleBell';
 import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
@@ -22,6 +23,7 @@ export default function Repartidor() {
 
   const disponibles = items.filter((d) => !d.mine); // viajes sin tomar
   const mias = items.filter((d) => d.mine); // mis viajes en curso
+  useTitleBell(disponibles.length, 'Repartidor · RepuestosAlToque'); // campanita si hay viajes nuevos para tomar
 
   // cada acción opera sobre el VIAJE entero (el server consolida por patente+comercio+mecánico).
   async function tomar(t) {

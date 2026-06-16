@@ -6,6 +6,7 @@ import BottomNav from '@/components/BottomNav';
 import Loading from '@/components/Loading';
 import { tierFor, toast, ping } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
+import { useTitleBell } from '@/lib/useTitleBell';
 import { useRef } from 'react';
 import { getMe, getMyJobs } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
@@ -55,6 +56,9 @@ export default function MecanicoDashboard() {
   // insignia por operaciones REALES (ítems entregados), no el número del mock
   const concretados = jobs.flatMap((jb) => jb.items || []).filter((i) => i.status === 'DELIVERED').length;
   const badge = tierFor('mechanic', concretados);
+  // campanita en el tab: cotizaciones recibidas para decidir + repartidor que llegó al taller
+  const alertas = jobs.flatMap((jb) => jb.items || []).filter((i) => i.status === 'QUOTED' || i.arrivedDrop).length;
+  useTitleBell(alertas);
 
   async function logout() { await logoutAction(); router.push('/login'); }
 

@@ -1030,13 +1030,17 @@ export async function createJobCheckout(jobId) {
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
   const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+  // Dominio canónico para que MP vuelva a www.repuestosaltoque.com.ar (no al *.vercel.app).
+  // APP_URL se setea por entorno en Vercel (prod = dominio real, staging = url de staging);
+  // sin APP_URL (local) cae al host del request.
+  const base = (process.env.APP_URL || `${proto}://${host}`).replace(/\/+$/, '');
   try {
     const { link } = await createPaymentLink({
       orderRef: `job::${jobId}`,
       title: `Repuestos · Trabajo #${j.code} · ${j.brand || ''} ${j.model || ''} ${j.plate || ''}`.trim(),
       amount,
-      backUrl: `${proto}://${host}/api/mp/return`,
-      notificationUrl: `${proto}://${host}/api/mp/webhook`,
+      backUrl: `${base}/api/mp/return`,
+      notificationUrl: `${base}/api/mp/webhook`,
     });
     await prisma.job.update({ where: { id: jobId }, data: { selectedAt: new Date(), status: 'CLOSED', paymentLink: link } });
     return { link, breakdown };

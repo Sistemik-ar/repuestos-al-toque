@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor, fmtDateTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
+import { useTitleBell } from '@/lib/useTitleBell';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
@@ -61,6 +62,7 @@ export default function Comercio() {
     .filter((r) => r.myCount === 0 && windowOpen(r) && !dismissed.includes(r.id))
     .sort((a, b) => (a.windowEndsAt || Infinity) - (b.windowEndsAt || Infinity) || (a.urgency === 'Necesito ahora' ? -1 : 1));
   const cot = open.filter((r) => r.myCount > 0);
+  useTitleBell(pend.length, 'Comercio · RepuestosAlToque'); // campanita en el tab si hay pedidos nuevos para cotizar
   // "esperando decisión": vivas (ventana cerrada hace <24hs) vs zombies "sin respuesta"
   const ZOMBIE_MS = 24 * 60 * 60 * 1000;
   const esperando = cot.filter((r) => ['OPEN', 'QUOTED'].includes(r.status));
@@ -227,6 +229,7 @@ function DRow({ k, v }) {
 
 // Detalle de un pedido (sirve para Pendientes, Cotizadas y Concretadas — muestra lo que haya).
 function DetalleModal({ r, onClose }) {
+  const [zoom, setZoom] = useState(null);
   const veh = `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
   const isSale = !!r.orderId || !!r.orderStatus;
   const ESTADO = { PAID: r.hasDelivery ? 'Pagado · repartidor en camino' : 'Pagado · esperando repartidor', SHIPPED: 'Retirado · en camino al taller', DELIVERED: 'Entregado al mecánico', READY: 'Listo', REFUNDED: 'Reembolsado' };
@@ -254,20 +257,21 @@ function DetalleModal({ r, onClose }) {
             <DRow k="Fecha de venta" v={fmtDateTime(r.soldAt)} />
             <DRow k="Monto de la venta" v={r.part ? '$' + r.part.toLocaleString('es-AR') : '—'} />
             <DRow k="Estado" v={ESTADO[r.orderStatus] || r.orderStatus || '—'} />
-            {r.creditAccount && <DRow k="Cuenta corriente" v={r.creditSettledAt ? 'Sí · procesada' : 'Sí · pendiente de procesar'} />}
+            {r.creditAccount && <DRow k="Cuenta corriente" v={r.creditSettledAt ? 'Sí · cobrada' : 'Sí · pendiente de pago'} />}
             {r.issue && <DRow k="Incidencia" v={r.issue} />}
           </div>
         )}
 
         {r.photoUrls?.length > 0 && (
           <div className="mb-12">
-            <div className="text-xs muted mb-8">Fotos</div>
-            <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />)}</div>
+            <div className="text-xs muted mb-8">Fotos <span className="muted">(tocá para agrandar)</span></div>
+            <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" onClick={() => setZoom(u)} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)', cursor: 'zoom-in' }} />)}</div>
           </div>
         )}
 
         <button className="btn btn-ghost btn-block" onClick={onClose}>Cerrar</button>
       </div>
+      {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 500, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '92vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12 }} /></div>}
     </div>
   );
 }
@@ -281,7 +285,7 @@ function PorCobrar({ sales, onChanged }) {
   async function marcar(r, on) {
     const res = await markCreditSettled(r.orderId, on);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: on ? 'Marcado como procesado' : 'Vuelto a pendiente', icon: on ? 'fa-check' : 'fa-rotate-left', type: 'green' });
+    toast({ title: on ? 'Cuenta corriente cobrada' : 'Vuelta a pendiente de pago', icon: on ? 'fa-check' : 'fa-rotate-left', type: 'green' });
     onChanged?.();
   }
 
@@ -296,21 +300,24 @@ function PorCobrar({ sales, onChanged }) {
         <>
           <div className="flex-between mb-8">
             <span className="text-sm subtle"><i className="fa-solid fa-id-card-clip text-yellow"></i> En cuenta corriente (te debe el taller)</span>
-            <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(cc).toLocaleString('es-AR')} <span className="text-xs muted">({pendientes.length} sin procesar)</span></span>
+            <span className="text-sm" style={{ fontWeight: 800 }}>{'$' + sum(cc).toLocaleString('es-AR')} <span className="text-xs muted">({pendientes.length} pendiente{pendientes.length === 1 ? '' : 's'} de pago)</span></span>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
-              <thead><tr><th>Producto</th><th>Fecha</th><th>Mecánico</th><th>Monto</th><th></th></tr></thead>
+              <thead><tr><th>Producto</th><th>Fecha</th><th>Mecánico</th><th>Monto</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 {cc.map((r) => (
-                  <tr key={r.orderId} style={r.creditSettledAt ? { opacity: 0.5 } : {}}>
+                  <tr key={r.orderId} style={r.creditSettledAt ? { opacity: 0.55 } : {}}>
                     <td className="text-xs">{r.desc || r.catLabel || 'Repuesto'}{r.desc && r.catLabel ? <span className="muted"> · {r.catLabel}</span> : null}</td>
                     <td className="text-xs">{fmtDateTime(r.soldAt)}</td>
                     <td className="text-xs">{r.mechanicName}</td>
                     <td className="text-xs" style={{ fontWeight: 800 }}>{r.part ? '$' + r.part.toLocaleString('es-AR') : '—'}</td>
                     <td>{r.creditSettledAt
-                      ? <button className="btn btn-ghost btn-sm" onClick={() => marcar(r, false)} title="Volver a pendiente"><i className="fa-solid fa-circle-check text-green"></i> Procesado</button>
-                      : <button className="btn btn-yellow btn-sm" onClick={() => marcar(r, true)}><i className="fa-solid fa-check"></i> Marcar procesado</button>}</td>
+                      ? <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Cobrada</span>
+                      : <span className="badge badge-yellow"><i className="fa-solid fa-clock"></i> Pendiente de pago</span>}</td>
+                    <td>{r.creditSettledAt
+                      ? <button className="btn btn-ghost btn-sm" onClick={() => marcar(r, false)} title="Volver a pendiente de pago"><i className="fa-solid fa-rotate-left"></i> Deshacer</button>
+                      : <button className="btn btn-yellow btn-sm" onClick={() => { if (window.confirm(`¿El mecánico ${r.mechanicName} ya te pagó esta cuenta corriente?\n\n${r.desc || r.catLabel || 'Repuesto'} · ${r.part ? '$' + r.part.toLocaleString('es-AR') : ''}`)) marcar(r, true); }}><i className="fa-solid fa-hand-holding-dollar"></i> Marcar cobrada</button>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -342,7 +349,7 @@ function EntregaCard({ r, label, veh, onChanged, onDetail }) {
       <div className="flex-between mb-8">
         <div><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div>
         <div className="flex-center gap-8" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {r.creditAccount && <span className="badge badge-yellow"><i className="fa-solid fa-id-card-clip"></i> Cta. corriente{r.creditSettledAt ? ' · procesada' : ''}</span>}
+          {r.creditAccount && <span className="badge badge-yellow"><i className="fa-solid fa-id-card-clip"></i> Cta. corriente{r.creditSettledAt ? ' · cobrada' : ''}</span>}
           <span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span>
         </div>
       </div>

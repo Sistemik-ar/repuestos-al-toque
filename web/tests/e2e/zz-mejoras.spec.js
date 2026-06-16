@@ -76,30 +76,32 @@ test('admin: con trabajo activo, el cambio de rol queda BLOQUEADO', async ({ bro
   await ac.close(); await mc.close();
 });
 
-test('cuenta corriente: el comercio la ve en "Por cobrar", la marca procesada, y el mecánico la ve en sus compras', async ({ browser }) => {
+test('cuenta corriente: el comercio la ve en "Por cobrar", confirma el cobro, y el mecánico la ve en sus compras', async ({ browser }) => {
   test.setTimeout(90000);
   const desc = `CC cobrar ${Date.now()}`;
   sale = await seedCreditSale({ desc, amount: 45000, status: 'DELIVERED', creditAccount: true });
 
   // COMERCIO: la venta CC aparece en "Por cobrar" con su detalle
   const sc = await browser.newContext(); const s = await sc.newPage();
+  s.on('dialog', (d) => d.accept()); // confirma el "¿ya te pagó?"
   await login(s, VENDEDOR);
   const row = s.locator('tr', { hasText: desc });
   await expect(row).toBeVisible({ timeout: 15000 });
   await expect(row.getByText('$45.000')).toBeVisible();        // monto
   await expect(row.getByText(/Taller Patagonia/i)).toBeVisible(); // mecánico (nombre del taller seed)
-  // marcar procesada
-  await row.getByRole('button', { name: /Marcar procesado/i }).click();
-  await expect(s.getByText(/Marcado como procesado/i)).toBeVisible({ timeout: 10000 });
-  await expect(s.locator('tr', { hasText: desc }).getByRole('button', { name: /Procesado/i })).toBeVisible({ timeout: 10000 });
+  await expect(row.getByText(/Pendiente de pago/i)).toBeVisible(); // estado inicial
+  // marcar cobrada (confirma el alertbox)
+  await row.getByRole('button', { name: /Marcar cobrada/i }).click();
+  await expect(s.getByText(/Cuenta corriente cobrada/i)).toBeVisible({ timeout: 10000 });
+  await expect(s.locator('tr', { hasText: desc }).getByText(/Cobrada/i)).toBeVisible({ timeout: 10000 }); // estado pasó a Cobrada
 
-  // MECÁNICO: la ve en "Mis compras en cuenta corriente" como procesada por el comercio
+  // MECÁNICO: la ve en "Mis compras en cuenta corriente" como cobrada por el comercio
   const mc = await browser.newContext(); const m = await mc.newPage();
   await login(m, MECANICO);
   await m.goto('/mecanico/cuentas');
   const mrow = m.locator('tr', { hasText: desc });
   await expect(mrow).toBeVisible({ timeout: 15000 });
-  await expect(mrow.getByText(/Procesada por el comercio/i)).toBeVisible();
+  await expect(mrow.getByText(/Cobrada por el comercio/i)).toBeVisible();
 
   await sc.close(); await mc.close();
 });

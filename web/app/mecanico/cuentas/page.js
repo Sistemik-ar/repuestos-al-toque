@@ -82,8 +82,8 @@ export default function Cuentas() {
                     <td className="text-xs">{c.storeName}</td>
                     <td className="text-xs" style={{ fontWeight: 800 }}>{c.part ? '$' + c.part.toLocaleString('es-AR') : '—'}</td>
                     <td>{c.settled
-                      ? <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Procesada por el comercio</span>
-                      : <span className="badge badge-yellow"><i className="fa-solid fa-clock"></i> Pendiente</span>}</td>
+                      ? <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Cobrada por el comercio</span>
+                      : <span className="badge badge-yellow"><i className="fa-solid fa-clock"></i> Pendiente de pago</span>}</td>
                   </tr>
                 ))}
               </tbody>
