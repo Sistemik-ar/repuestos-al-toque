@@ -61,7 +61,7 @@ export default function MecanicoDashboard() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></Link>
+        <Link href="/mecanico" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></Link>
         <div className="topbar-actions">
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
           <div className="avatar">{initials}</div>

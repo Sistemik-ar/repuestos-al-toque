@@ -52,7 +52,7 @@ export default function Admin() {
   return (
     <div className="app-shell wide">
       <div className="topbar">
-        <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Admin · RepuestosAlToque</span></Link>
+        <Link href="/admin" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Admin · RepuestosAlToque</span></Link>
         <div className="topbar-actions">
           <span className="badge badge-gray"><i className="fa-solid fa-location-dot"></i> Bariloche</span>
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>

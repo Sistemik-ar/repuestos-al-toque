@@ -56,7 +56,7 @@ export default function Repartidor() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Repartidor</span></Link>
+        <Link href="/repartidor" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Repartidor</span></Link>
         <div className="topbar-actions">
           {rep && <span className="badge badge-yellow" title="Tu reputación: promedio de reseñas · entregas concretadas"><i className="fa-solid fa-star"></i> {rep.rating != null ? `${rep.rating} (${rep.count})` : 'Nuevo'} · {rep.points} {rep.points === 1 ? 'entrega' : 'entregas'}</span>}
           <span className="badge badge-green"><i className="fa-solid fa-circle" style={{ fontSize: 7 }}></i> En línea</span>

@@ -98,7 +98,7 @@ export default function Comercio() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Panel Comercio</span></Link>
+        <Link href="/comercio" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Panel Comercio</span></Link>
         <div className="topbar-actions">
           <Link href="/comercio/perfil" className="icon-btn" title="Mi perfil"><i className="fa-solid fa-user"></i></Link>
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
