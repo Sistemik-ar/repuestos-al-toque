@@ -9,8 +9,10 @@ import * as Sentry from '@sentry/nextjs';
 export default function Error({ error, reset }) {
   useEffect(() => {
     const msg = `${error?.name || ''} ${error?.message || ''}`;
-    const staleChunk = /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported|Failed to fetch dynamically|importing a module script failed/i.test(msg);
-    if (!staleChunk) { Sentry.captureException(error); return; } // error real -> a Sentry (si hay DSN)
+    // Recuperable recargando: chunk viejo tras deploy + fallas de red transitorias
+    // (Safari: "Load failed" · Chrome: "Failed to fetch"). Comunísimo en mobile con señal intermitente.
+    const recoverable = /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported|Failed to fetch|Load failed|importing a module script failed/i.test(msg);
+    if (!recoverable) { Sentry.captureException(error); return; } // error real -> a Sentry (si hay DSN)
     const KEY = 'rat_reload_at';
     const last = Number(sessionStorage.getItem(KEY) || 0);
     if (Date.now() - last > 10000) {
