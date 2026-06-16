@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { savePushSubscription } from '@/app/actions/data';
 import { toast } from '@/lib/ui';
 
-const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const VAPID = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '').trim();
 
 function urlB64ToUint8Array(base64) {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
