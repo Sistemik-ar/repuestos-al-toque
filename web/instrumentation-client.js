@@ -13,3 +13,6 @@ if (dsn) {
     integrations: [Sentry.replayIntegration()],
   });
 }
+
+// Instrumentación de navegación del App Router (no-op si Sentry no se inicializó).
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

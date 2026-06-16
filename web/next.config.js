@@ -18,7 +18,6 @@ const nextConfig = {
 // Sin SENTRY_AUTH_TOKEN NO sube sourcemaps (no rompe el build); sin DSN los SDK quedan inertes.
 module.exports = withSentryConfig(nextConfig, {
   silent: true,
-  disableLogger: true,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
