@@ -603,6 +603,104 @@ export async function setUserEmail(userId, email) {
   return { ok: true, email: next };
 }
 
+// "Trabajo activo" que impide cambiar el rol (definición estricta): órdenes en curso (sin
+// entregar/reembolsar) + trabajos/pedidos abiertos del mecánico + cotizaciones vivas del comercio.
+async function activeWorkCount(userId) {
+  const [orders, jobs, requests, quotes] = await Promise.all([
+    prisma.order.count({ where: { status: { notIn: ['DELIVERED', 'REFUNDED'] }, OR: [{ mechanicId: userId }, { storeId: userId }, { deliveryId: userId }] } }),
+    prisma.job.count({ where: { mechanicId: userId, status: { notIn: ['DONE', 'CANCELLED'] } } }),
+    prisma.request.count({ where: { mechanicId: userId, status: { notIn: ['DELIVERED', 'CANCELLED', 'EXPIRED'] } } }),
+    prisma.requestQuote.count({ where: { storeId: userId, status: 'SENT', request: { status: { in: ['OPEN', 'QUOTED', 'CLOSED'] } } } }),
+  ]);
+  return orders + jobs + requests + quotes;
+}
+
+// El admin lee el detalle completo de un usuario (con su perfil por rol) para editarlo.
+export async function getUserDetail(userId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true, email: true, name: true, role: true, status: true, phone: true, whatsapp: true,
+      mechanic: { select: { workshopName: true, barrio: true, address: true, lat: true, lng: true } },
+      store: { select: { tradeName: true, cuit: true, ivaCondition: true, barrio: true, address: true, lat: true, lng: true } },
+      delivery: { select: { vehicleType: true, plate: true, dni: true, licenseNumber: true, insurance: true } },
+    },
+  });
+  if (!u) return null;
+  return { ...u, hasActiveWork: (await activeWorkCount(userId)) > 0 };
+}
+
+// El admin edita un usuario: datos básicos + perfil por rol, y puede cambiar el rol (solo si NO tiene
+// trabajo activo). Al cambiar de rol se conserva el perfil anterior (no se borra) y se crea/actualiza
+// el del nuevo rol. Comercio/mecánico requieren dirección con coords (para calcular el envío).
+export async function updateUser(userId, input) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true, email: true } });
+  if (!u) return { error: 'Usuario no encontrado' };
+  if (u.role === 'ADMIN') return { error: 'No se puede editar un administrador desde acá.' };
+
+  // ---- validaciones (antes de escribir nada) ----
+  const data = {};
+  if ('name' in input) data.name = txt(input.name, 120);
+  if ('phone' in input) data.phone = txt(input.phone, 40);
+  if ('whatsapp' in input) data.whatsapp = txt(input.whatsapp, 40);
+
+  if (input.email != null) {
+    const next = String(input.email).trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) return { error: 'Email inválido.' };
+    if (next !== u.email) {
+      const dup = await prisma.user.findUnique({ where: { email: next }, select: { id: true } });
+      if (dup && dup.id !== userId) return { error: 'Ya existe un usuario con ese email.' };
+      data.email = next;
+    }
+  }
+
+  const newRole = input.role;
+  const roleChange = !!newRole && newRole !== u.role;
+  if (roleChange) {
+    if (!['MECHANIC', 'STORE', 'DELIVERY'].includes(newRole)) return { error: 'Rol inválido.' };
+    if ((await activeWorkCount(userId)) > 0) return { error: 'No se puede cambiar el rol: el usuario tiene órdenes o pedidos activos. Esperá a que se completen o cancelalos.' };
+    data.role = newRole;
+  }
+  const role = newRole || u.role;
+
+  // Si vino una dirección elegida del autocompletado, validar que esté en Bariloche.
+  let coords = null;
+  if ((role === 'MECHANIC' || role === 'STORE') && input.lat != null && input.lng != null) {
+    const picked = { lat: Number(input.lat), lng: Number(input.lng), label: input.address };
+    if (!inBariloche(picked)) return { error: 'Esa dirección no está en Bariloche. Elegí una del listado.' };
+    coords = picked;
+  }
+
+  // perfil existente del rol destino (para mergear campos y validar coords requeridas en cambio de rol)
+  let exMech = null, exStore = null, exDel = null;
+  if (role === 'MECHANIC') { exMech = await prisma.mechanicProfile.findUnique({ where: { userId } }); if (roleChange && !coords && !(exMech && exMech.lat != null && exMech.lng != null)) return { error: 'Para mecánico hace falta una dirección: elegila del listado de sugerencias.' }; }
+  if (role === 'STORE') { exStore = await prisma.storeProfile.findUnique({ where: { userId } }); if (roleChange && !coords && !(exStore && exStore.lat != null && exStore.lng != null)) return { error: 'Para comercio hace falta una dirección: elegila del listado de sugerencias.' }; }
+  if (role === 'DELIVERY') { exDel = await prisma.deliveryProfile.findUnique({ where: { userId } }); }
+
+  // ---- escritura ----
+  try {
+    await prisma.user.update({ where: { id: userId }, data });
+    if (role === 'MECHANIC') {
+      const up = { workshopName: input.name ?? exMech?.workshopName ?? null, barrio: input.barrio ?? exMech?.barrio ?? null, ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
+      await prisma.mechanicProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
+    } else if (role === 'STORE') {
+      const up = { tradeName: input.name || exStore?.tradeName || 'Comercio', cuit: input.cuit ?? exStore?.cuit ?? null, ivaCondition: input.ivaCondition ?? exStore?.ivaCondition ?? null, barrio: input.barrio ?? exStore?.barrio ?? null, ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
+      await prisma.storeProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
+    } else if (role === 'DELIVERY') {
+      const dni = input.dni ?? exDel?.dni; const licenseNumber = input.licenseNumber ?? exDel?.licenseNumber; const insurance = input.insurance ?? exDel?.insurance;
+      const docsOk = !!(String(dni || '').trim() && String(licenseNumber || '').trim() && String(insurance || '').trim());
+      const up = { vehicleType: input.vehicleType ?? exDel?.vehicleType ?? null, plate: input.plate ?? exDel?.plate ?? null, dni: dni || null, licenseNumber: licenseNumber || null, insurance: insurance || null, docsOk };
+      await prisma.deliveryProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
+    }
+    if (data.role) invalidateStatusCache(userId);
+    return { ok: true };
+  } catch (e) {
+    return { error: e?.code === 'P2002' ? 'Datos duplicados (CUIT o email ya en uso).' : 'No se pudo guardar.' };
+  }
+}
+
 // ---- Tarifas de envío (backoffice) ----
 export async function getShippingTariffs() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];

@@ -34,16 +34,19 @@ test('el admin setea una contraseña temporal a un comercio y este entra con ell
   await ac.close(); await sc.close();
 });
 
-test('el admin cambia el email de un comercio', async ({ browser }) => {
+test('el admin edita un comercio y le cambia el email (modal Editar)', async ({ browser }) => {
   test.setTimeout(60000);
   const nuevo = `vendedor-edit-${Date.now()}@rat.test`;
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
-  a.on('dialog', (d) => d.accept(nuevo)); // responde el window.prompt del email
   const row = a.locator('tr', { hasText: VENDEDOR });
   await expect(row).toBeVisible({ timeout: 15000 });
-  await row.getByRole('button', { name: /Email/i }).click();
-  await expect(a.getByText(/Email actualizado/i)).toBeVisible({ timeout: 10000 });
+  await row.getByRole('button', { name: /Editar/i }).click();
+  const modal = a.locator('.modal');
+  await expect(modal.getByRole('heading', { name: /Editar usuario/i })).toBeVisible({ timeout: 10000 });
+  await modal.locator('input[type="email"]').fill(nuevo); // cambia el email en el form
+  await modal.getByRole('button', { name: /Guardar cambios/i }).click();
+  await expect(a.getByText(/Usuario actualizado/i)).toBeVisible({ timeout: 10000 });
   await expect(a.locator('tr', { hasText: nuevo })).toBeVisible({ timeout: 10000 }); // la tabla refleja el nuevo email
   await restoreSeedEmail(); // restaurar ya para no romper los tests siguientes
   await ac.close();

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, setUserEmail, searchAddresses } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, searchAddresses, getUserDetail, updateUser } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
 
@@ -23,6 +23,7 @@ export default function Admin() {
   useEffect(() => { getShippingTariffs().then(setTariffs); }, []);
 
   const [cred, setCred] = useState(null); // { email, pass } recién seteada para mostrar/copiar
+  const [editing, setEditing] = useState(null); // userId que se está editando en el modal
 
   async function logout() { await logoutAction(); router.push('/login'); }
   async function toggleUser(u) {
@@ -37,14 +38,6 @@ export default function Admin() {
     setCred({ email: res.email, pass: res.tempPassword });
     toast({ title: 'Contraseña temporal lista', sub: res.email, icon: 'fa-key', type: 'green' });
   }
-  async function editEmail(u) {
-    const next = window.prompt(`Nuevo email para ${u.name || u.email}:`, u.email);
-    if (next === null || next.trim() === u.email) return;
-    const res = await setUserEmail(u.id, next);
-    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
-    toast({ title: 'Email actualizado', sub: res.email, icon: 'fa-envelope', type: 'green' }); load();
-  }
-
   // editor de tarifas
   function setRow(i, k, v) { setTariffs((t) => t.map((r, j) => (j === i ? { ...r, [k]: v } : r))); }
   function addRow() { setTariffs((t) => [...t, { uptoKm: '', price: '' }]); }
@@ -144,7 +137,7 @@ export default function Admin() {
                     <td><span className={`badge ${ST_BADGE[u.status] || 'badge-gray'}`}>{u.status}</span></td>
                     <td>{u.role !== 'ADMIN' && (
                       <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => editEmail(u)} title="Cambiar email"><i className="fa-solid fa-envelope"></i> Email</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setEditing(u.id)} title="Editar usuario"><i className="fa-solid fa-user-pen"></i> Editar</button>
                         <button className="btn btn-ghost btn-sm" onClick={() => resetPass(u)} title="Setear contraseña temporal"><i className="fa-solid fa-key"></i> Pass</button>
                         <button className={`btn btn-sm ${u.status === 'SUSPENDED' ? 'btn-success' : 'btn-ghost'}`} onClick={() => toggleUser(u)}>{u.status === 'SUSPENDED' ? 'Reactivar' : 'Suspender'}</button>
                       </div>
@@ -174,6 +167,146 @@ export default function Admin() {
         </div>
 
         <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Admin</p>
+      </div>
+
+      {editing && <EditUserModal userId={editing} onClose={() => setEditing(null)} onSaved={load} />}
+    </div>
+  );
+}
+
+function EditUserModal({ userId, onClose, onSaved }) {
+  const [f, setF] = useState(null); // null = cargando
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [locked, setLocked] = useState(false); // tiene trabajo activo -> rol bloqueado
+
+  useEffect(() => {
+    let alive = true;
+    getUserDetail(userId).then((u) => {
+      if (!alive || !u) return;
+      setLocked(!!u.hasActiveWork);
+      setF({
+        role: u.role,
+        name: u.name || u.store?.tradeName || u.mechanic?.workshopName || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        whatsapp: u.whatsapp || '',
+        address: u.store?.address || u.mechanic?.address || '',
+        lat: u.store?.lat ?? u.mechanic?.lat ?? null,
+        lng: u.store?.lng ?? u.mechanic?.lng ?? null,
+        barrio: u.store?.barrio || u.mechanic?.barrio || '',
+        cuit: u.store?.cuit || '',
+        ivaCondition: u.store?.ivaCondition || 'RESPONSABLE_INSCRIPTO',
+        vehicleType: u.delivery?.vehicleType || 'MOTO',
+        plate: u.delivery?.plate || '',
+        dni: u.delivery?.dni || '',
+        licenseNumber: u.delivery?.licenseNumber || '',
+        insurance: u.delivery?.insurance || '',
+      });
+    });
+    return () => { alive = false; };
+  }, [userId]);
+
+  if (!f) return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal"><div className="modal-handle"></div><Loading label="Cargando usuario…" /></div>
+    </div>
+  );
+
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const isStore = f.role === 'STORE'; const isMech = f.role === 'MECHANIC'; const isCourier = f.role === 'DELIVERY';
+
+  async function save() {
+    setError('');
+    setSaving(true);
+    const res = await updateUser(userId, f);
+    setSaving(false);
+    if (res?.error) { setError(res.error); return; }
+    toast({ title: 'Usuario actualizado', icon: 'fa-user-pen', type: 'green' });
+    onSaved?.(); onClose();
+  }
+
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+      <div className="modal">
+        <div className="modal-handle"></div>
+        <h2 className="h-md mb-4">Editar usuario</h2>
+        <p className="text-sm muted mb-16">{f.email}</p>
+
+        <div className="grid-2 mb-12">
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Rol</label>
+            <select className="select" value={f.role} disabled={locked} onChange={(e) => set('role', e.target.value)}>
+              <option value="STORE">Casa de repuestos (vendedor)</option>
+              <option value="MECHANIC">Mecánico / Taller</option>
+              <option value="DELIVERY">Repartidor</option>
+            </select>
+            {locked && <div className="text-xs muted mt-4"><i className="fa-solid fa-lock"></i> Tiene órdenes/pedidos activos: el rol no se puede cambiar hasta cerrarlos.</div>}
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>{isStore ? 'Nombre del comercio' : isMech ? 'Nombre del taller' : 'Nombre'}</label>
+            <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} />
+          </div>
+        </div>
+
+        <div className="grid-2 mb-12">
+          <div className="field" style={{ marginBottom: 0 }}><label>Email</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
+          <div className="field" style={{ marginBottom: 0 }}><label>WhatsApp</label><input className="input" value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} /></div>
+        </div>
+        <div className="field mb-12" style={{ maxWidth: '50%' }}><label>Teléfono</label><input className="input" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+
+        {(isStore || isMech) && (
+          <div className="grid-2 mb-12">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Dirección *</label>
+              <AddressAutocomplete value={f.address} picked={f.lat != null && f.lng != null}
+                onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
+                onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
+              <div className="text-xs muted mt-4">Si no la cambiás, se conserva la dirección actual.</div>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} /></div>
+          </div>
+        )}
+
+        {isStore && (
+          <div className="grid-2 mb-12">
+            <div className="field" style={{ marginBottom: 0 }}><label>CUIT</label><input className="input" inputMode="numeric" value={f.cuit} onChange={(e) => set('cuit', e.target.value)} /></div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Condición IVA</label>
+              <select className="select" value={f.ivaCondition} onChange={(e) => set('ivaCondition', e.target.value)}>
+                <option value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</option>
+                <option value="MONOTRIBUTO">Monotributo</option>
+                <option value="EXENTO">Exento</option>
+                <option value="CONSUMIDOR_FINAL">Consumidor Final</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {isCourier && (
+          <>
+            <div className="grid-2 mb-12">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Tipo de vehículo</label>
+                <select className="select" value={f.vehicleType} onChange={(e) => set('vehicleType', e.target.value)}>
+                  <option value="MOTO">Moto</option><option value="AUTO">Auto</option><option value="UTILITARIO">Utilitario</option>
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Patente</label><input className="input" value={f.plate} onChange={(e) => set('plate', e.target.value)} /></div>
+            </div>
+            <div className="grid-2 mb-12">
+              <div className="field" style={{ marginBottom: 0 }}><label>DNI</label><input className="input" inputMode="numeric" value={f.dni} onChange={(e) => set('dni', e.target.value)} /></div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Licencia</label><input className="input" value={f.licenseNumber} onChange={(e) => set('licenseNumber', e.target.value)} /></div>
+            </div>
+            <div className="field mb-12"><label>Seguro (aseguradora y póliza)</label><input className="input" value={f.insurance} onChange={(e) => set('insurance', e.target.value)} /><div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Sin DNI + licencia + seguro, el repartidor queda deshabilitado para tomar pedidos.</div></div>
+          </>
+        )}
+
+        {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
+        <div className="flex gap-12">
+          <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? <span className="spinner"></span> : <><i className="fa-solid fa-floppy-disk"></i> Guardar cambios</>}</button>
+          <button className="btn btn-ghost" disabled={saving} onClick={onClose}>Cancelar</button>
+        </div>
       </div>
     </div>
   );

@@ -154,8 +154,6 @@ export default function Repartidor() {
 
       <nav className="bottom-nav">
         <Link href="/repartidor" className="active"><i className="fa-solid fa-truck-fast"></i>Entregas</Link>
-        <Link href="/"><i className="fa-solid fa-map"></i>Mapa</Link>
-        <Link href="/"><i className="fa-solid fa-coins"></i>Ganancias</Link>
         <button onClick={logout} style={{ background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--text-2)', fontSize: '10.5px', fontWeight: 600, cursor: 'pointer' }}><i className="fa-solid fa-right-from-bracket"></i>Salir</button>
       </nav>
     </div>
