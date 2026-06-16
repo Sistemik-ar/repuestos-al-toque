@@ -10,7 +10,7 @@ export default function manifest() {
     theme_color: '#6D28D9',
     icons: [
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-      { src: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+      { src: '/apple-icon', sizes: '180x180', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

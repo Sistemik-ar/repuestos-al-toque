@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
+import PushButton from '@/components/PushButton';
 import { getMyDeliveries, markDelivered, claimDelivery, reportArrival, reportIssue, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
@@ -68,6 +69,7 @@ export default function Repartidor() {
 
       <div className="container">
         <div className="mb-16"><div className="eyebrow">Empresa de fletes</div><h1 className="h-lg">Entregas</h1><p className="text-sm muted">Retiros y entregas asignadas</p></div>
+        <div className="mb-16"><PushButton /></div>
 
         <div className="grid-3 mb-16">
           <div className="card stat-card" style={{ padding: 14 }}><div className="stat-value text-yellow">{disponibles.length}</div><div className="stat-label">Disponibles</div></div>

@@ -510,3 +510,16 @@ model Job {
   @@index([status])
   @@map("jobs")
 }
+
+// Suscripciones Web Push (PWA). Una por dispositivo/navegador. endpoint único.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}

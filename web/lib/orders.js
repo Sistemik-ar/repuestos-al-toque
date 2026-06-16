@@ -4,6 +4,7 @@ import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
 import { drivingKm } from '@/lib/geo';
 import { getSettings } from '@/lib/settings';
 import { mpIsTest } from '@/lib/mercadopago';
+import { notifyDeliveryNewTrip } from '@/lib/push';
 
 // ¿El pago real (transaction_amount de MP) cubre lo esperado?
 // Tolerancia del 10%: el envío (OSRM) y el redondeo del recargo MP pueden variar unos pesos
@@ -111,6 +112,7 @@ async function confirmJobPaid(jobId, paidAmount) {
     data: { status: 'CANCELLED' },
   }).catch(() => {});
   await prisma.job.update({ where: { id: jobId }, data: { status: 'PAID' } }).catch(() => {});
+  if (plan.items.some((it) => !it.useCredit)) await notifyDeliveryNewTrip(); // hay pieza física para fletar
   return true;
 }
 
@@ -143,5 +145,6 @@ export async function confirmPaidByRef(ref, paidAmount) {
   }
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }).catch(() => {});
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
+  if (!creditAccount) await notifyDeliveryNewTrip(); // pieza pagada por plataforma -> necesita flete
   return true;
 }

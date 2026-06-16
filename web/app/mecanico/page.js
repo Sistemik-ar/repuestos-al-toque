@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import Loading from '@/components/Loading';
+import PushButton from '@/components/PushButton';
 import { tierFor, toast, ping } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
@@ -91,6 +92,7 @@ export default function MecanicoDashboard() {
           <h1 className="h-lg">Hola 👋</h1>
           <p className="text-sm muted">¿Qué repuesto necesitás hoy?</p>
         </div>
+        <div className="mb-16"><PushButton /></div>
 
         <div className="card glow mb-16" style={{ background: 'linear-gradient(135deg,rgba(109,40,217,0.28),rgba(31,41,55,0.6))' }}>
           <div className="flex-between mb-12">

@@ -9,6 +9,7 @@ import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCre
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 import Loading from '@/components/Loading';
+import PushButton from '@/components/PushButton';
 
 export default function Comercio() {
   const router = useRouter();
@@ -114,6 +115,7 @@ export default function Comercio() {
 
       <div className="container">
         <div className="mb-16"><div className="eyebrow">{me?.name || 'Comercio'}</div><h1 className="h-lg">Solicitudes entrantes</h1><p className="text-sm muted">Respondé rápido = ganás la venta</p></div>
+        <div className="mb-16"><PushButton /></div>
 
         <div className="card glow mb-16" style={{ background: 'linear-gradient(135deg,rgba(250,204,21,0.16),rgba(31,41,55,0.6))' }}>
           <div className="flex-between mb-12">

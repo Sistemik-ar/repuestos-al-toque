@@ -10,6 +10,7 @@ import { geocode, inBariloche, searchBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
 import { aliasLabel } from '@/lib/alias';
+import { sendPush, sendPushMany } from '@/lib/push';
 
 const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
 const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
@@ -43,6 +44,26 @@ function quotePublic(q, creditEligible = false) {
 export async function getMe() {
   const s = await getSession();
   return s ? { id: s.id, email: s.email, role: s.role, name: s.name } : null;
+}
+
+// ---- Web Push (PWA) ----
+// Guarda la suscripción del navegador del usuario (una por dispositivo, identificada por endpoint).
+export async function savePushSubscription(sub) {
+  const s = await getSession(); if (!s) return { error: 'No autorizado' };
+  const endpoint = sub?.endpoint; const p256dh = sub?.keys?.p256dh; const auth = sub?.keys?.auth;
+  if (!endpoint || !p256dh || !auth) return { error: 'Suscripción inválida' };
+  await prisma.pushSubscription.upsert({
+    where: { endpoint },
+    update: { userId: s.id, p256dh, auth },
+    create: { userId: s.id, endpoint, p256dh, auth },
+  });
+  return { ok: true };
+}
+
+export async function deletePushSubscription(endpoint) {
+  const s = await getSession(); if (!s || !endpoint) return { error: 'No autorizado' };
+  await prisma.pushSubscription.deleteMany({ where: { endpoint, userId: s.id } });
+  return { ok: true };
 }
 
 // ---- Mecánico ----
@@ -127,6 +148,8 @@ export async function acceptQuote(quoteId) {
     prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }),
     prisma.request.update({ where: { id: q.requestId }, data: { status: 'CLOSED', selectedAt: new Date() } }),
   ]);
+  // push al comercio: el mecánico eligió su oferta
+  await sendPush(q.storeId, { title: 'Te eligieron tu cotización 🎉', body: 'El mecánico eligió tu oferta. Cuando pague, coordinamos el flete.', url: '/comercio', tag: 'elegida-' + q.requestId }).catch(() => {});
   return { ok: true, requestId: q.requestId, quoteId };
 }
 
@@ -287,7 +310,7 @@ export async function markCreditSettled(orderId, settled = true) {
 
 export async function createQuote(requestId, input) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
-  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true } });
+  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true, mechanicId: true } });
   if (!req) return { error: 'Solicitud no encontrada' };
   if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
   if (req.windowEndsAt && req.windowEndsAt.getTime() < Date.now()) return { error: 'La ventana de cotización ya cerró' };
@@ -315,6 +338,8 @@ export async function createQuote(requestId, input) {
     },
   });
   await prisma.request.update({ where: { id: requestId }, data: { status: 'QUOTED' } }).catch(() => {});
+  // push al mecánico: llegó una cotización (tag por pedido -> coalesce si llegan varias)
+  await sendPush(req.mechanicId, { title: 'Llegó una cotización 🏷️', body: 'Tenés una oferta nueva para tu pedido. Revisala.', url: '/mecanico', tag: 'cotiz-' + requestId }).catch(() => {});
   return { ok: true };
 }
 
@@ -954,6 +979,11 @@ export async function publishJob(jobId) {
   const ends = new Date(Date.now() + 10 * 60 * 1000);
   await prisma.job.update({ where: { id: jobId }, data: { status: 'OPEN', windowEndsAt: ends } });
   await prisma.request.updateMany({ where: { jobId }, data: { windowEndsAt: ends, status: 'OPEN' } });
+  // push a los comercios que venden esos rubros (o que reciben de todo)
+  const catIds = [...new Set(job.requests.map((r) => r.categoryId).filter(Boolean))];
+  const stores = await prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { categories: { select: { categoryId: true } } } } } });
+  const targets = stores.filter((u) => { const cats = u.store?.categories || []; return cats.length === 0 || catIds.length === 0 || cats.some((c) => catIds.includes(c.categoryId)); }).map((u) => u.id);
+  await sendPushMany(targets, { title: 'Nuevo pedido para cotizar 🔧', body: 'Un taller necesita un repuesto. Cotizá antes de que cierre la ventana (10 min).', url: '/comercio', tag: 'nuevo-pedido-' + jobId }).catch(() => {});
   return { ok: true };
 }
 
@@ -1056,8 +1086,10 @@ export async function reportArrival(orderId, stage) {
   if (!o || o.deliveryId !== s.id) return { error: 'Este pedido no está asignado a vos' };
   // la llegada al COMERCIO es por comercio (recoge en cada uno); la llegada al TALLER es del viaje
   if (stage === 'pickup' && o.status === 'PAID') await prisma.order.updateMany({ where: { ...tripWhere(o, { perStore: true }), deliveryId: s.id, status: 'PAID' }, data: { arrivedPickupAt: new Date() } });
-  else if (stage === 'drop' && o.status === 'SHIPPED') await prisma.order.updateMany({ where: { ...tripWhere(o), deliveryId: s.id, status: 'SHIPPED' }, data: { arrivedDropAt: new Date() } });
-  else return { error: 'Etapa inválida' };
+  else if (stage === 'drop' && o.status === 'SHIPPED') {
+    await prisma.order.updateMany({ where: { ...tripWhere(o), deliveryId: s.id, status: 'SHIPPED' }, data: { arrivedDropAt: new Date() } });
+    await sendPush(o.mechanicId, { title: 'El repartidor llegó a tu taller 📍', body: 'Recibí la pieza y dale tu PIN de entrega.', url: '/mecanico', tag: 'llegada-' + o.mechanicId }).catch(() => {});
+  } else return { error: 'Etapa inválida' };
   return { ok: true };
 }
 
