@@ -15,8 +15,9 @@ export default function MecanicoDashboard() {
   const [me, setMe] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
+  const [dismissed, setDismissed] = useState([]); // banners de llegada cerrados con la X
 
-  const arrivalsRef = useRef(null); // avisar UNA vez cuando el repartidor llega al taller
+  const arrivalsRef = useRef(null); // avisar UNA vez (sonido) cuando el repartidor llega al taller
   const load = async () => {
     try {
       const [m, js] = await Promise.all([getMe(), getMyJobs()]);
@@ -26,8 +27,7 @@ export default function MecanicoDashboard() {
       if (arrivalsRef.current) {
         for (const i of items) {
           if (ahora.has(i.id) && !arrivalsRef.current.has(i.id)) {
-            ping(3); // sonido insistente + vibración: el repartidor está esperando
-            toast({ title: '📍 ¡El repartidor llegó a tu taller!', sub: `Trae «${i.desc || i.catLabel}» — recibí la pieza y dale tu PIN (está en el detalle del pedido)`, icon: 'fa-location-dot', type: 'yellow', duration: 20000 });
+            ping(3); // sonido insistente + vibración: el repartidor está esperando (el aviso visual es el banner persistente de abajo)
           }
         }
       }
@@ -69,6 +69,19 @@ export default function MecanicoDashboard() {
       </div>
 
       <div className="container">
+        {/* Llegada del repartidor: banner PERSISTENTE (no se autocierra; solo con la X). Lleva al pedido para mostrar el PIN. */}
+        {jobs.flatMap((jb) => jb.items || []).filter((i) => i.arrivedDrop && !dismissed.includes(i.id)).map((i) => (
+          <div key={i.id} className="float-notif mb-12" style={{ borderColor: 'rgba(250,204,21,0.55)', background: 'linear-gradient(135deg,rgba(250,204,21,0.14),rgba(31,41,55,0.5))' }}>
+            <i className="fa-solid fa-location-dot text-yellow"></i>
+            <div className="text-sm subtle" style={{ flex: 1 }}>
+              <b>¡El repartidor llegó a tu taller!</b>
+              <div className="text-xs muted mt-4">Trae «{i.desc || i.catLabel}» — recibí la pieza y dale tu PIN de entrega.</div>
+              <div className="mt-8"><Link className="btn btn-yellow btn-sm" href={`/mecanico/detalle?id=${i.id}`}><i className="fa-solid fa-key"></i> Ver PIN e ir al pedido</Link></div>
+            </div>
+            <button className="icon-btn" style={{ flexShrink: 0 }} onClick={() => setDismissed((p) => [...p, i.id])} title="Cerrar" aria-label="Cerrar"><i className="fa-solid fa-xmark"></i></button>
+          </div>
+        ))}
+
         <div className="mb-16">
           <div className="eyebrow">{me?.name || 'Taller'}</div>
           <h1 className="h-lg">Hola 👋</h1>

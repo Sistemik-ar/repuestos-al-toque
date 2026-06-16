@@ -167,6 +167,7 @@ function Estrellas({ value, onChange }) {
 }
 
 function RatingSection({ requestId }) {
+  const router = useRouter();
   const [seller, setSeller] = useState(0);
   const [product, setProduct] = useState(0);
   const [delivery, setDelivery] = useState(0);
@@ -186,6 +187,7 @@ function RatingSection({ requestId }) {
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
     setSent(true);
     toast({ title: '¡Gracias por calificar!', sub: 'Tu opinión mejora el ranking', icon: 'fa-star', type: 'green' });
+    router.push('/mecanico'); // el toast sobrevive a la navegación (Toaster está en el layout)
   }
 
   return (

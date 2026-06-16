@@ -256,6 +256,24 @@ export async function getStoreSales() {
   }));
 }
 
+// Datos del comercio para su vista de perfil (SOLO LECTURA): sus datos + los rubros que vende.
+export async function getMyStoreProfile() {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return null;
+  const [u, prof, cats] = await Promise.all([
+    prisma.user.findUnique({ where: { id: s.id }, select: { email: true, name: true, phone: true, whatsapp: true } }),
+    prisma.storeProfile.findUnique({ where: { userId: s.id } }),
+    prisma.storeCategory.findMany({ where: { storeId: s.id }, select: { category: { select: { name: true } } } }),
+  ]);
+  return {
+    email: u?.email || null, name: u?.name || null, phone: u?.phone || null, whatsapp: u?.whatsapp || null,
+    tradeName: prof?.tradeName || null, legalName: prof?.legalName || null, cuit: prof?.cuit || null,
+    ivaCondition: prof?.ivaCondition || null, invoiceType: prof?.invoiceType || null, partCondition: prof?.partCondition || null,
+    address: prof?.address || null, barrio: prof?.barrio || null,
+    rating: prof && prof.ratingsCount > 0 ? num(prof.ratingAvg) : null, ratingsCount: prof?.ratingsCount || 0, points: prof?.points || 0,
+    categories: cats.map((c) => c.category?.name).filter(Boolean).sort((a, b) => a.localeCompare(b, 'es')),
+  };
+}
+
 // El comercio marca (o desmarca) una venta en cuenta corriente como "procesada internamente"
 // en su sistema/contabilidad. No mueve plata: es un control de seguimiento del cobro al taller.
 export async function markCreditSettled(orderId, settled = true) {

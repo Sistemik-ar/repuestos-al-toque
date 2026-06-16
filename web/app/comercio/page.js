@@ -18,6 +18,7 @@ export default function Comercio() {
   const [modal, setModal] = useState(null);
   const [dismissed, setDismissed] = useState([]);
   const [zoom, setZoom] = useState(null);
+  const [detalle, setDetalle] = useState(null); // pedido cuyo detalle se ve en el modal
   const [rep, setRep] = useState(null);
   const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
   // la insignia sale de los PUNTOS reales (ventas concretadas), no del mock
@@ -99,8 +100,9 @@ export default function Comercio() {
       <div className="topbar">
         <Link href="/" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Panel Comercio</span></Link>
         <div className="topbar-actions">
+          <Link href="/comercio/perfil" className="icon-btn" title="Mi perfil"><i className="fa-solid fa-user"></i></Link>
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
-          <div className="avatar" style={{ background: 'linear-gradient(135deg,var(--yellow),var(--purple))' }}>{initials}</div>
+          <Link href="/comercio/perfil" className="avatar" style={{ background: 'linear-gradient(135deg,var(--yellow),var(--purple))', textDecoration: 'none' }}>{initials}</Link>
         </div>
       </div>
 
@@ -132,8 +134,8 @@ export default function Comercio() {
 
         <div className="pill-tabs mb-16">
           <button className={tab === 'pend' ? 'active' : ''} onClick={() => setTab('pend')}>Pendientes <span className="badge badge-yellow" style={{ marginLeft: 4 }}>{pend.length}</span></button>
-          <button className={tab === 'cot' ? 'active' : ''} onClick={() => setTab('cot')}>Cotizadas</button>
-          <button className={tab === 'ent' ? 'active' : ''} onClick={() => setTab('ent')}>Concretadas</button>
+          <button className={tab === 'cot' ? 'active' : ''} onClick={() => setTab('cot')}>Cotizadas {cot.length > 0 && <span className="badge badge-gray" style={{ marginLeft: 4 }}>{cot.length}</span>}</button>
+          <button className={tab === 'ent' ? 'active' : ''} onClick={() => setTab('ent')}>Concretadas {sales.length > 0 && <span className="badge badge-green" style={{ marginLeft: 4 }}>{sales.length}</span>}</button>
         </div>
 
         {tab === 'pend' && (!loaded ? <Loading label="Cargando solicitudes…" /> : pend.length === 0 ? (
@@ -157,6 +159,7 @@ export default function Comercio() {
             )}
             {r.photoUrls?.length > 0 && <div className="flex gap-8 mb-12">{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" onClick={() => setZoom(u)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />)}</div>}
             <div className="locked-info mb-12"><i className="fa-solid fa-user-secret"></i> Mecánico anónimo hasta concretar</div>
+            <button className="btn btn-ghost btn-sm btn-block mb-8" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
             <div className="flex gap-12">
               <button className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} onClick={() => { setDismissed((d) => [...d, r.id]); toast({ title: 'Marcado sin stock', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' }); }}><i className="fa-solid fa-ban"></i> Sin stock</button>
               <button className="btn btn-yellow btn-block" onClick={() => setModal(r)}><i className="fa-solid fa-tag"></i> Cotizar</button>
@@ -192,6 +195,7 @@ export default function Comercio() {
                       <div className="flex-between text-sm mb-8"><span className="muted">Tus precios</span><span style={{ fontWeight: 700 }}>{(r.myPrices || []).map((p) => '$' + p.toLocaleString('es-AR')).join(' · ')}</span></div>
                     )}
                     <div className="text-xs muted mb-8"><i className="fa-regular fa-clock"></i> {esPago ? `eligió ${timeAgo(r.selectedAt)}` : timeAgo(r.createdAt)}</div>
+                    <button className="btn btn-ghost btn-block btn-sm mb-8" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
                     {g.titulo === 'Esperando decisión' && r.myCount < 3 && <button className="btn btn-ghost btn-block btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar otra opción</button>}
                   </div>
                 );
@@ -202,11 +206,61 @@ export default function Comercio() {
 
         {tab === 'ent' && (!loaded ? <Loading label="Cargando tus ventas…" /> : sales.length === 0 ? (
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box"></i></div><div className="text-sm">Sin ventas concretadas todavía</div></div>
-        ) : <div className="cards-grid">{sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} onChanged={load} />)}</div>)}
+        ) : <div className="cards-grid">{sales.map((r) => <EntregaCard key={r.orderId} r={r} label={label(r)} veh={veh(r)} onChanged={load} onDetail={() => setDetalle(r)} />)}</div>)}
       </div>
 
       {modal && <CotizarModal lead={modal} label={label(modal)} veh={veh(modal)} onClose={() => setModal(null)} onSend={sendQuote} />}
+      {detalle && <DetalleModal r={detalle} onClose={() => setDetalle(null)} />}
       {zoom && <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'grid', placeItems: 'center', padding: 20, cursor: 'zoom-out' }}><img src={zoom} alt="" style={{ maxWidth: '92vw', maxHeight: '85vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 12 }} /></div>}
+    </div>
+  );
+}
+
+function DRow({ k, v }) {
+  return <div className="flex-between" style={{ padding: '7px 0', borderTop: '1px solid var(--border)', gap: 12 }}><span className="text-xs muted" style={{ flexShrink: 0 }}>{k}</span><span className="text-sm" style={{ fontWeight: 600, textAlign: 'right' }}>{v}</span></div>;
+}
+
+// Detalle de un pedido (sirve para Pendientes, Cotizadas y Concretadas — muestra lo que haya).
+function DetalleModal({ r, onClose }) {
+  const veh = `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
+  const isSale = !!r.orderId || !!r.orderStatus;
+  const ESTADO = { PAID: r.hasDelivery ? 'Pagado · repartidor en camino' : 'Pagado · esperando repartidor', SHIPPED: 'Retirado · en camino al taller', DELIVERED: 'Entregado al mecánico', READY: 'Listo', REFUNDED: 'Reembolsado' };
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4"><h2 className="h-md">{r.desc || r.catLabel || 'Repuesto'}</h2>{r.code && <span className="badge badge-gray">#{r.code}</span>}</div>
+        <p className="text-sm muted mb-16">{veh || 'Vehículo'}{r.catLabel ? ` · ${r.catLabel}` : ''}</p>
+
+        <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
+          <DRow k="Repuesto" v={r.desc || r.catLabel || '—'} />
+          <DRow k="Categoría" v={r.catLabel || '—'} />
+          <DRow k="Vehículo" v={veh || '—'} />
+          {r.vin && <DRow k="VIN / Chasis" v={r.vin} />}
+          <DRow k="Urgencia" v={r.urgency || '—'} />
+          <DRow k="Factura" v={r.invoiceType === 'factura_a' ? 'Factura A' : 'Consumidor Final'} />
+          {r.invoiceType === 'factura_a' && <DRow k="A nombre de" v={`${r.solicRazon || '—'}${r.solicCuit ? ` · CUIT ${r.solicCuit}` : ''}`} />}
+        </div>
+
+        {isSale && (
+          <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
+            <DRow k="Mecánico" v={r.mechanicName || '—'} />
+            <DRow k="Monto de la venta" v={r.part ? '$' + r.part.toLocaleString('es-AR') : '—'} />
+            <DRow k="Estado" v={ESTADO[r.orderStatus] || r.orderStatus || '—'} />
+            {r.creditAccount && <DRow k="Cuenta corriente" v={r.creditSettledAt ? 'Sí · procesada' : 'Sí · pendiente de procesar'} />}
+            {r.issue && <DRow k="Incidencia" v={r.issue} />}
+          </div>
+        )}
+
+        {r.photoUrls?.length > 0 && (
+          <div className="mb-12">
+            <div className="text-xs muted mb-8">Fotos</div>
+            <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>{r.photoUrls.map((u, i) => <img key={i} src={u} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />)}</div>
+          </div>
+        )}
+
+        <button className="btn btn-ghost btn-block" onClick={onClose}>Cerrar</button>
+      </div>
     </div>
   );
 }
@@ -263,7 +317,7 @@ function PorCobrar({ sales, onChanged }) {
   );
 }
 
-function EntregaCard({ r, label, veh, onChanged }) {
+function EntregaCard({ r, label, veh, onChanged, onDetail }) {
   const [pin, setPin] = useState('');
   const [sending, setSending] = useState(false); // evita doble-confirmación + da feedback
   async function confirmar() {
@@ -305,6 +359,7 @@ function EntregaCard({ r, label, veh, onChanged }) {
           </div>
         </div>
       )}
+      <button className="btn btn-ghost btn-sm btn-block mt-8" onClick={onDetail}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
     </div>
   );
 }

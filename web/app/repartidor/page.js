@@ -117,10 +117,8 @@ export default function Repartidor() {
             {/* RETIROS: uno por comercio */}
             {t.pickups.map((pk, i) => (
               <div className="card mb-12" key={pk.storeId} style={{ background: 'var(--bg-1)', padding: 12 }}>
-                <div className="flex-between mb-8">
-                  <Punto icon="fa-store" color="#FACC15" titulo={`Retiro ${t.pickups.length > 1 ? i + 1 : ''}`.trim()} lugar={pk.name} dir={pk.address} barrio={pk.barrio} maps={mapsUrl(pk)} />
-                  {pk.allPicked && <span className="badge badge-green" style={{ flexShrink: 0 }}><i className="fa-solid fa-check"></i> Retirado</span>}
-                </div>
+                <Punto icon="fa-store" color="#FACC15" titulo={`Retiro ${t.pickups.length > 1 ? i + 1 : ''}`.trim()} lugar={pk.name} dir={pk.address} barrio={pk.barrio} maps={mapsUrl(pk)} />
+                {pk.allPicked && <div className="mt-8"><span className="badge badge-green"><i className="fa-solid fa-check"></i> Retirado</span></div>}
                 <ItemsViaje items={pk.items} embedded />
                 {!pk.allPicked && (
                   <div className="mt-8">
@@ -203,9 +201,9 @@ function ItemsViaje({ items, embedded }) {
 
 function Punto({ icon, color, titulo, lugar, dir, barrio, maps }) {
   return (
-    <div className="flex-center gap-12">
-      <div className="store-avatar" style={{ width: 34, height: 34, background: 'transparent', color }}><i className={`fa-solid ${icon}`}></i></div>
-      <div style={{ flex: 1 }}>
+    <div className="flex gap-12" style={{ alignItems: 'flex-start' }}>
+      <div className="store-avatar" style={{ width: 34, height: 34, background: 'transparent', color, flexShrink: 0 }}><i className={`fa-solid ${icon}`}></i></div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div className="text-xs muted">{titulo}</div>
         <div className="text-sm" style={{ fontWeight: 700 }}>{lugar || '—'}</div>
         <div className="text-xs muted">{dir ? `${dir}${barrio ? ' · ' + barrio : ''}` : 'Sin dirección cargada'}</div>
