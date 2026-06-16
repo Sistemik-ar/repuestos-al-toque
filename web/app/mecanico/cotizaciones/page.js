@@ -74,7 +74,7 @@ export default function Cotizaciones() {
     <div className="app-shell">
       <div className="topbar">
         <div className="flex-center">
-          <Link href="/mecanico" className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link>
+          <Link href={(jobId || request?.jobId) ? `/mecanico/trabajo?id=${jobId || request.jobId}` : '/mecanico'} className="icon-btn"><i className="fa-solid fa-arrow-left"></i></Link>
           <div><div style={{ fontWeight: 800 }}>Cotizaciones</div><div className="text-xs muted">{request ? `Pedido #${request.code}` : id ? 'Cargando…' : 'Sin pedido'}</div></div>
         </div>
         <div className="icon-btn"><i className="fa-solid fa-tower-broadcast text-purple"></i></div>

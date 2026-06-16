@@ -130,9 +130,9 @@ export default function Trabajo() {
                   ) : <Link href={`/mecanico/detalle?id=${it.id}`} className="btn btn-ghost btn-sm btn-block">Ver detalle</Link>}
                   {/* cuenta corriente por ítem (solo antes de generar el link) */}
                   {it.selected && it.creditEligible && !locked && (
-                    <label className="flex-between mt-12" style={{ cursor: 'pointer', gap: 10 }}>
-                      <span className="text-xs subtle"><i className="fa-solid fa-id-card-clip text-purple"></i> Pagar este repuesto con Cuenta Corriente <span className="muted">(acá solo pagás comisión + envío)</span></span>
-                      <input type="checkbox" checked={!!it.useCredit} onChange={() => toggleCC(it)} />
+                    <label className="flex-between mt-12" style={{ cursor: 'pointer', gap: 12, padding: '12px 14px', border: '1px solid rgba(109,40,217,0.45)', borderRadius: 12, background: 'rgba(109,40,217,0.10)' }}>
+                      <span className="text-sm subtle" style={{ fontWeight: 600 }}><i className="fa-solid fa-id-card-clip text-purple"></i> Pagar con Cuenta Corriente <span className="muted" style={{ fontWeight: 400 }}>— acá solo pagás comisión + envío</span></span>
+                      <input type="checkbox" checked={!!it.useCredit} onChange={() => toggleCC(it)} style={{ width: 24, height: 24, accentColor: 'var(--purple)', flexShrink: 0, cursor: 'pointer' }} />
                     </label>
                   )}
                   {['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked && (

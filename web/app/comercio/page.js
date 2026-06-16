@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor, fmtDateTime } from '@/lib/ui';
@@ -49,6 +49,10 @@ export default function Comercio() {
     } catch {} // si una action falla (red/DB), conservamos el último estado válido
   };
   usePoll(load, 4000);
+
+  // Navegabilidad: persistir la pestaña activa para no resetear a "Pendientes" al volver/recargar.
+  useEffect(() => { const t = sessionStorage.getItem('rat_comercio_tab'); if (t) setTab(t); }, []);
+  useEffect(() => { try { sessionStorage.setItem('rat_comercio_tab', tab); } catch {} }, [tab]);
 
   // pendientes: solo con la ventana de cotización todavía abierta.
   // Orden: la que VENCE ANTES primero (es donde hay que actuar ya); urgente desempata.
