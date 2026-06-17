@@ -10,6 +10,7 @@ import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 import Loading from '@/components/Loading';
 import PushButton from '@/components/PushButton';
+import FontScale from '@/components/FontScale';
 
 export default function Comercio() {
   const router = useRouter();
@@ -107,6 +108,7 @@ export default function Comercio() {
       <div className="topbar">
         <Link href="/comercio" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Panel Comercio</span></Link>
         <div className="topbar-actions">
+          <FontScale />
           <Link href="/comercio/perfil" className="icon-btn" title="Mi perfil"><i className="fa-solid fa-user"></i></Link>
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
           <Link href="/comercio/perfil" className="avatar" style={{ background: 'linear-gradient(135deg,var(--yellow),var(--purple))', textDecoration: 'none' }}>{initials}</Link>
@@ -226,7 +228,7 @@ export default function Comercio() {
 }
 
 function DRow({ k, v }) {
-  return <div className="flex-between" style={{ padding: '7px 0', borderTop: '1px solid var(--border)', gap: 12 }}><span className="text-xs muted" style={{ flexShrink: 0 }}>{k}</span><span className="text-sm" style={{ fontWeight: 600, textAlign: 'right' }}>{v}</span></div>;
+  return <div className="flex-between" style={{ padding: '10px 0', borderTop: '1px solid var(--border)', gap: 12 }}><span className="text-sm" style={{ flexShrink: 0, color: '#fff' }}>{k}</span><span className="text-sm" style={{ fontWeight: 700, textAlign: 'right', color: '#fff' }}>{v}</span></div>;
 }
 
 // Detalle de un pedido (sirve para Pendientes, Cotizadas y Concretadas — muestra lo que haya).

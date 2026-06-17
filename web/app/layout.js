@@ -55,6 +55,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <head>
+        {/* Aplica el tamaño de texto guardado antes de pintar (evita parpadeo). Lo setea FontScale. */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var s=localStorage.getItem('rat_ui_scale');if(s&&s!=='1')document.documentElement.style.zoom=s;}catch(e){}` }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"

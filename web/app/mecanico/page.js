@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import Loading from '@/components/Loading';
 import PushButton from '@/components/PushButton';
+import FontScale from '@/components/FontScale';
 import { tierFor, toast, ping } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
@@ -68,6 +69,7 @@ export default function MecanicoDashboard() {
       <div className="topbar">
         <Link href="/mecanico" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></Link>
         <div className="topbar-actions">
+          <FontScale />
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
           <div className="avatar">{initials}</div>
         </div>
