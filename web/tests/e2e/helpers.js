@@ -25,8 +25,9 @@ export async function pickAddress(page, query = 'Mitre 100') {
 // arma un trabajo con 1 ítem y deja la pantalla en "¿seguir comprando?"
 export async function crearItem(m, desc, plate) {
   await m.goto('/mecanico/pedido');
-  await m.locator('button:has-text("Toyota Hilux")').first().click();
+  await m.locator('button:has-text("Toyota Hilux")').first().click(); // setea marca/modelo/año
   await m.getByPlaceholder('ABC123 o AB123CD').fill(plate);
+  await m.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
   await m.getByRole('button', { name: /Continuar/i }).click();
   await m.locator('text=Frenos').first().click();
   await m.locator('textarea').first().fill(desc);

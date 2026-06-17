@@ -237,6 +237,12 @@ function DetalleModal({ r, onClose }) {
   const veh = `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
   const isSale = !!r.orderId || !!r.orderStatus;
   const ESTADO = { PAID: r.hasDelivery ? 'Pagado · repartidor en camino' : 'Pagado · esperando repartidor', SHIPPED: 'Retirado · en camino al taller', DELIVERED: 'Entregado al mecánico', READY: 'Listo', REFUNDED: 'Reembolsado' };
+  // estado de la cotización (cuando todavía no es venta concretada)
+  const estadoCot = isSale ? null
+    : r.status === 'CANCELLED' ? 'Cancelado — el mecánico no pagó'
+    : r.status === 'CLOSED' ? (r.mySelected ? 'Esperando pago del mecánico' : 'No elegida')
+    : r.myCount > 0 ? 'Esperando decisión del mecánico'
+    : 'Pendiente — todavía no cotizaste';
   return (
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
@@ -255,6 +261,13 @@ function DetalleModal({ r, onClose }) {
           <DRow k="Factura" v={r.invoiceType === 'factura_a' ? 'Factura A' : 'Consumidor Final'} />
           {r.invoiceType === 'factura_a' && <DRow k="A nombre de" v={`${r.solicRazon || '—'}${r.solicCuit ? ` · CUIT ${r.solicCuit}` : ''}`} />}
         </div>
+
+        {estadoCot && (
+          <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
+            <DRow k="Estado" v={estadoCot} />
+            {r.mySelected && r.mySelectedPrice ? <DRow k="Precio elegido" v={'$' + r.mySelectedPrice.toLocaleString('es-AR')} /> : null}
+          </div>
+        )}
 
         {isSale && (
           <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
@@ -431,8 +444,17 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
     setUploading(false);
   }
 
+  // Evita perder el borrador por un toque accidental (sobre todo en mobile): si hay algo cargado,
+  // confirma antes de cerrar; y si una foto se está subiendo, no deja cerrar.
+  function tryClose() {
+    if (uploading) { toast({ title: 'Esperá un toque', sub: 'Se está subiendo la foto…', icon: 'fa-spinner', type: 'yellow' }); return; }
+    const dirty = !!(String(price).trim() || photos.length || String(note).trim());
+    if (dirty && !window.confirm('¿Descartar esta cotización? Vas a perder el precio y las fotos que cargaste.')) return;
+    onClose();
+  }
+
   return (
-    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) tryClose(); }}>
       <div className="modal">
         <div className="modal-handle"></div>
         <h2 className="h-md mb-4">Enviar cotización{lead.myCount > 0 ? ` · opción ${lead.myCount + 1}` : ''}</h2>
@@ -457,7 +479,7 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         </div>
         <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" maxLength={300} placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">
-          <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} disabled={sending} onClick={onClose}>Cancelar</button>
+          <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} disabled={sending} onClick={tryClose}>Cancelar</button>
           <button className="btn btn-yellow btn-block" disabled={!price || sending} onClick={async () => { setSending(true); try { await onSend({ price, partBrand: brand, optionLabel: opcion, note, photoUrls: photos }); } finally { setSending(false); } }}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Enviando…</> : <><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</>}</button>
         </div>
       </div>

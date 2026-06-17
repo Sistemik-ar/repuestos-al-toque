@@ -8,6 +8,7 @@ test.describe('Cambios MVP (UI)', () => {
     await page.goto('/mecanico/pedido');
     await page.locator('button:has-text("Toyota Hilux")').first().click();
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
+    await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click(); // -> paso 2
     await page.locator('text=Frenos').first().click(); // -> paso 3 (auto-avance)
     await expect(page.getByRole('heading', { name: /Describí el repuesto/i })).toBeVisible();
@@ -24,6 +25,7 @@ test.describe('Cambios MVP (UI)', () => {
     await page.goto('/mecanico/pedido');
     await page.locator('button:has-text("Toyota Hilux")').first().click();
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
+    await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click(); // -> paso 2 (categorías)
     await expect(page.getByText(/¿Qué tipo de repuesto/i)).toBeVisible();
     for (const c of ['Accesorios y equipamiento', 'Inyección y combustible', 'Lubricentro', 'Suspensión y dirección', 'Frenos']) {

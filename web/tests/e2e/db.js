@@ -114,7 +114,20 @@ export async function seedCreditSale({ mechEmail = 'mecanico@repuestosaltoque.co
   return { jobId: job.id, requestId: req.id, quoteId: quote.id, orderId: order.id };
 }
 
-// Borra una venta sembrada (orden -> request[cascada quote] -> job).
+// Siembra un pedido donde el mecánico YA eligió la cotización del comercio pero NO pagó
+// (request CLOSED + quote SELECTED, sin orden). Para probar el estado "Esperando pago".
+export async function seedChosenQuote({ mechEmail = 'mecanico@repuestosaltoque.com.ar', storeEmail = 'vendedor@repuestosaltoque.com.ar', desc = 'Pastillas elegidas E2E', price = 38000 } = {}) {
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: mechEmail } });
+  const store = await p.user.findUnique({ where: { email: storeEmail } });
+  const stamp = Date.now() + Math.floor(Math.random() * 1000);
+  const job = await p.job.create({ data: { code: 'JCH' + stamp, mechanicId: mech.id, plate: 'CH' + (stamp % 100000), brand: 'Fiat', model: 'Punto', status: 'CLOSED' } });
+  const req = await p.request.create({ data: { code: 'RCH' + stamp, mechanicId: mech.id, jobId: job.id, description: desc, status: 'CLOSED', selectedAt: new Date(), photoUrls: [] } });
+  const quote = await p.requestQuote.create({ data: { requestId: req.id, storeId: store.id, alias: 'Casa A', price, status: 'SELECTED', photoUrls: [] } });
+  return { jobId: job.id, requestId: req.id, quoteId: quote.id };
+}
+
+// Borra una venta/pedido sembrado (orden -> request[cascada quote] -> job).
 export async function removeSeededSale({ orderId, requestId, jobId } = {}) {
   const p = db();
   if (orderId) await p.order.delete({ where: { id: orderId } }).catch(() => {});

@@ -8,7 +8,8 @@ test.describe('Validación del pedido', () => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
     const continuar = page.getByRole('button', { name: /Continuar/i });
-    await page.locator('button:has-text("Toyota Hilux")').first().click(); // marca+modelo, falta patente
+    await page.locator('button:has-text("Toyota Hilux")').first().click(); // marca+modelo+año
+    await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización OK -> el único faltante es la patente
     await continuar.click(); // intenta avanzar incompleto
     await expect(page.getByText(/Cargá la patente/i).first()).toBeVisible(); // marca el faltante (toast + inline)
     await expect(page.getByText(/¿Para qué vehículo/i)).toBeVisible(); // sigue en Paso 1
@@ -24,6 +25,7 @@ test.describe('Validación del pedido', () => {
     await page.goto('/mecanico/pedido');
     await page.locator('button:has-text("Toyota Hilux")').first().click();
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
+    await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click();
     await page.locator('text=Frenos').first().click();
     await expect(page.getByRole('heading', { name: /Describí el repuesto/i })).toBeVisible(); // esperar Paso 3 (auto-avance 200ms)
@@ -40,6 +42,7 @@ test.describe('Validación del pedido', () => {
     await page.goto('/mecanico/pedido');
     await page.locator('button:has-text("Toyota Hilux")').first().click();
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
+    await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click();
     await page.locator('text=Frenos').first().click();
     await page.locator('textarea').first().fill('Pastillas de freno E2E');
