@@ -561,3 +561,41 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
   .step-row { grid-template-columns: repeat(3, 1fr); }
   .roles { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ===== Admin: tablas con búsqueda/orden/paginación, responsive (tablas → tarjetas en mobile) ===== */
+.rat-th-date { white-space: nowrap; }
+.rat-pgbtn { min-width: 38px; padding-left: 10px; padding-right: 10px; }
+
+/* Categorías por comercio: grilla de tarjetas */
+.rat-store-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.rat-store-card { background: var(--bg-1); border: 1px solid var(--border); border-radius: 14px; padding: 14px; transition: border-color .15s ease; }
+.rat-store-card:hover { border-color: var(--border-strong); }
+.rat-store-card .chip { display: inline-flex; align-items: center; gap: 6px; }
+@media (min-width: 820px) { .rat-store-grid { grid-template-columns: 1fr 1fr; } }
+
+/* Ordenamiento por columna (click en header en desktop) */
+.rat-th-sort { cursor: pointer; user-select: none; transition: color .12s ease; }
+.rat-th-sort:hover { color: var(--text-1); }
+.rat-th-active { color: var(--purple-light) !important; }
+.rat-sortbar { display: none; }
+@media (max-width: 720px) { .rat-sortbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; } }
+
+/* Mobile: formularios del admin a 1 columna (KPIs siguen 2-up) — scopeado al admin */
+@media (max-width: 600px) {
+  .app-shell.wide .grid-2 { grid-template-columns: 1fr; }
+  .app-shell.wide .dash-grid.grid-2 { grid-template-columns: 1fr 1fr; }
+}
+
+/* Mobile: tablas anchas → tarjetas apiladas con etiqueta (data-label) */
+@media (max-width: 720px) {
+  .rat-table thead { display: none; }
+  .rat-table, .rat-table tbody, .rat-table tr, .rat-table td { display: block; width: 100%; }
+  .rat-table tr { background: var(--bg-1); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; padding: 4px 2px; }
+  .rat-table tr:hover td { background: transparent; }
+  .rat-table td { border: none; padding: 9px 14px; display: flex; justify-content: space-between; align-items: center; gap: 16px; text-align: right; font-size: 13px; }
+  .rat-table td::before { content: attr(data-label); color: var(--text-2); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; text-align: left; flex-shrink: 0; }
+  .rat-table td.rat-actions { justify-content: flex-end; padding-top: 6px; }
+  .rat-table td.rat-actions::before { display: none; }
+  .rat-table td.rat-actions .flex { width: 100%; justify-content: flex-end; }
+  .rat-table td:empty { display: none; }
+}

@@ -1,45 +1,172 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { money, toast } from '@/lib/ui';
-import { usePoll, keep } from '@/lib/usePoll';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, searchAddresses, getUserDetail, updateUser } from '@/app/actions/data';
+import { money, toast, fmtDateTime } from '@/lib/ui';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, searchAddresses, getUserDetail, updateUser, getAdminTrip } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import Loading from '@/components/Loading';
 import FontScale from '@/components/FontScale';
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
 const ST_BADGE = { ACTIVE: 'badge-green', PENDING: 'badge-yellow', SUSPENDED: 'badge-red' };
+const CC_BADGE = { PENDING: ['badge-yellow', 'Pendiente'], APPROVED: ['badge-green', 'Aprobado'], REJECTED: ['badge-red', 'Rechazado'] };
+const CC_STATE = { PENDING: ['badge-yellow', 'Pendiente'], ACTIVE: ['badge-green', 'Activa'], REJECTED: ['badge-red', 'Rechazada'], DISABLED: ['badge-gray', 'Desactivada'] };
+
+// ----- columnas (key = campo crudo para ordenar/buscar; type str|num; date = mostrar fecha) -----
+const USER_COLS = [
+  { label: 'Nombre', key: 'name', type: 'str' },
+  { label: 'Email', key: 'email', type: 'str' },
+  { label: 'Rol', key: 'roleLabel', type: 'str' },
+  { label: 'Estado', key: 'status', type: 'str' },
+  { label: 'Alta', key: 'createdAt', type: 'num', date: true },
+  { label: '', key: null },
+];
+const USER_SEARCH = ['name', 'email', 'roleLabel'];
+const CC_COLS = [
+  { label: 'Mecánico', key: 'mechanicName', type: 'str' },
+  { label: 'Comercio', key: 'storeName', type: 'str' },
+  { label: 'Solicitada', key: 'createdAt', type: 'num', date: true },
+  { label: 'Aprob. admin', key: 'adminStatus', type: 'str' },
+  { label: 'Aprob. comercio', key: 'storeStatus', type: 'str' },
+  { label: 'Estado', key: 'status', type: 'str' },
+  { label: '', key: null },
+];
+const CC_SEARCH = ['mechanicName', 'storeName'];
+const ORDER_COLS = [
+  { label: '#', key: 'code', type: 'str' },
+  { label: 'Repuesto', key: 'label', type: 'str' },
+  { label: 'Vehículo', key: 'vehicle', type: 'str' },
+  { label: 'Total', key: 'total', type: 'num' },
+  { label: 'Estado', key: 'status', type: 'str' },
+  { label: 'Creado', key: 'created', type: 'num', date: true },
+  { label: 'Concretada', key: 'concretada', type: 'num', date: true },
+  { label: 'Reparto', key: 'tripRank', type: 'num' },
+];
+const ORDER_SEARCH = ['code', 'label', 'vehicle', 'status', 'total'];
+
+// ----- helpers de tabla (búsqueda + orden + paginación, client-side) -----
+function applySort(arr, sort, typeByKey) {
+  if (!sort || !sort.key) return arr;
+  const t = typeByKey[sort.key] || 'str';
+  const dir = sort.dir === 'desc' ? -1 : 1;
+  return [...arr].sort((a, b) => {
+    let x = a[sort.key], y = b[sort.key];
+    if (t === 'num') { const an = x == null, bn = y == null; if (an && bn) return 0; if (an) return 1; if (bn) return -1; return (x - y) * dir; }
+    x = String(x == null ? '' : x).toLowerCase(); y = String(y == null ? '' : y).toLowerCase();
+    return x < y ? -dir : x > y ? dir : 0;
+  });
+}
+// modelo de botones de paginado: 1 … (p-1) p (p+1) … N
+function pageButtons(page, pages) {
+  const out = [];
+  if (pages <= 7) { for (let i = 1; i <= pages; i++) out.push({ n: i }); return out; }
+  out.push({ n: 1 });
+  const lo = Math.max(2, page - 1), hi = Math.min(pages - 1, page + 1);
+  if (lo > 2) out.push({ ell: true });
+  for (let i = lo; i <= hi; i++) out.push({ n: i });
+  if (hi < pages - 1) out.push({ ell: true });
+  out.push({ n: pages });
+  return out;
+}
+function useTable(rows, cols, searchKeys, initialSort) {
+  const [query, setQ] = useState('');
+  const [sort, setSort] = useState(initialSort);
+  const [page, setPage] = useState(1);
+  const [perPage, setPP] = useState(10);
+  const typeByKey = useMemo(() => { const m = {}; cols.forEach((c) => { if (c.key) m[c.key] = c.type || 'str'; }); return m; }, [cols]);
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => (!q ? rows : rows.filter((r) => searchKeys.some((k) => String(r[k] == null ? '' : r[k]).toLowerCase().includes(q)))), [rows, q, searchKeys]);
+  const sorted = useMemo(() => applySort(filtered, sort, typeByKey), [filtered, sort, typeByKey]);
+  const total = sorted.length;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const cur = Math.min(page, pages);
+  const start = (cur - 1) * perPage;
+  const visible = sorted.slice(start, start + perPage);
+
+  const setSortKey = (key) => { setPage(1); setSort((s) => { const t = typeByKey[key]; const dir = s.key === key ? (s.dir === 'asc' ? 'desc' : 'asc') : (t === 'num' ? 'desc' : 'asc'); return { key, dir }; }); };
+  const headers = cols.map((c) => {
+    const sortable = !!c.key, active = sortable && sort.key === c.key;
+    const ind = !sortable ? '' : active ? (sort.dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort';
+    return { label: c.label, sortable, ind, thClass: (c.date ? 'rat-th-date ' : '') + (sortable ? 'rat-th-sort' : '') + (active ? ' rat-th-active' : ''), onSort: sortable ? () => setSortKey(c.key) : undefined };
+  });
+  const sortUI = {
+    key: sort.key, options: cols.filter((c) => c.key).map((c) => ({ value: c.key, label: c.label })),
+    dirIcon: sort.dir === 'asc' ? 'fa-arrow-up-wide-short' : 'fa-arrow-down-wide-short',
+    setKey: (e) => { const key = e.target.value; setPage(1); setSort({ key, dir: typeByKey[key] === 'num' ? 'desc' : 'asc' }); },
+    toggleDir: () => { setPage(1); setSort((s) => ({ key: s.key, dir: s.dir === 'asc' ? 'desc' : 'asc' })); },
+  };
+  const pager = {
+    info: total === 0 ? '0 resultados' : `${start + 1}–${Math.min(start + perPage, total)} de ${total}`,
+    page: cur, buttons: pageButtons(cur, pages), perPage, setPerPage: (n) => { setPP(n); setPage(1); },
+    prev: () => setPage((p) => Math.max(1, p - 1)), next: () => setPage((p) => Math.min(pages, p + 1)), go: setPage,
+    prevDisabled: cur <= 1, nextDisabled: cur >= pages,
+  };
+  return { query, setQuery: (v) => { setQ(v); setPage(1); }, visible, headers, sortUI, pager, total };
+}
+
+function Search({ value, onChange, placeholder }) {
+  return (
+    <div style={{ position: 'relative', maxWidth: 360, marginBottom: 12 }}>
+      <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-2)', fontSize: 13, pointerEvents: 'none' }}></i>
+      <input className="input" style={{ paddingLeft: 38 }} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      {value && <button type="button" onClick={() => onChange('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer' }}><i className="fa-solid fa-xmark"></i></button>}
+    </div>
+  );
+}
+function SortBar({ sortUI }) {
+  return (
+    <div className="rat-sortbar">
+      <span className="text-xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700, flexShrink: 0 }}>Ordenar</span>
+      <select className="select" style={{ flex: 1, padding: '9px 30px 9px 12px', fontSize: 13 }} value={sortUI.key} onChange={sortUI.setKey}>
+        {sortUI.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <button className="btn btn-ghost btn-sm rat-pgbtn" type="button" onClick={sortUI.toggleDir} title="Invertir orden"><i className={`fa-solid ${sortUI.dirIcon}`}></i></button>
+    </div>
+  );
+}
+function Thead({ headers }) {
+  return <thead><tr>{headers.map((h, i) => (
+    <th key={i} className={h.thClass} onClick={h.onSort}>{h.label}{h.sortable && <i className={`fa-solid ${h.ind}`} style={{ marginLeft: 6, fontSize: 10, opacity: 0.6 }}></i>}</th>
+  ))}</tr></thead>;
+}
+function Pager({ pager }) {
+  return (
+    <div className="flex-between" style={{ marginTop: 14, flexWrap: 'wrap', gap: 12 }}>
+      <div className="flex gap-8" style={{ alignItems: 'center' }}>
+        <span className="text-xs muted">{pager.info}</span>
+        <select className="select" style={{ padding: '6px 24px 6px 9px', fontSize: 12, width: 'auto' }} value={pager.perPage} onChange={(e) => pager.setPerPage(Number(e.target.value))} title="Filas por página">
+          <option value={5}>5</option><option value={10}>10</option><option value={25}>25</option>
+        </select>
+      </div>
+      <div className="flex gap-8" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-ghost btn-sm rat-pgbtn" type="button" onClick={pager.prev} disabled={pager.prevDisabled}><i className="fa-solid fa-chevron-left"></i></button>
+        {pager.buttons.map((p, i) => p.ell
+          ? <span key={i} className="muted" style={{ padding: '0 4px' }}>…</span>
+          : <button key={i} type="button" className={`btn btn-sm rat-pgbtn ${p.n === pager.page ? 'btn-primary' : 'btn-ghost'}`} onClick={() => pager.go(p.n)}>{p.n}</button>)}
+        <button className="btn btn-ghost btn-sm rat-pgbtn" type="button" onClick={pager.next} disabled={pager.nextDisabled}><i className="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </div>
+  );
+}
 
 export default function Admin() {
   const router = useRouter();
   const [d, setD] = useState(null);
+  const [creds, setCreds] = useState([]);
   const [tariffs, setTariffs] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // el dashboard se refresca solo; las tarifas NO (para no pisar lo que estás editando):
-  // se cargan una vez al entrar y se recargan después de guardar
-  const load = async () => { try { const a = await getAdminData(); setD((p) => keep(p, a || null)); } catch {} };
-  usePoll(load, 6000);
-  useEffect(() => { getShippingTariffs().then(setTariffs); }, []);
-
-  const [cred, setCred] = useState(null); // { email, pass } recién seteada para mostrar/copiar
-  const [editing, setEditing] = useState(null); // userId que se está editando en el modal
+  // Carga al entrar + botón "Actualizar" + recarga después de cada acción (sin auto-poll: no pisa búsqueda/página).
+  const load = async () => {
+    setRefreshing(true);
+    try { const [a, c] = await Promise.all([getAdminData(), getCreditRequests()]); setD(a || null); setCreds(c || []); } catch {}
+    setRefreshing(false);
+  };
+  useEffect(() => { load(); getShippingTariffs().then(setTariffs); }, []);
 
   async function logout() { await logoutAction(); router.push('/login'); }
-  async function toggleUser(u) {
-    const next = u.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
-    await setUserStatus(u.id, next); toast({ title: next === 'ACTIVE' ? 'Reactivado' : 'Suspendido', sub: u.email, icon: 'fa-user', type: 'green' }); load();
-  }
-  async function resetPass(u) {
-    const typed = window.prompt(`Contraseña temporal para ${u.email}\n(dejá vacío para generar una al azar):`);
-    if (typed === null) return; // canceló
-    const res = await setUserTempPassword(u.id, typed);
-    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
-    setCred({ email: res.email, pass: res.tempPassword });
-    toast({ title: 'Contraseña temporal lista', sub: res.email, icon: 'fa-key', type: 'green' });
-  }
-  // editor de tarifas
+  // editor de tarifas (se carga una vez y se recarga tras guardar, para no pisar lo que estás editando)
   function setRow(i, k, v) { setTariffs((t) => t.map((r, j) => (j === i ? { ...r, [k]: v } : r))); }
   function addRow() { setTariffs((t) => [...t, { uptoKm: '', price: '' }]); }
   function delRow(i) { setTariffs((t) => t.filter((_, j) => j !== i)); }
@@ -56,6 +183,7 @@ export default function Admin() {
         <Link href="/admin" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Admin · RepuestosAlToque</span></Link>
         <div className="topbar-actions">
           <span className="badge badge-gray"><i className="fa-solid fa-location-dot"></i> Bariloche</span>
+          <button className="icon-btn" onClick={load} title="Actualizar" disabled={refreshing}><i className={`fa-solid fa-rotate ${refreshing ? 'fa-spin' : ''}`}></i></button>
           <FontScale />
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
         </div>
@@ -75,17 +203,10 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Alta de usuarios */}
         <AltaUsuario onCreated={load} />
-
-        {/* Categorías que vende cada comercio */}
         <StoreCategories stores={d?.stores} categories={d?.categories} onSaved={load} />
-
-        {/* Comisión y recargo */}
         <Pricing />
-
-        {/* Cuentas corrientes */}
-        <CreditRequests />
+        <CreditSection rows={creds} onReload={load} />
 
         {/* Tarifas de envío */}
         <div className="card mb-16">
@@ -112,331 +233,112 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Usuarios */}
-        <div className="card mb-16">
-          <div className="section-title"><h2>Usuarios</h2><span className="text-xs muted">{d?.users?.length || 0}</span></div>
-          {cred && (
-            <div className="float-notif mb-12" style={{ borderColor: 'rgba(250,204,21,0.4)', background: 'linear-gradient(135deg,rgba(250,204,21,0.10),rgba(31,41,55,0.5))' }}>
-              <i className="fa-solid fa-key text-yellow"></i>
-              <div className="text-sm subtle">
-                <b>Contraseña temporal lista.</b> Pasásela al usuario:
-                <div className="text-xs mt-4">Email: <b>{cred.email}</b> · Contraseña: <b className="text-yellow">{cred.pass}</b>
-                  {' · '}<button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${cred.email} / ${cred.pass}`)}>copiar</button>
-                  {' · '}<button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => setCred(null)}>ocultar</button>
-                </div>
-              </div>
-            </div>
-          )}
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
-              <tbody>
-                {(d?.users || []).map((u) => (
-                  <tr key={u.id}>
-                    <td>{u.name || '—'}</td>
-                    <td className="text-xs">{u.email}</td>
-                    <td><span className="badge badge-gray">{ROLE_LABEL[u.role] || u.role}</span></td>
-                    <td><span className={`badge ${ST_BADGE[u.status] || 'badge-gray'}`}>{u.status}</span></td>
-                    <td>{u.role !== 'ADMIN' && (
-                      <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setEditing(u.id)} title="Editar usuario"><i className="fa-solid fa-user-pen"></i> Editar</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => resetPass(u)} title="Setear contraseña temporal"><i className="fa-solid fa-key"></i> Pass</button>
-                        <button className={`btn btn-sm ${u.status === 'SUSPENDED' ? 'btn-success' : 'btn-ghost'}`} onClick={() => toggleUser(u)}>{u.status === 'SUSPENDED' ? 'Reactivar' : 'Suspender'}</button>
-                      </div>
-                    )}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Últimos pedidos */}
-        <div className="card">
-          <div className="section-title"><h2>Últimos pedidos</h2></div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead><tr><th>#</th><th>Repuesto</th><th>Vehículo</th><th>Total</th><th>Estado</th></tr></thead>
-              <tbody>
-                {d === null && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
-                {d !== null && (d?.recent || []).length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin pedidos todavía</td></tr>}
-                {(d?.recent || []).map((r) => (
-                  <tr key={r.id}><td>{r.code}</td><td>{r.label}</td><td>{r.vehicle}</td><td>{r.total ? money(r.total) : '—'}</td><td><span className="badge badge-gray">{r.status}</span></td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <UsersSection users={d?.users} onReload={load} />
+        <OrdersSection orders={d?.recent} loading={d === null} />
 
         <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Admin</p>
       </div>
-
-      {editing && <EditUserModal userId={editing} onClose={() => setEditing(null)} onSaved={load} />}
     </div>
   );
 }
 
-function EditUserModal({ userId, onClose, onSaved }) {
-  const [f, setF] = useState(null); // null = cargando
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [locked, setLocked] = useState(false); // tiene trabajo activo -> rol bloqueado
+// ===================== USUARIOS =====================
+function UsersSection({ users, onReload }) {
+  const [cred, setCred] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const rows = useMemo(() => (users || []).map((u) => ({ ...u, roleLabel: ROLE_LABEL[u.role] || u.role })), [users]);
+  const t = useTable(rows, USER_COLS, USER_SEARCH, { key: 'createdAt', dir: 'desc' });
 
-  useEffect(() => {
-    let alive = true;
-    getUserDetail(userId).then((u) => {
-      if (!alive || !u) return;
-      setLocked(!!u.hasActiveWork);
-      setF({
-        role: u.role,
-        name: u.name || u.store?.tradeName || u.mechanic?.workshopName || '',
-        email: u.email || '',
-        phone: u.phone || '',
-        whatsapp: u.whatsapp || '',
-        address: u.store?.address || u.mechanic?.address || '',
-        lat: u.store?.lat ?? u.mechanic?.lat ?? null,
-        lng: u.store?.lng ?? u.mechanic?.lng ?? null,
-        barrio: u.store?.barrio || u.mechanic?.barrio || '',
-        cuit: u.store?.cuit || '',
-        ivaCondition: u.store?.ivaCondition || 'RESPONSABLE_INSCRIPTO',
-        vehicleType: u.delivery?.vehicleType || 'MOTO',
-        plate: u.delivery?.plate || '',
-        dni: u.delivery?.dni || '',
-        licenseNumber: u.delivery?.licenseNumber || '',
-        insurance: u.delivery?.insurance || '',
-      });
-    });
-    return () => { alive = false; };
-  }, [userId]);
-
-  if (!f) return (
-    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal"><div className="modal-handle"></div><Loading label="Cargando usuario…" /></div>
-    </div>
-  );
-
-  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const isStore = f.role === 'STORE'; const isMech = f.role === 'MECHANIC'; const isCourier = f.role === 'DELIVERY';
-
-  async function save() {
-    setError('');
-    setSaving(true);
-    const res = await updateUser(userId, f);
-    setSaving(false);
-    if (res?.error) { setError(res.error); return; }
-    toast({ title: 'Usuario actualizado', icon: 'fa-user-pen', type: 'green' });
-    onSaved?.(); onClose();
+  async function toggleUser(u) {
+    const next = u.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    await setUserStatus(u.id, next); toast({ title: next === 'ACTIVE' ? 'Reactivado' : 'Suspendido', sub: u.email, icon: 'fa-user', type: 'green' }); onReload?.();
+  }
+  async function resetPass(u) {
+    const typed = window.prompt(`Contraseña temporal para ${u.email}\n(dejá vacío para generar una al azar):`);
+    if (typed === null) return;
+    const res = await setUserTempPassword(u.id, typed);
+    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    setCred({ email: res.email, pass: res.tempPassword });
+    toast({ title: 'Contraseña temporal lista', sub: res.email, icon: 'fa-key', type: 'green' });
   }
 
-  return (
-    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
-      <div className="modal">
-        <div className="modal-handle"></div>
-        <h2 className="h-md mb-4">Editar usuario</h2>
-        <p className="text-sm muted mb-16">{f.email}</p>
-
-        <div className="grid-2 mb-12">
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Rol</label>
-            <select className="select" value={f.role} disabled={locked} onChange={(e) => set('role', e.target.value)}>
-              <option value="STORE">Casa de repuestos (vendedor)</option>
-              <option value="MECHANIC">Mecánico / Taller</option>
-              <option value="DELIVERY">Repartidor</option>
-            </select>
-            {locked && <div className="text-xs muted mt-4"><i className="fa-solid fa-lock"></i> Tiene órdenes/pedidos activos: el rol no se puede cambiar hasta cerrarlos.</div>}
-          </div>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>{isStore ? 'Nombre del comercio' : isMech ? 'Nombre del taller' : 'Nombre'}</label>
-            <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} />
-          </div>
-        </div>
-
-        <div className="grid-2 mb-12">
-          <div className="field" style={{ marginBottom: 0 }}><label>Email</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
-          <div className="field" style={{ marginBottom: 0 }}><label>WhatsApp</label><input className="input" value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} /></div>
-        </div>
-        <div className="field mb-12" style={{ maxWidth: '50%' }}><label>Teléfono</label><input className="input" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-
-        {(isStore || isMech) && (
-          <div className="grid-2 mb-12">
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Dirección *</label>
-              <AddressAutocomplete value={f.address} picked={f.lat != null && f.lng != null}
-                onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
-                onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
-              <div className="text-xs muted mt-4">Si no la cambiás, se conserva la dirección actual.</div>
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} /></div>
-          </div>
-        )}
-
-        {isStore && (
-          <div className="grid-2 mb-12">
-            <div className="field" style={{ marginBottom: 0 }}><label>CUIT</label><input className="input" inputMode="numeric" value={f.cuit} onChange={(e) => set('cuit', e.target.value)} /></div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Condición IVA</label>
-              <select className="select" value={f.ivaCondition} onChange={(e) => set('ivaCondition', e.target.value)}>
-                <option value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</option>
-                <option value="MONOTRIBUTO">Monotributo</option>
-                <option value="EXENTO">Exento</option>
-                <option value="CONSUMIDOR_FINAL">Consumidor Final</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {isCourier && (
-          <>
-            <div className="grid-2 mb-12">
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Tipo de vehículo</label>
-                <select className="select" value={f.vehicleType} onChange={(e) => set('vehicleType', e.target.value)}>
-                  <option value="MOTO">Moto</option><option value="AUTO">Auto</option><option value="UTILITARIO">Utilitario</option>
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}><label>Patente</label><input className="input" value={f.plate} onChange={(e) => set('plate', e.target.value)} /></div>
-            </div>
-            <div className="grid-2 mb-12">
-              <div className="field" style={{ marginBottom: 0 }}><label>DNI</label><input className="input" inputMode="numeric" value={f.dni} onChange={(e) => set('dni', e.target.value)} /></div>
-              <div className="field" style={{ marginBottom: 0 }}><label>Licencia</label><input className="input" value={f.licenseNumber} onChange={(e) => set('licenseNumber', e.target.value)} /></div>
-            </div>
-            <div className="field mb-12"><label>Seguro (aseguradora y póliza)</label><input className="input" value={f.insurance} onChange={(e) => set('insurance', e.target.value)} /><div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Sin DNI + licencia + seguro, el repartidor queda deshabilitado para tomar pedidos.</div></div>
-          </>
-        )}
-
-        {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
-        <div className="flex gap-12">
-          <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? <span className="spinner"></span> : <><i className="fa-solid fa-floppy-disk"></i> Guardar cambios</>}</button>
-          <button className="btn btn-ghost" disabled={saving} onClick={onClose}>Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StoreCategories({ stores, categories, onSaved }) {
-  if (!stores || !categories) return null;
-  if (stores.length === 0) return null;
   return (
     <div className="card mb-16">
-      <div className="section-title"><h2>Categorías por comercio</h2><span className="text-xs muted">qué rubros cotiza cada uno</span></div>
-      <p className="text-sm muted mb-12">Tildá los rubros que vende cada comercio: solo le van a llegar pedidos de esas categorías. Si no tildás ninguno, recibe de todas.</p>
-      {stores.map((st) => <StoreCatRow key={st.id} store={st} categories={categories} onSaved={onSaved} />)}
-    </div>
-  );
-}
-
-function StoreCatRow({ store, categories, onSaved }) {
-  const [sel, setSel] = useState(() => new Set(store.categoryIds || []));
-  const [saving, setSaving] = useState(false);
-  const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  async function save() {
-    setSaving(true);
-    const r = await setStoreCategories(store.id, [...sel]);
-    setSaving(false);
-    if (r?.error) { toast({ title: r.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
-    toast({ title: 'Rubros guardados', sub: store.name, icon: 'fa-check', type: 'green' });
-    onSaved?.();
-  }
-  return (
-    <div className="card mb-12 store-cat-row" style={{ background: 'var(--bg-1)' }}>
-      <div className="flex-between mb-8">
-        <div className="text-sm" style={{ fontWeight: 700 }}>{store.name}</div>
-        <button className="btn btn-yellow btn-sm" disabled={saving} onClick={save}>{saving ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : <><i className="fa-solid fa-floppy-disk"></i> Guardar</>}</button>
-      </div>
-      <div className="flex" style={{ flexWrap: 'wrap', gap: 8 }}>
-        {categories.map((c) => {
-          const on = sel.has(c.id);
-          return (
-            <button key={c.id} type="button" className="chip" onClick={() => toggle(c.id)}
-              style={on ? { background: 'var(--purple)', color: '#fff', borderColor: 'var(--purple)' } : {}}>
-              {on ? '✓ ' : ''}{c.name}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Autocompletado de direcciones de Bariloche: la dirección DEBE elegirse de la lista (trae coords
-// exactas para el cálculo de envío). Si el admin edita el texto, se borra la elección y hay que re-elegir.
-function AddressAutocomplete({ value, picked, onType, onPick }) {
-  const [sug, setSug] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const tRef = useRef(null);
-  function handleType(v) {
-    onType(v);
-    clearTimeout(tRef.current);
-    if (v.trim().length < 4) { setSug([]); setOpen(false); return; }
-    setLoading(true); setOpen(true);
-    tRef.current = setTimeout(async () => {
-      try { const res = await searchAddresses(v.trim()); setSug(res || []); } catch { setSug([]); }
-      setLoading(false);
-    }, 350);
-  }
-  return (
-    <div style={{ position: 'relative' }}>
-      <input className="input" value={value} autoComplete="off" placeholder="Escribí la calle y número, y elegí del listado"
-        onChange={(e) => handleType(e.target.value)} onFocus={() => { if (sug.length) setOpen(true); }} />
-      {picked
-        ? <div className="text-xs text-green mt-4"><i className="fa-solid fa-circle-check"></i> Dirección validada en Bariloche</div>
-        : value.trim().length >= 4 && <div className="text-xs muted mt-4">{loading ? 'Buscando…' : 'Elegí una opción del listado ↓'}</div>}
-      {open && !picked && sug.length > 0 && (
-        <div className="card address-suggest" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: 'auto', padding: 6 }}>
-          {sug.map((c, i) => (
-            <button key={i} type="button" className="btn btn-ghost btn-sm btn-block" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }}
-              onClick={() => { onPick(c); setSug([]); setOpen(false); }}>
-              <i className="fa-solid fa-location-dot text-purple"></i> {c.label}
-            </button>
-          ))}
+      <div className="section-title"><h2>Usuarios</h2><span className="text-xs muted">{t.total}</span></div>
+      {cred && (
+        <div className="float-notif mb-12" style={{ borderColor: 'rgba(250,204,21,0.4)', background: 'linear-gradient(135deg,rgba(250,204,21,0.10),rgba(31,41,55,0.5))' }}>
+          <i className="fa-solid fa-key text-yellow"></i>
+          <div className="text-sm subtle">
+            <b>Contraseña temporal lista.</b> Pasásela al usuario:
+            <div className="text-xs mt-4">Email: <b>{cred.email}</b> · Contraseña: <b className="text-yellow">{cred.pass}</b>
+              {' · '}<button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${cred.email} / ${cred.pass}`)}>copiar</button>
+              {' · '}<button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => setCred(null)}>ocultar</button>
+            </div>
+          </div>
         </div>
       )}
+      <Search value={t.query} onChange={t.setQuery} placeholder="Buscar por nombre, email o rol…" />
+      <SortBar sortUI={t.sortUI} />
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table rat-table">
+          <Thead headers={t.headers} />
+          <tbody>
+            {t.total === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin resultados</td></tr>}
+            {t.visible.map((u) => (
+              <tr key={u.id}>
+                <td data-label="Nombre">{u.name || '—'}</td>
+                <td data-label="Email" className="text-xs">{u.email}</td>
+                <td data-label="Rol"><span className="badge badge-gray">{u.roleLabel}</span></td>
+                <td data-label="Estado"><span className={`badge ${ST_BADGE[u.status] || 'badge-gray'}`}>{u.status}</span></td>
+                <td data-label="Alta" className="text-xs muted rat-th-date">{fmtDateTime(u.createdAt)}</td>
+                <td className="rat-actions">{u.role !== 'ADMIN' && (
+                  <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(u.id)} title="Editar usuario"><i className="fa-solid fa-user-pen"></i> Editar</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => resetPass(u)} title="Setear contraseña temporal"><i className="fa-solid fa-key"></i> Pass</button>
+                    <button className={`btn btn-sm ${u.status === 'SUSPENDED' ? 'btn-success' : 'btn-ghost'}`} onClick={() => toggleUser(u)}>{u.status === 'SUSPENDED' ? 'Reactivar' : 'Suspender'}</button>
+                  </div>
+                )}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager pager={t.pager} />
+      {editing && <EditUserModal userId={editing} onClose={() => setEditing(null)} onSaved={onReload} />}
     </div>
   );
 }
 
-function Kpi({ label, value, icon, yellow }) {
-  return (
-    <div className="card stat-card">
-      <div className="flex-between"><span className="stat-label">{label}</span><i className={`fa-solid ${icon} ${yellow ? 'text-yellow' : 'text-purple'}`}></i></div>
-      <div className={`stat-value ${yellow ? 'text-yellow' : ''}`}>{value}</div>
-    </div>
-  );
-}
-
-const CC_BADGE = { PENDING: ['badge-yellow', 'Pendiente'], APPROVED: ['badge-green', 'Aprobado'], REJECTED: ['badge-red', 'Rechazado'] };
-const CC_STATE = { PENDING: ['badge-yellow', 'Pendiente'], ACTIVE: ['badge-green', 'Activa'], REJECTED: ['badge-red', 'Rechazada'], DISABLED: ['badge-gray', 'Desactivada'] };
-
-function CreditRequests() {
-  const [rows, setRows] = useState([]);
-  const load = async () => { try { const r = await getCreditRequests(); setRows((p) => keep(p, r || [])); } catch {} };
-  usePoll(load, 6000);
-
-  async function approve(r) { await adminActOnCredit(r.id, true, null); toast({ title: 'Vinculación validada', icon: 'fa-check', type: 'green' }); load(); }
-  async function reject(r) { const note = window.prompt('Observación interna (opcional):') || null; await adminActOnCredit(r.id, false, note); toast({ title: 'Rechazada', icon: 'fa-ban', type: 'purple' }); load(); }
-  async function disable(r) { await disableCreditAccount(r.id); toast({ title: 'Relación desactivada', icon: 'fa-ban', type: 'purple' }); load(); }
+// ===================== CUENTA CORRIENTE =====================
+function CreditSection({ rows, onReload }) {
+  const t = useTable(rows || [], CC_COLS, CC_SEARCH, { key: 'createdAt', dir: 'desc' });
+  async function approve(r) { await adminActOnCredit(r.id, true, null); toast({ title: 'Vinculación validada', icon: 'fa-check', type: 'green' }); onReload?.(); }
+  async function reject(r) { const note = window.prompt('Observación interna (opcional):') || null; await adminActOnCredit(r.id, false, note); toast({ title: 'Rechazada', icon: 'fa-ban', type: 'purple' }); onReload?.(); }
+  async function disable(r) { await disableCreditAccount(r.id); toast({ title: 'Relación desactivada', icon: 'fa-ban', type: 'purple' }); onReload?.(); }
 
   return (
     <div className="card mb-16">
-      <div className="section-title"><h2>Solicitudes de Cuenta Corriente</h2><span className="text-xs muted">{rows.length}</span></div>
+      <div className="section-title"><h2>Solicitudes de Cuenta Corriente</h2><span className="text-xs muted">{t.total}</span></div>
+      <Search value={t.query} onChange={t.setQuery} placeholder="Buscar por mecánico o comercio…" />
+      <SortBar sortUI={t.sortUI} />
       <div style={{ overflowX: 'auto' }}>
-        <table className="table">
-          <thead><tr><th>Mecánico</th><th>Comercio</th><th>Admin</th><th>Comercio</th><th>Estado</th><th></th></tr></thead>
+        <table className="table rat-table">
+          <Thead headers={t.headers} />
           <tbody>
-            {rows.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin solicitudes</td></tr>}
-            {rows.map((r) => {
+            {t.total === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin solicitudes</td></tr>}
+            {t.visible.map((r) => {
               const st = CC_STATE[r.status] || ['badge-gray', r.status];
-              const a = CC_BADGE[r.adminStatus]; const sc = CC_BADGE[r.storeStatus];
+              const a = CC_BADGE[r.adminStatus] || ['badge-gray', r.adminStatus];
+              const sc = CC_BADGE[r.storeStatus] || ['badge-gray', r.storeStatus];
               return (
                 <tr key={r.id}>
-                  <td>{r.mechanicName}</td>
-                  <td>{r.storeName}</td>
-                  <td><span className={`badge ${a[0]}`}>{a[1]}</span></td>
-                  <td><span className={`badge ${sc[0]}`}>{sc[1]}</span></td>
-                  <td><span className={`badge ${st[0]}`}>{st[1]}</span>{r.adminNote && <div className="text-xs muted mt-4" title={r.adminNote}><i className="fa-solid fa-note-sticky"></i> nota</div>}</td>
-                  <td>
+                  <td data-label="Mecánico">{r.mechanicName}</td>
+                  <td data-label="Comercio">{r.storeName}</td>
+                  <td data-label="Solicitada" className="text-xs muted rat-th-date">{fmtDateTime(r.createdAt)}</td>
+                  <td data-label="Aprob. admin"><span className={`badge ${a[0]}`}>{a[1]}</span></td>
+                  <td data-label="Aprob. comercio"><span className={`badge ${sc[0]}`}>{sc[1]}</span></td>
+                  <td data-label="Estado"><span className={`badge ${st[0]}`}>{st[1]}</span>{r.adminNote && <div className="text-xs muted mt-4" title={r.adminNote}><i className="fa-solid fa-note-sticky"></i> nota</div>}</td>
+                  <td className="rat-actions">
                     <div className="flex gap-8">
                       {r.adminStatus === 'PENDING' && <><button className="btn btn-success btn-sm" onClick={() => approve(r)}>Validar</button><button className="btn btn-ghost btn-sm" onClick={() => reject(r)}>Rechazar</button></>}
                       {r.status === 'ACTIVE' && <button className="btn btn-danger btn-sm" onClick={() => disable(r)}>Desactivar</button>}
@@ -448,6 +350,193 @@ function CreditRequests() {
           </tbody>
         </table>
       </div>
+      <Pager pager={t.pager} />
+    </div>
+  );
+}
+
+// ===================== ÚLTIMOS PEDIDOS =====================
+function OrdersSection({ orders, loading }) {
+  const [tripId, setTripId] = useState(null);
+  const rows = useMemo(() => (orders || []).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' })), [orders]);
+  const t = useTable(rows, ORDER_COLS, ORDER_SEARCH, { key: 'created', dir: 'desc' });
+
+  return (
+    <div className="card">
+      <div className="section-title"><h2>Últimos pedidos</h2><span className="text-xs muted">{t.total}</span></div>
+      <Search value={t.query} onChange={t.setQuery} placeholder="Buscar repuesto, vehículo o total…" />
+      <SortBar sortUI={t.sortUI} />
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table rat-table">
+          <Thead headers={t.headers} />
+          <tbody>
+            {loading && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
+            {!loading && t.total === 0 && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
+            {t.visible.map((o) => (
+              <tr key={o.id}>
+                <td data-label="#" className="text-xs">{o.code}</td>
+                <td data-label="Repuesto">{o.label}</td>
+                <td data-label="Vehículo">{o.vehicle}</td>
+                <td data-label="Total">{o.totalStr}</td>
+                <td data-label="Estado"><span className="badge badge-gray">{o.status}</span></td>
+                <td data-label="Creado" className="text-xs muted rat-th-date">{fmtDateTime(o.created)}</td>
+                <td data-label="Concretada" className="text-xs muted rat-th-date">{fmtDateTime(o.concretada)}</td>
+                <td data-label="Reparto">{o.hasTrip
+                  ? <button className="btn btn-ghost btn-sm" onClick={() => setTripId(o.orderId)}><i className="fa-solid fa-truck-fast"></i> Ver reparto</button>
+                  : <span className="muted">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pager pager={t.pager} />
+      {tripId && <TripModal orderId={tripId} onClose={() => setTripId(null)} />}
+    </div>
+  );
+}
+
+function TripModal({ orderId, onClose }) {
+  const [trip, setTrip] = useState(null);
+  useEffect(() => { let alive = true; getAdminTrip(orderId).then((r) => { if (alive) setTrip(r || { events: [] }); }); return () => { alive = false; }; }, [orderId]);
+  const ST = { PAID: ['badge-yellow', 'Pagado'], SHIPPED: ['badge-yellow', 'En camino'], DELIVERED: ['badge-green', 'Entregado'], DONE: ['badge-green', 'Entregado'] };
+  const stBadge = trip ? (ST[trip.status] || ['badge-gray', trip.status]) : null;
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4">
+          <h2 className="h-md">Historial de reparto</h2>
+          <button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button>
+        </div>
+        {!trip ? <Loading label="Cargando reparto…" /> : (
+          <>
+            <p className="text-sm muted mb-16">{trip.code} · {trip.label}{trip.vehicle ? ` · ${trip.vehicle}` : ''}</p>
+            <div className="map-mock mb-16"><div className="map-route"></div><div className="map-pin start"></div><div className="map-pin driver"></div><div className="map-pin end"></div></div>
+            <div className="card mb-16" style={{ background: 'var(--bg-1)' }}>
+              <div className="flex-center gap-12">
+                <div className="store-avatar"><i className="fa-solid fa-motorcycle"></i></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="text-sm" style={{ fontWeight: 700 }}>{trip.courier || 'Sin repartidor asignado'}</div>
+                  {trip.plate && <div className="text-xs muted">Patente {trip.plate}</div>}
+                </div>
+                {stBadge && <span className={`badge ${stBadge[0]}`}>{stBadge[1]}</span>}
+              </div>
+              {trip.consolidated && (
+                <div className="float-notif mt-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-layer-group text-purple"></i><div className="text-xs subtle">Viaje <b>consolidado</b>: el repartidor retira piezas de más de un comercio en el mismo recorrido.</div></div>
+              )}
+            </div>
+            <div className="timeline">
+              {trip.events.map((e, i) => (
+                <div key={i} className={`timeline-item ${e.state}`}>
+                  <span className="dot"><i className={`fa-solid ${e.icon}`}></i></span>
+                  <div className="t-title">{e.title}</div>
+                  <div className="text-xs muted">{e.sub}</div>
+                  <div className="t-time">{e.time ? fmtDateTime(e.time) : '—'}</div>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-ghost btn-block mt-16" type="button" onClick={onClose}>Cerrar</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===================== CATEGORÍAS POR COMERCIO =====================
+function StoreCategories({ stores, categories, onSaved }) {
+  const [query, setQuery] = useState('');
+  const [catFilter, setCatFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  if (!stores || !categories || stores.length === 0) return null;
+
+  const q = query.trim().toLowerCase();
+  let list = stores;
+  if (q) list = list.filter((s) => (s.name || '').toLowerCase().includes(q));
+  if (catFilter) list = list.filter((s) => (s.categoryIds || []).includes(Number(catFilter)));
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const cur = Math.min(page, pages);
+  const start = (cur - 1) * perPage;
+  const visible = list.slice(start, start + perPage);
+  const pager = {
+    info: total === 0 ? '0 comercios' : `${start + 1}–${Math.min(start + perPage, total)} de ${total}`,
+    page: cur, buttons: pageButtons(cur, pages), perPage, setPerPage: (n) => { setPerPage(n); setPage(1); },
+    prev: () => setPage((p) => Math.max(1, p - 1)), next: () => setPage((p) => Math.min(pages, p + 1)), go: setPage,
+    prevDisabled: cur <= 1, nextDisabled: cur >= pages,
+  };
+
+  return (
+    <div className="card mb-16">
+      <div className="section-title"><h2>Categorías por comercio</h2><span className="text-xs muted">qué rubros cotiza cada uno</span></div>
+      <p className="text-sm muted mb-12">Tildá los rubros que vende cada comercio: solo le van a llegar pedidos de esas categorías. Si no tildás ninguno, recibe de todas.</p>
+      <div className="flex gap-12 mb-16" style={{ flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 200, maxWidth: 340 }}>
+          <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-2)', fontSize: 13, pointerEvents: 'none' }}></i>
+          <input className="input" style={{ paddingLeft: 38 }} placeholder="Buscar comercio…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} />
+          {query && <button type="button" onClick={() => { setQuery(''); setPage(1); }} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer' }}><i className="fa-solid fa-xmark"></i></button>}
+        </div>
+        <select className="select" style={{ flex: '0 1 260px', minWidth: 200 }} value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setPage(1); }}>
+          <option value="">Todos los rubros</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      {total === 0
+        ? <div className="empty-state" style={{ padding: '32px 20px' }}><div className="empty-icon"><i className="fa-solid fa-store-slash"></i></div>No hay comercios que coincidan con el filtro.</div>
+        : <div className="rat-store-grid">{visible.map((st) => <StoreCatCard key={st.id} store={st} categories={categories} onSaved={onSaved} />)}</div>}
+      <Pager pager={pager} />
+    </div>
+  );
+}
+
+function StoreCatCard({ store, categories, onSaved }) {
+  const [sel, setSel] = useState(() => new Set(store.categoryIds || []));
+  const [saving, setSaving] = useState(false);
+  // si el comercio cambió por recarga, re-sincronizar la selección
+  useEffect(() => { setSel(new Set(store.categoryIds || [])); }, [store.categoryIds]);
+  const toggle = (id) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const countLabel = sel.size === 0 ? 'Recibe de todos los rubros' : `${sel.size} rubro${sel.size === 1 ? '' : 's'}`;
+  async function save() {
+    setSaving(true);
+    const r = await setStoreCategories(store.id, [...sel]);
+    setSaving(false);
+    if (r?.error) { toast({ title: r.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    toast({ title: 'Rubros guardados', sub: store.name, icon: 'fa-check', type: 'green' });
+    onSaved?.();
+  }
+  return (
+    <div className="rat-store-card">
+      <div className="flex-between mb-12" style={{ gap: 12 }}>
+        <div className="flex-center gap-12" style={{ minWidth: 0 }}>
+          <div className="store-avatar"><i className="fa-solid fa-store"></i></div>
+          <div style={{ minWidth: 0 }}>
+            <div className="text-sm" style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{store.name}</div>
+            <div className="text-xs muted" style={{ marginTop: 2 }}>{countLabel}</div>
+          </div>
+        </div>
+        <button className="btn btn-yellow btn-sm" disabled={saving} onClick={save} style={{ flexShrink: 0 }}>{saving ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : <><i className="fa-solid fa-floppy-disk"></i> Guardar</>}</button>
+      </div>
+      <div className="flex" style={{ flexWrap: 'wrap', gap: 8 }}>
+        {categories.map((c) => {
+          const on = sel.has(c.id);
+          return (
+            <button key={c.id} type="button" className="chip" onClick={() => toggle(c.id)} style={on ? { background: 'var(--purple)', color: '#fff', borderColor: 'var(--purple)' } : {}}>
+              {on && <i className="fa-solid fa-check" style={{ fontSize: 10 }}></i>} {c.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===================== KPI / PRICING / ALTA / EDIT (sin cambios funcionales) =====================
+function Kpi({ label, value, icon, yellow }) {
+  return (
+    <div className="card stat-card">
+      <div className="flex-between"><span className="stat-label">{label}</span><i className={`fa-solid ${icon} ${yellow ? 'text-yellow' : 'text-purple'}`}></i></div>
+      <div className={`stat-value ${yellow ? 'text-yellow' : ''}`}>{value}</div>
     </div>
   );
 }
@@ -486,11 +575,9 @@ function AltaUsuario({ onCreated }) {
   const [f, setF] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState(null); // {email, tempPassword, geocoded}
+  const [done, setDone] = useState(null);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const isStore = f.role === 'STORE';
-  const isMech = f.role === 'MECHANIC';
-  const isCourier = f.role === 'DELIVERY';
+  const isStore = f.role === 'STORE'; const isMech = f.role === 'MECHANIC'; const isCourier = f.role === 'DELIVERY';
 
   async function submit(e) {
     e.preventDefault(); setError('');
@@ -505,7 +592,6 @@ function AltaUsuario({ onCreated }) {
   return (
     <div className="card mb-16">
       <div className="section-title"><h2>Alta de usuario</h2><span className="text-xs muted">por invitación manual</span></div>
-
       {done && (
         <div className="float-notif mb-16" style={{ borderColor: 'rgba(34,197,94,0.35)', background: 'linear-gradient(135deg,rgba(34,197,94,0.12),rgba(31,41,55,0.5))' }}>
           <i className="fa-solid fa-circle-check text-green"></i>
@@ -516,7 +602,6 @@ function AltaUsuario({ onCreated }) {
           </div>
         </div>
       )}
-
       <form onSubmit={submit}>
         <div className="grid-2 mb-12">
           <div className="field" style={{ marginBottom: 0 }}>
@@ -532,27 +617,21 @@ function AltaUsuario({ onCreated }) {
             <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder={isStore ? 'Repuestos Centro' : isMech ? 'Taller Patagonia' : 'Diego R.'} />
           </div>
         </div>
-
         <div className="grid-2 mb-12">
           <div className="field" style={{ marginBottom: 0 }}><label>Email</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="cuenta@email.com" /></div>
           <div className="field" style={{ marginBottom: 0 }}><label>WhatsApp</label><input className="input" value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+54 9 294 ..." /></div>
         </div>
-
         {(isStore || isMech) && (
           <div className="grid-2 mb-12">
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Dirección *</label>
-              <AddressAutocomplete
-                value={f.address}
-                picked={f.lat != null && f.lng != null}
+              <AddressAutocomplete value={f.address} picked={f.lat != null && f.lng != null}
                 onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
-                onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))}
-              />
+                onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
             </div>
             <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} placeholder="Centro" /></div>
           </div>
         )}
-
         {isStore && (
           <div className="grid-2 mb-12">
             <div className="field" style={{ marginBottom: 0 }}><label>CUIT</label><input className="input" inputMode="numeric" value={f.cuit} onChange={(e) => set('cuit', e.target.value)} placeholder="30-12345678-9" /></div>
@@ -567,7 +646,6 @@ function AltaUsuario({ onCreated }) {
             </div>
           </div>
         )}
-
         {isCourier && (
           <>
             <div className="grid-2 mb-12">
@@ -583,18 +661,174 @@ function AltaUsuario({ onCreated }) {
               <div className="field" style={{ marginBottom: 0 }}><label>DNI *</label><input className="input" inputMode="numeric" value={f.dni} onChange={(e) => set('dni', e.target.value)} placeholder="30111222" /></div>
               <div className="field" style={{ marginBottom: 0 }}><label>Licencia de conducir *</label><input className="input" value={f.licenseNumber} onChange={(e) => set('licenseNumber', e.target.value)} placeholder="Nro de licencia" /></div>
             </div>
-            <div className="field mb-12" style={{ marginBottom: 12 }}>
+            <div className="field mb-12">
               <label>Seguro (aseguradora y póliza) *</label>
               <input className="input" value={f.insurance} onChange={(e) => set('insurance', e.target.value)} placeholder="Ej: Rivadavia · póliza 12345" />
               <div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Sin DNI + licencia + seguro, el repartidor queda deshabilitado para tomar pedidos.</div>
             </div>
           </>
         )}
-
         {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
         <button className="btn btn-primary" type="submit" disabled={loading || !f.email}>{loading ? <span className="spinner"></span> : <><i className="fa-solid fa-user-plus"></i> Crear usuario</>}</button>
         <span className="text-xs muted" style={{ marginLeft: 12 }}>Se genera una contraseña temporal para compartir.</span>
       </form>
+    </div>
+  );
+}
+
+function EditUserModal({ userId, onClose, onSaved }) {
+  const [f, setF] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getUserDetail(userId).then((u) => {
+      if (!alive || !u) return;
+      setLocked(!!u.hasActiveWork);
+      setF({
+        role: u.role, name: u.name || u.store?.tradeName || u.mechanic?.workshopName || '', email: u.email || '',
+        phone: u.phone || '', whatsapp: u.whatsapp || '', address: u.store?.address || u.mechanic?.address || '',
+        lat: u.store?.lat ?? u.mechanic?.lat ?? null, lng: u.store?.lng ?? u.mechanic?.lng ?? null,
+        barrio: u.store?.barrio || u.mechanic?.barrio || '', cuit: u.store?.cuit || '', ivaCondition: u.store?.ivaCondition || 'RESPONSABLE_INSCRIPTO',
+        vehicleType: u.delivery?.vehicleType || 'MOTO', plate: u.delivery?.plate || '', dni: u.delivery?.dni || '',
+        licenseNumber: u.delivery?.licenseNumber || '', insurance: u.delivery?.insurance || '',
+      });
+    });
+    return () => { alive = false; };
+  }, [userId]);
+
+  if (!f) return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal"><div className="modal-handle"></div><Loading label="Cargando usuario…" /></div>
+    </div>
+  );
+
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const isStore = f.role === 'STORE'; const isMech = f.role === 'MECHANIC'; const isCourier = f.role === 'DELIVERY';
+
+  async function save() {
+    setError(''); setSaving(true);
+    const res = await updateUser(userId, f);
+    setSaving(false);
+    if (res?.error) { setError(res.error); return; }
+    toast({ title: 'Usuario actualizado', icon: 'fa-user-pen', type: 'green' });
+    onSaved?.(); onClose();
+  }
+
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+      <div className="modal">
+        <div className="modal-handle"></div>
+        <h2 className="h-md mb-4">Editar usuario</h2>
+        <p className="text-sm muted mb-16">{f.email}</p>
+        <div className="grid-2 mb-12">
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Rol</label>
+            <select className="select" value={f.role} disabled={locked} onChange={(e) => set('role', e.target.value)}>
+              <option value="STORE">Casa de repuestos (vendedor)</option>
+              <option value="MECHANIC">Mecánico / Taller</option>
+              <option value="DELIVERY">Repartidor</option>
+            </select>
+            {locked && <div className="text-xs muted mt-4"><i className="fa-solid fa-lock"></i> Tiene órdenes/pedidos activos: el rol no se puede cambiar hasta cerrarlos.</div>}
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>{isStore ? 'Nombre del comercio' : isMech ? 'Nombre del taller' : 'Nombre'}</label>
+            <input className="input" value={f.name} onChange={(e) => set('name', e.target.value)} />
+          </div>
+        </div>
+        <div className="grid-2 mb-12">
+          <div className="field" style={{ marginBottom: 0 }}><label>Email</label><input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
+          <div className="field" style={{ marginBottom: 0 }}><label>WhatsApp</label><input className="input" value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} /></div>
+        </div>
+        <div className="field mb-12" style={{ maxWidth: '50%' }}><label>Teléfono</label><input className="input" value={f.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+        {(isStore || isMech) && (
+          <div className="grid-2 mb-12">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Dirección *</label>
+              <AddressAutocomplete value={f.address} picked={f.lat != null && f.lng != null}
+                onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
+                onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
+              <div className="text-xs muted mt-4">Si no la cambiás, se conserva la dirección actual.</div>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} /></div>
+          </div>
+        )}
+        {isStore && (
+          <div className="grid-2 mb-12">
+            <div className="field" style={{ marginBottom: 0 }}><label>CUIT</label><input className="input" inputMode="numeric" value={f.cuit} onChange={(e) => set('cuit', e.target.value)} /></div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Condición IVA</label>
+              <select className="select" value={f.ivaCondition} onChange={(e) => set('ivaCondition', e.target.value)}>
+                <option value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</option>
+                <option value="MONOTRIBUTO">Monotributo</option>
+                <option value="EXENTO">Exento</option>
+                <option value="CONSUMIDOR_FINAL">Consumidor Final</option>
+              </select>
+            </div>
+          </div>
+        )}
+        {isCourier && (
+          <>
+            <div className="grid-2 mb-12">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Tipo de vehículo</label>
+                <select className="select" value={f.vehicleType} onChange={(e) => set('vehicleType', e.target.value)}>
+                  <option value="MOTO">Moto</option><option value="AUTO">Auto</option><option value="UTILITARIO">Utilitario</option>
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Patente</label><input className="input" value={f.plate} onChange={(e) => set('plate', e.target.value)} /></div>
+            </div>
+            <div className="grid-2 mb-12">
+              <div className="field" style={{ marginBottom: 0 }}><label>DNI</label><input className="input" inputMode="numeric" value={f.dni} onChange={(e) => set('dni', e.target.value)} /></div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Licencia</label><input className="input" value={f.licenseNumber} onChange={(e) => set('licenseNumber', e.target.value)} /></div>
+            </div>
+            <div className="field mb-12"><label>Seguro (aseguradora y póliza)</label><input className="input" value={f.insurance} onChange={(e) => set('insurance', e.target.value)} /><div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Sin DNI + licencia + seguro, el repartidor queda deshabilitado para tomar pedidos.</div></div>
+          </>
+        )}
+        {error && <div className="text-sm text-red mb-12"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
+        <div className="flex gap-12">
+          <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? <span className="spinner"></span> : <><i className="fa-solid fa-floppy-disk"></i> Guardar cambios</>}</button>
+          <button className="btn btn-ghost" disabled={saving} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddressAutocomplete({ value, picked, onType, onPick }) {
+  const [sug, setSug] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const tRef = useRef(null);
+  function handleType(v) {
+    onType(v);
+    clearTimeout(tRef.current);
+    if (v.trim().length < 4) { setSug([]); setOpen(false); return; }
+    setLoading(true); setOpen(true);
+    tRef.current = setTimeout(async () => {
+      try { const res = await searchAddresses(v.trim()); setSug(res || []); } catch { setSug([]); }
+      setLoading(false);
+    }, 350);
+  }
+  return (
+    <div style={{ position: 'relative' }}>
+      <input className="input" value={value} autoComplete="off" placeholder="Escribí la calle y número, y elegí del listado"
+        onChange={(e) => handleType(e.target.value)} onFocus={() => { if (sug.length) setOpen(true); }} />
+      {picked
+        ? <div className="text-xs text-green mt-4"><i className="fa-solid fa-circle-check"></i> Dirección validada en Bariloche</div>
+        : value.trim().length >= 4 && <div className="text-xs muted mt-4">{loading ? 'Buscando…' : 'Elegí una opción del listado ↓'}</div>}
+      {open && !picked && sug.length > 0 && (
+        <div className="card address-suggest" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: 'auto', padding: 6 }}>
+          {sug.map((c, i) => (
+            <button key={i} type="button" className="btn btn-ghost btn-sm btn-block" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }}
+              onClick={() => { onPick(c); setSug([]); setOpen(false); }}>
+              <i className="fa-solid fa-location-dot text-purple"></i> {c.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

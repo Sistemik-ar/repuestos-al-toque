@@ -562,19 +562,58 @@ export async function getAdminData() {
     prisma.user.count(),
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
-    prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, email: true, name: true, role: true, status: true } }),
-    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 150, include: { category: true, order: true } }),
+    prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
+    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
   ]);
   const commission = paid.reduce((a, o) => a + num(o.commissionAmount), 0);
   return {
     kpis: { users: usersCount, requests: reqCount, paid: paid.length, commission },
-    users,
+    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, status: u.status, createdAt: u.createdAt ? u.createdAt.getTime() : null })),
     categories,
     // comercios con los rubros que tienen asignados (para el editor de categorías)
     stores: storeRows.map((st) => ({ id: st.userId, name: st.tradeName, categoryIds: st.categories.map((c) => c.categoryId) })),
-    recent: recent.map((r) => ({ id: r.id, code: r.code, label: r.description || r.category?.name || 'Repuesto', vehicle: `${r.brand || ''} ${r.model || ''}`.trim(), status: r.status, total: r.order ? num(r.order.total) : null })),
+    recent: recent.map((r) => ({
+      id: r.id, code: r.code,
+      label: r.description || r.category?.name || 'Repuesto',
+      vehicle: `${r.brand || ''} ${r.model || ''}`.trim(),
+      status: r.status,
+      total: r.order ? num(r.order.total) : null,
+      created: r.createdAt ? r.createdAt.getTime() : null,
+      concretada: r.order ? r.order.createdAt.getTime() : null,
+      orderId: r.order ? r.order.id : null,
+      hasTrip: !!(r.order && (r.order.deliveryId || ['SHIPPED', 'DELIVERED', 'DONE'].includes(r.order.status))),
+    })),
+  };
+}
+
+// Historial de reparto de un pedido (para el modal del admin). On-demand, con timestamps reales.
+export async function getAdminTrip(orderId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const o = await prisma.order.findUnique({ where: { id: orderId }, include: { request: { select: { code: true, description: true, brand: true, model: true } } } });
+  if (!o) return null;
+  let courier = null, plate = null;
+  if (o.deliveryId) {
+    const dp = await prisma.deliveryProfile.findUnique({ where: { userId: o.deliveryId }, select: { plate: true, user: { select: { name: true } } } });
+    courier = dp?.user?.name || 'Repartidor'; plate = dp?.plate || null;
+  }
+  let consolidated = false;
+  if (o.shipmentId) { const cnt = await prisma.order.count({ where: { shipmentId: o.shipmentId } }); consolidated = cnt > 1; }
+  const ms = (d) => (d ? d.getTime() : null);
+  const ev = [];
+  ev.push({ icon: 'fa-credit-card', title: 'Pedido pagado', sub: 'Mercado Pago', time: ms(o.createdAt), state: 'done' });
+  if (o.arrivedPickupAt) ev.push({ icon: 'fa-store', title: 'Llegó al comercio', sub: 'Retiro de la pieza', time: ms(o.arrivedPickupAt), state: 'done' });
+  if (o.pickedAt) ev.push({ icon: 'fa-box', title: 'Retiró la pieza', sub: 'PIN de retiro validado', time: ms(o.pickedAt), state: 'done' });
+  if (o.arrivedDropAt) ev.push({ icon: 'fa-location-dot', title: 'Llegó al taller', sub: 'Entrega al mecánico', time: ms(o.arrivedDropAt), state: 'done' });
+  if (o.deliveredAt) ev.push({ icon: 'fa-circle-check', title: 'Entregado', sub: 'PIN de entrega validado', time: ms(o.deliveredAt), state: 'done' });
+  else ev.push({ icon: 'fa-circle-check', title: 'Entrega pendiente', sub: 'Espera el PIN del mecánico', time: null, state: o.deliveryId ? 'current' : 'pending' });
+  if (o.issue) ev.push({ icon: 'fa-triangle-exclamation', title: 'Incidencia reportada', sub: o.issue, time: ms(o.issueAt), state: 'done' });
+  return {
+    code: o.request?.code || '',
+    label: o.request?.description || 'Repuesto',
+    vehicle: `${o.request?.brand || ''} ${o.request?.model || ''}`.trim(),
+    courier, plate, consolidated, status: o.status, events: ev,
   };
 }
 
@@ -886,7 +925,7 @@ export async function getCreditRequests() {
   ]);
   const mName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
   const sName = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
-  return ccs.map((c) => ({ id: c.id, mechanicName: mName[c.mechanicId] || 'Taller', storeName: sName[c.storeId] || 'Comercio', adminStatus: c.adminStatus, storeStatus: c.storeStatus, adminNote: c.adminNote, status: creditStatus(c) }));
+  return ccs.map((c) => ({ id: c.id, mechanicName: mName[c.mechanicId] || 'Taller', storeName: sName[c.storeId] || 'Comercio', adminStatus: c.adminStatus, storeStatus: c.storeStatus, adminNote: c.adminNote, status: creditStatus(c), createdAt: c.createdAt ? c.createdAt.getTime() : null }));
 }
 
 export async function adminActOnCredit(id, approve, note) {
