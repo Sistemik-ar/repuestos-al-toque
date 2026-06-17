@@ -13,7 +13,9 @@ test('el comercio solo recibe pedidos de los rubros que le asignó el admin', as
   // 1) ADMIN: al comercio "Repuestos Centro" le deja SOLO "Motor" (no Frenos)
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
-  const row = a.locator('.store-cat-row', { hasText: 'Repuestos Centro' });
+  await a.getByRole('button', { name: /Comercios/i }).click(); // tab Comercios
+  await a.getByPlaceholder(/Buscar comercio/i).fill('Repuestos Centro'); // filtra la grilla paginada
+  const row = a.locator('.rat-store-card', { hasText: 'Repuestos Centro' });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole('button', { name: /^✓?\s*Motor$/ }).click(); // tildar Motor
   await row.getByRole('button', { name: /Guardar/i }).click();

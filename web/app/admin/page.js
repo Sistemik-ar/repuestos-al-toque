@@ -156,6 +156,7 @@ export default function Admin() {
   const [creds, setCreds] = useState([]);
   const [tariffs, setTariffs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState('usuarios');
 
   // Carga al entrar + botón "Actualizar" + recarga después de cada acción (sin auto-poll: no pisa búsqueda/página).
   const load = async () => {
@@ -203,38 +204,52 @@ export default function Admin() {
           </div>
         )}
 
-        <AltaUsuario onCreated={load} />
-        <StoreCategories stores={d?.stores} categories={d?.categories} onSaved={load} />
-        <Pricing />
-        <CreditSection rows={creds} onReload={load} />
+        <div className="rat-tabs"><div className="pill-tabs">
+          <button type="button" className={tab === 'usuarios' ? 'active' : ''} onClick={() => setTab('usuarios')}><i className="fa-solid fa-users"></i> Usuarios</button>
+          <button type="button" className={tab === 'comercios' ? 'active' : ''} onClick={() => setTab('comercios')}><i className="fa-solid fa-store"></i> Comercios</button>
+          <button type="button" className={tab === 'cuentas' ? 'active' : ''} onClick={() => setTab('cuentas')}><i className="fa-solid fa-id-card-clip"></i> Cuenta corriente</button>
+          <button type="button" className={tab === 'pedidos' ? 'active' : ''} onClick={() => setTab('pedidos')}><i className="fa-solid fa-receipt"></i> Pedidos</button>
+          <button type="button" className={tab === 'ajustes' ? 'active' : ''} onClick={() => setTab('ajustes')}><i className="fa-solid fa-sliders"></i> Ajustes</button>
+        </div></div>
 
-        {/* Tarifas de envío */}
-        <div className="card mb-16">
-          <div className="section-title"><h2>Tarifas de envío (por km)</h2><span className="text-xs muted">respeta el envío mínimo configurado</span></div>
-          <p className="text-sm muted mb-12">Definí cuánto sale el envío según la distancia. "Hasta N km → precio". Se usa la banda más chica que cubra la distancia.</p>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead><tr><th>Hasta (km)</th><th>Precio</th><th></th></tr></thead>
-              <tbody>
-                {tariffs.map((r, i) => (
-                  <tr key={i}>
-                    <td><input className="input" style={{ maxWidth: 110 }} inputMode="numeric" value={r.uptoKm} onChange={(e) => setRow(i, 'uptoKm', e.target.value)} /></td>
-                    <td><input className="input" style={{ maxWidth: 140 }} inputMode="numeric" value={r.price} onChange={(e) => setRow(i, 'price', e.target.value)} /></td>
-                    <td><button className="btn btn-danger btn-sm" onClick={() => delRow(i)}><i className="fa-solid fa-trash"></i></button></td>
-                  </tr>
-                ))}
-                {tariffs.length === 0 && <tr><td colSpan={3} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin bandas — agregá una</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex gap-12 mt-12">
-            <button className="btn btn-ghost btn-sm" onClick={addRow}><i className="fa-solid fa-plus"></i> Agregar banda</button>
-            <button className="btn btn-yellow btn-sm" onClick={saveT}><i className="fa-solid fa-floppy-disk"></i> Guardar tarifas</button>
-          </div>
-        </div>
+        {tab === 'usuarios' && (<>
+          <AltaUsuario onCreated={load} />
+          <UsersSection users={d?.users} onReload={load} />
+        </>)}
 
-        <UsersSection users={d?.users} onReload={load} />
-        <OrdersSection orders={d?.recent} loading={d === null} />
+        {tab === 'comercios' && <StoreCategories stores={d?.stores} categories={d?.categories} onSaved={load} />}
+
+        {tab === 'cuentas' && <CreditSection rows={creds} onReload={load} />}
+
+        {tab === 'pedidos' && <OrdersSection orders={d?.recent} loading={d === null} />}
+
+        {tab === 'ajustes' && (<>
+          <Pricing />
+          {/* Tarifas de envío */}
+          <div className="card mb-16">
+            <div className="section-title"><h2>Tarifas de envío (por km)</h2><span className="text-xs muted">respeta el envío mínimo configurado</span></div>
+            <p className="text-sm muted mb-12">Definí cuánto sale el envío según la distancia. "Hasta N km → precio". Se usa la banda más chica que cubra la distancia.</p>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table">
+                <thead><tr><th>Hasta (km)</th><th>Precio</th><th></th></tr></thead>
+                <tbody>
+                  {tariffs.map((r, i) => (
+                    <tr key={i}>
+                      <td><input className="input" style={{ maxWidth: 110 }} inputMode="numeric" value={r.uptoKm} onChange={(e) => setRow(i, 'uptoKm', e.target.value)} /></td>
+                      <td><input className="input" style={{ maxWidth: 140 }} inputMode="numeric" value={r.price} onChange={(e) => setRow(i, 'price', e.target.value)} /></td>
+                      <td><button className="btn btn-danger btn-sm" onClick={() => delRow(i)}><i className="fa-solid fa-trash"></i></button></td>
+                    </tr>
+                  ))}
+                  {tariffs.length === 0 && <tr><td colSpan={3} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin bandas — agregá una</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-12 mt-12">
+              <button className="btn btn-ghost btn-sm" onClick={addRow}><i className="fa-solid fa-plus"></i> Agregar banda</button>
+              <button className="btn btn-yellow btn-sm" onClick={saveT}><i className="fa-solid fa-floppy-disk"></i> Guardar tarifas</button>
+            </div>
+          </div>
+        </>)}
 
         <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Admin</p>
       </div>

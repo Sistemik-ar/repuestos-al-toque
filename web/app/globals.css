@@ -563,6 +563,10 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 }
 
 /* ===== Admin: tablas con búsqueda/orden/paginación, responsive (tablas → tarjetas en mobile) ===== */
+/* Navegación por tabs (scrolleable en mobile) */
+.rat-tabs { overflow-x: auto; margin-bottom: 20px; }
+.rat-tabs::-webkit-scrollbar { display: none; }
+.rat-tabs .pill-tabs { width: max-content; }
 .rat-th-date { white-space: nowrap; }
 .rat-pgbtn { min-width: 38px; padding-left: 10px; padding-right: 10px; }
 

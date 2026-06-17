@@ -59,6 +59,7 @@ test('aprobación: solicitar → admin valida → comercio aprueba → "Aprobada
   const ac = await browser.newContext();
   const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
+  await a.getByRole('button', { name: /Cuenta corriente/i }).click(); // tab Cuenta corriente
   await a.getByRole('button', { name: /^Validar$/ }).first().click();
   await expect(a.getByRole('button', { name: /^Validar$/ })).toHaveCount(0, { timeout: 10000 });
 

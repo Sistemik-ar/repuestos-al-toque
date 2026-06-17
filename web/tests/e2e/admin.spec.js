@@ -12,11 +12,16 @@ async function login(page, email, home) {
 test.describe('Backoffice (admin)', () => {
   test('paneles del admin presentes', async ({ page }) => {
     await login(page, 'admin@repuestosaltoque.com.ar', /\/admin/);
+    // tab Usuarios (por defecto): alta + tabla de usuarios
     await expect(page.getByRole('heading', { name: 'Alta de usuario' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
+    // tab Ajustes: comisión + tarifas
+    await page.getByRole('button', { name: /Ajustes/i }).click();
     await expect(page.getByRole('heading', { name: 'Comisión y recargo' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Tarifas de envío/ })).toBeVisible();
+    // tab Cuenta corriente
+    await page.getByRole('button', { name: /Cuenta corriente/i }).click();
     await expect(page.getByRole('heading', { name: /Solicitudes de Cuenta Corriente/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
   });
 
   test('alta de un vendedor + login con contraseña temporal', async ({ page, browser }) => {
