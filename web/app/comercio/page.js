@@ -91,7 +91,7 @@ export default function Comercio() {
   };
   const initials = (me?.name || 'RC').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   const label = (r) => r.desc || r.catLabel || 'Repuesto';
-  const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
+  const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim() + (r.engine ? ` · ${r.engine}` : '');
 
   async function sendQuote(payload) {
     const res = await createQuote(modal.id, payload);
@@ -246,6 +246,7 @@ function DetalleModal({ r, onClose }) {
           <DRow k="Repuesto" v={r.desc || r.catLabel || '—'} />
           <DRow k="Categoría" v={r.catLabel || '—'} />
           <DRow k="Vehículo" v={veh || '—'} />
+          <DRow k="Motorización" v={r.engine || 'No especificado'} />
           {r.vin && <DRow k="VIN / Chasis" v={r.vin} />}
           <DRow k="Urgencia" v={r.urgency || '—'} />
           <DRow k="Fecha del pedido" v={fmtDateTime(r.createdAt)} />

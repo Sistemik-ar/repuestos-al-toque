@@ -63,7 +63,7 @@ export default function Cotizaciones() {
   async function retry() { announced.current = false; await reopenWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
   async function cerrar() { await closeWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
 
-  const veh = request ? `${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() : '—';
+  const veh = request ? (`${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() + (request.engine ? ` · ${request.engine}` : '')) : '—';
   const part = request ? (request.desc || request.catLabel) : '—';
 
   if (!mounted) {

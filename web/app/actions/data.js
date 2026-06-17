@@ -25,6 +25,7 @@ const num = (d) => (d == null ? null : Number(d));
 function reqBase(r) {
   return {
     id: r.id, code: r.code, brand: r.brand, model: r.model, year: r.year, vin: r.vin,
+    engine: r.extraInfo, // motor / versión (campo libre)
     cat: r.category?.slug || null, catLabel: r.category?.name || null,
     desc: r.description, urgency: URGENCY_LABEL[r.urgency] || 'Necesito ahora',
     status: r.status, photoUrls: r.photoUrls || [],
@@ -76,6 +77,7 @@ export async function createRequest(input) {
   const data = {
     mechanicId: s.id,
     brand: txt(input.brand, 60), model: txt(input.model, 60), year: input.year ? parseInt(input.year, 10) : null, vin: txt(input.vin, 17),
+    extraInfo: txt(input.engine, 60), // motor / versión (campo libre) -> ayuda a cotizar el repuesto correcto
     categoryId, description: txt(input.desc, 500),
     urgency: URGENCY[input.urgency] || 'AHORA',
     photoUrls: input.photoUrls || [],

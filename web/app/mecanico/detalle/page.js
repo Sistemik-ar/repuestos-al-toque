@@ -84,6 +84,7 @@ export default function Detalle() {
               <div className="section-title"><h2>Pedido</h2><span className="badge badge-gray">#{r.code}</span></div>
               <Row k="Repuesto" v={r.desc || r.catLabel} />
               <Row k="Vehículo" v={veh || '—'} />
+              <Row k="Motorización" v={r.engine || '—'} />
               <Row k="Categoría" v={r.catLabel || '—'} />
               <Row k="Fecha del pedido" v={fmtDateTime(r.createdAt)} />
               <Row k="Urgencia" v={r.urgency} />

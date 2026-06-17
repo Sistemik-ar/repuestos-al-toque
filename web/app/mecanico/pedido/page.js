@@ -17,7 +17,7 @@ const labels = ['Vehículo', 'Categoría', 'Descripción', 'Urgencia', 'Confirma
 export default function Pedido() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
+  const [st, setSt] = useState({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', engine: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
   const [searching, setSearching] = useState(false);
   const [jobId, setJobId] = useState(null);
   const [itemCount, setItemCount] = useState(0);
@@ -47,7 +47,7 @@ export default function Pedido() {
 
   const cuitOk = (v) => /^\d{11}$/.test(String(v || '').replace(/\D/g, ''));
   const idOk = plateOk(st.plate) || String(st.vin).trim().length === 17; // patente O VIN, obligatorio
-  const step1Valid = !!st.brand && !!(needsOther ? st.modelOther.trim() : st.model) && idOk;
+  const step1Valid = !!st.brand && !!(needsOther ? st.modelOther.trim() : st.model) && !!st.year && !!st.engine.trim() && idOk;
   const step3Valid = !!st.desc.trim() &&
     (st.invoiceType !== 'factura_a' || (st.solicRazon.trim() && cuitOk(st.solicCuit)));
   const stepOk = step === 1 ? step1Valid : step === 3 ? step3Valid : true;
@@ -61,7 +61,7 @@ export default function Pedido() {
     if (!stepOk) {
       setTried(true); // habilita los avisos en rojo bajo cada campo faltante
       if (step === 1) {
-        const falta = !st.brand ? 'Elegí la marca' : !(needsOther ? st.modelOther.trim() : st.model) ? 'Elegí el modelo' : 'Cargá la patente o el VIN';
+        const falta = !st.brand ? 'Elegí la marca' : !(needsOther ? st.modelOther.trim() : st.model) ? 'Elegí el modelo' : !st.year ? 'Elegí el año' : !st.engine.trim() ? 'Cargá la motorización (motor)' : 'Cargá la patente o el VIN';
         toast({ title: falta, icon: 'fa-car', type: 'yellow' });
       } else if (step === 3 && !st.desc.trim()) toast({ title: 'Describí el repuesto', sub: 'Contá qué pieza necesitás', icon: 'fa-pen', type: 'yellow' });
       else toast({ title: 'Completá los datos de Factura A', sub: 'Razón social y CUIT (11 dígitos)', icon: 'fa-triangle-exclamation', type: 'yellow' });
@@ -105,7 +105,7 @@ export default function Pedido() {
     const res = await publishJob(jobId);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
     toast({ title: 'Presupuesto solicitado', sub: 'Arranquemos con el otro auto', icon: 'fa-car', type: 'green' });
-    setSt({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
+    setSt({ brand: '', model: '', modelOther: '', year: '', plate: '', vin: '', engine: '', cat: '', catLabel: '', desc: '', urgency: 'Necesito ahora', photoUrls: [], invoiceType: 'consumidor_final', emisorRazon: '', emisorCuit: '', solicRazon: '', solicCuit: '' });
     setJobId(null); setItemCount(0); setAdded(false); setStep(1); window.scrollTo({ top: 0 });
   }
 
@@ -167,11 +167,18 @@ export default function Pedido() {
               {tried && !(needsOther ? st.modelOther.trim() : st.model) && <div className="text-xs text-red mt-4">Elegí el modelo</div>}
             </div>
             <div className="field">
-              <label>Año</label>
+              <label>Año *</label>
               <select className="select" value={st.year} onChange={(e) => set({ year: e.target.value })}>
                 <option value="">Año</option>
                 {years.map((y) => <option key={y}>{y}</option>)}
               </select>
+              {tried && !st.year && <div className="text-xs text-red mt-4">Elegí el año</div>}
+            </div>
+            <div className="field">
+              <label>Motor / Motorización *</label>
+              <input className="input" placeholder="Ej: 1.4 · 1.3 Multijet · 1.8 TDI" value={st.engine} maxLength={60} onChange={(e) => set({ engine: e.target.value })} />
+              {tried && !st.engine.trim() && <div className="text-xs text-red mt-4">Cargá la motorización (ej: 1.4)</div>}
+              <div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Aclará la cilindrada/versión: evita que te coticen un repuesto de otro motor.</div>
             </div>
             <div className="field">
               <label>Patente *</label>
