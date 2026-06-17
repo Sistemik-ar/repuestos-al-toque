@@ -85,14 +85,16 @@ button { color: inherit; font-family: inherit; }
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
 }
-.topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; }
+.topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; min-width: 0; }
+.topbar .brand > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* el texto se recorta antes de desbordar */
 .topbar .brand .logo-mark {
   width: 32px; height: 32px; border-radius: 9px;
   background: linear-gradient(135deg, var(--purple), var(--purple-light));
   display: grid; place-items: center; color: white;
   box-shadow: var(--shadow-glow);
 }
-.topbar-actions { display: flex; align-items: center; gap: 14px; }
+.topbar-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+@media (max-width: 420px) { .topbar { padding: 12px 12px; } .topbar-actions { gap: 8px; } }
 .icon-btn {
   position: relative; width: 40px; height: 40px; border-radius: 12px;
   background: var(--bg-2); border: 1px solid var(--border);

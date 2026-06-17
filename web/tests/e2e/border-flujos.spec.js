@@ -86,7 +86,7 @@ test('checkout con Cuenta Corriente: el repuesto NO se cobra acá (solo comisió
   await expect(m).toHaveURL(/\/mecanico\/trabajo/);
 
   // activar Cuenta Corriente en el ítem (el toggle aparece porque hay CC activa con ese comercio)
-  await m.getByText(/Pagar este repuesto con Cuenta Corriente/i).click();
+  await m.getByText(/Pagar con Cuenta Corriente/i).click();
   // generar link y verificar el desglose: el repuesto va a CC (no se cobra acá)
   await m.getByRole('button', { name: /Generar link de pago/i }).click();
   await expect(m.getByText(/A cuenta corriente \(no se cobra acá\)/i)).toBeVisible({ timeout: 20000 });
