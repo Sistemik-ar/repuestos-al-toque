@@ -68,7 +68,7 @@ test('admin: con trabajo activo, el cambio de rol queda BLOQUEADO', async ({ bro
 
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
-  await a.getByPlaceholder(/nombre, email o rol/i).fill('mecanico'); // filtra la tabla de usuarios (paginada)
+  await a.getByPlaceholder(/nombre, email o rol/i).fill('Taller Patagonia'); // nombre único del taller seed (paginado)
   const row = a.locator('tr', { hasText: MECANICO });
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole('button', { name: /Editar/i }).click();

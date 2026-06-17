@@ -150,6 +150,40 @@ function Pager({ pager }) {
   );
 }
 
+// Barra de tabs con indicador de scroll horizontal: en mobile no entran las 5 pestañas,
+// así que mostramos un degradé + chevron animado cuando quedan opciones ocultas a la derecha.
+function AdminTabs({ tab, setTab }) {
+  const ref = useRef(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const upd = () => setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 8);
+    upd();
+    el.addEventListener('scroll', upd, { passive: true });
+    window.addEventListener('resize', upd);
+    return () => { el.removeEventListener('scroll', upd); window.removeEventListener('resize', upd); };
+  }, []);
+  const TABS = [
+    ['usuarios', 'fa-users', 'Usuarios'],
+    ['comercios', 'fa-store', 'Comercios'],
+    ['cuentas', 'fa-id-card-clip', 'Cuenta corriente'],
+    ['pedidos', 'fa-receipt', 'Pedidos'],
+    ['ajustes', 'fa-sliders', 'Ajustes'],
+  ];
+  return (
+    <div className={`rat-tabs-wrap ${more ? 'has-more' : ''}`}>
+      <div className="rat-tabs" ref={ref}>
+        <div className="pill-tabs">
+          {TABS.map(([k, icon, label]) => (
+            <button key={k} type="button" className={tab === k ? 'active' : ''} onClick={() => setTab(k)}><i className={`fa-solid ${icon}`}></i> {label}</button>
+          ))}
+        </div>
+      </div>
+      <button type="button" className="rat-tabs-more" aria-label="Ver más pestañas" onClick={() => ref.current?.scrollBy({ left: 200, behavior: 'smooth' })}><i className="fa-solid fa-chevron-right"></i></button>
+    </div>
+  );
+}
+
 export default function Admin() {
   const router = useRouter();
   const [d, setD] = useState(null);
@@ -204,13 +238,7 @@ export default function Admin() {
           </div>
         )}
 
-        <div className="rat-tabs"><div className="pill-tabs">
-          <button type="button" className={tab === 'usuarios' ? 'active' : ''} onClick={() => setTab('usuarios')}><i className="fa-solid fa-users"></i> Usuarios</button>
-          <button type="button" className={tab === 'comercios' ? 'active' : ''} onClick={() => setTab('comercios')}><i className="fa-solid fa-store"></i> Comercios</button>
-          <button type="button" className={tab === 'cuentas' ? 'active' : ''} onClick={() => setTab('cuentas')}><i className="fa-solid fa-id-card-clip"></i> Cuenta corriente</button>
-          <button type="button" className={tab === 'pedidos' ? 'active' : ''} onClick={() => setTab('pedidos')}><i className="fa-solid fa-receipt"></i> Pedidos</button>
-          <button type="button" className={tab === 'ajustes' ? 'active' : ''} onClick={() => setTab('ajustes')}><i className="fa-solid fa-sliders"></i> Ajustes</button>
-        </div></div>
+        <AdminTabs tab={tab} setTab={setTab} />
 
         {tab === 'usuarios' && (<>
           <AltaUsuario onCreated={load} />

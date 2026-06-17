@@ -563,10 +563,17 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 }
 
 /* ===== Admin: tablas con búsqueda/orden/paginación, responsive (tablas → tarjetas en mobile) ===== */
-/* Navegación por tabs (scrolleable en mobile) */
-.rat-tabs { overflow-x: auto; margin-bottom: 20px; }
+/* Navegación por tabs (scrolleable en mobile, con indicador de "hay más a la derecha") */
+.rat-tabs-wrap { position: relative; margin-bottom: 20px; }
+.rat-tabs { overflow-x: auto; }
 .rat-tabs::-webkit-scrollbar { display: none; }
 .rat-tabs .pill-tabs { width: max-content; }
+/* degradé en el borde derecho + chevron animado, visibles solo si quedan pestañas ocultas */
+.rat-tabs-wrap::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 60px; pointer-events: none; opacity: 0; transition: opacity .2s ease; background: linear-gradient(to right, transparent, var(--bg-0) 75%); }
+.rat-tabs-wrap.has-more::after { opacity: 1; }
+.rat-tabs-more { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-0); display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.45); animation: rat-tabs-nudge 1.5s ease-in-out infinite; }
+.rat-tabs-wrap.has-more .rat-tabs-more { display: flex; }
+@keyframes rat-tabs-nudge { 0%, 100% { transform: translateY(-50%) translateX(0); } 50% { transform: translateY(-50%) translateX(4px); } }
 .rat-th-date { white-space: nowrap; }
 .rat-pgbtn { min-width: 38px; padding-left: 10px; padding-right: 10px; }
 

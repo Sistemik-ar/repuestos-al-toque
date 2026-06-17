@@ -1101,10 +1101,12 @@ export async function createJobCheckout(jobId) {
   const h = headers();
   const host = h.get('host') || 'localhost:3000';
   const proto = h.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-  // Dominio canónico para que MP vuelva a www.repuestosaltoque.com.ar (no al *.vercel.app).
-  // APP_URL se setea por entorno en Vercel (prod = dominio real, staging = url de staging);
-  // sin APP_URL (local) cae al host del request.
-  const base = (process.env.APP_URL || `${proto}://${host}`).replace(/\/+$/, '');
+  // Volvemos al MISMO host donde está navegando el usuario. La cookie de sesión es host-only:
+  // si MP lo devuelve a otro dominio (ej. apex repuestosaltoque.com.ar vs www.) la cookie no viaja
+  // y el middleware lo manda a /login. Solo forzamos APP_URL (dominio real) si el request entra
+  // por una URL interna *.vercel.app (preview), donde no queremos mandarlo.
+  const reqBase = `${proto}://${host}`.replace(/\/+$/, '');
+  const base = /\.vercel\.app$/i.test(host) && process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : reqBase;
   try {
     const { link } = await createPaymentLink({
       orderRef: `job::${jobId}`,
