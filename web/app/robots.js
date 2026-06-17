@@ -6,6 +6,6 @@ export default function robots() {
       allow: '/',
       disallow: ['/admin', '/mecanico', '/comercio', '/repartidor', '/api/', '/demo/'],
     },
-    sitemap: 'https://www.repuestosaltoque.com.ar/sitemap.xml',
+    sitemap: 'https://repuestosaltoque.com.ar/sitemap.xml',
   };
 }

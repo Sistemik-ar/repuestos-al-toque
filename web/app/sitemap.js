@@ -1,4 +1,4 @@
-const SITE = 'https://www.repuestosaltoque.com.ar';
+const SITE = 'https://repuestosaltoque.com.ar';
 
 export default function sitemap() {
   return [

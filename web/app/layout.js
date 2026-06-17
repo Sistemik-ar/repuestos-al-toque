@@ -2,7 +2,7 @@ import './globals.css';
 import Toaster from '@/components/Toaster';
 import EnvBadge from '@/components/EnvBadge';
 
-const SITE = 'https://www.repuestosaltoque.com.ar';
+const SITE = 'https://repuestosaltoque.com.ar';
 
 export const metadata = {
   metadataBase: new URL(SITE),
