@@ -53,7 +53,9 @@ const jsonLd = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es">
+    // suppressHydrationWarning: el script de zoom de abajo muta <html> antes de hidratar,
+    // y algunas extensiones del navegador inyectan atributos en <body>. Evita el falso "hydration mismatch".
+    <html lang="es" suppressHydrationWarning>
       <head>
         {/* Aplica el tamaño de texto guardado antes de pintar (evita parpadeo). Lo setea FontScale. */}
         <script dangerouslySetInnerHTML={{ __html: `try{var s=localStorage.getItem('rat_ui_scale');if(s&&s!=='1')document.documentElement.style.zoom=s;}catch(e){}` }} />
@@ -68,7 +70,7 @@ export default function RootLayout({ children }) {
         />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <EnvBadge />
         <Toaster />
         {children}

@@ -563,7 +563,7 @@ export async function getAdminData() {
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 50, select: { id: true, email: true, name: true, role: true, status: true } }),
-    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 15, include: { category: true, order: true } }),
+    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 150, include: { category: true, order: true } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
   ]);
