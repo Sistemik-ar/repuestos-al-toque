@@ -140,14 +140,16 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   const dc = await browser.newContext();
   const d = await dc.newPage();
   await login(d, 'repartidor@repuestosaltoque.com.ar');
+  await d.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click(); // tab disponibles
   const dCard = d.locator('.card', { hasText: desc }).first();
   await expect(dCard).toBeVisible({ timeout: 15000 });
   await dCard.getByRole('button', { name: /Tomar viaje/i }).click();
+  // el PIN de retiro aparece DESPUÉS de avisar la llegada
   const miCard = d.locator('.card', { hasText: desc }).first();
+  await miCard.getByRole('button', { name: /Llegué al comercio/i }).click();
   await expect(miCard.getByText(/Mostrale este PIN al vendedor/i)).toBeVisible({ timeout: 15000 });
   const pickupPin = (await miCard.locator('.pickup-pin').innerText()).replace(/\D/g, '');
   expect(pickupPin).toHaveLength(4);
-  await miCard.getByRole('button', { name: /Llegué al comercio/i }).click();
 
   // 4) vendedor: ve la llegada, PIN incorrecto rechazado, PIN correcto confirma retiro
   await s.reload();

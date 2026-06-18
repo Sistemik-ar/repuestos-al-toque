@@ -82,7 +82,8 @@ test.describe('mobile (viewport celular)', () => {
 
   test('mobile: el repartidor ve sus secciones', async ({ page }) => {
     await login(page, 'repartidor@repuestosaltoque.com.ar');
-    await expect(page.getByRole('heading', { name: /Pedidos disponibles/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Mis entregas/i })).toBeVisible();
+    await expect(page.locator('.rep-tabs').getByRole('button', { name: /Mi viaje/i })).toBeVisible();
+    await expect(page.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i })).toBeVisible();
+    await expect(page.locator('.rep-tabs').getByRole('button', { name: /Historial/i })).toBeVisible();
   });
 });

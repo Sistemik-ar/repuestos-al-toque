@@ -706,3 +706,29 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 .rat-map .leaflet-control-attribution { font-size: 9px; }
 .rat-pin { display: grid; place-items: center; color: #FACC15; font-size: 30px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); cursor: grab; }
 .rat-pin:active { cursor: grabbing; }
+
+/* Repartidor (.rep) — texto más grande + componentes del rediseño */
+.rep .text-sm { font-size: 15.5px; }
+.rep .text-xs { font-size: 13.5px; }
+.rep .input { font-size: 16px; }
+.rep .section-title h2 { font-size: 18px; }
+.rep-wrap { max-width: 560px; margin: 0 auto; }
+.rep-feed { display: flex; flex-direction: column; gap: 14px; }
+.rep-tabs { overflow-x: auto; margin-bottom: 18px; }
+.rep-tabs::-webkit-scrollbar { display: none; }
+.rep-tabs .pill-tabs { width: 100%; padding: 5px; gap: 5px; }
+.rep-tabs .pill-tabs button { flex: 1; font-size: 15px; padding: 13px 6px; border-radius: 11px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.rep-stat { padding: 14px 12px; text-align: center; }
+.rep-stat .v { font-size: 24px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.rep-stat .l { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
+.rep-hero { border: 2px solid var(--purple); box-shadow: 0 10px 40px rgba(109, 40, 217, 0.22); padding: 20px; }
+.pin-big { font-size: 42px; font-weight: 800; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; }
+.rep-point { display: flex; gap: 12px; align-items: flex-start; }
+.rep-point .ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; font-size: 16px; }
+.rep-connector { border-left: 2px dashed var(--border); height: 16px; margin-left: 18px; }
+.rep-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.rep-pgbtn { min-width: 44px; padding-left: 12px; padding-right: 12px; }
+.step-labels { display: flex; gap: 6px; margin: -12px 0 18px; }
+.step-labels span { flex: 1; font-size: 12px; text-align: center; color: var(--text-2); font-weight: 600; }
+.step-labels span.on { color: var(--yellow); }
+.step-labels span.ok { color: var(--purple-light); }

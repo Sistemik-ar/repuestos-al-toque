@@ -121,6 +121,8 @@ test('dos repartidores tocan "Tomar pedido" a la vez: gana uno solo', async ({ b
   const d2c = await browser.newContext(); const d2 = await d2c.newPage();
   await login(d1, 'repartidor@repuestosaltoque.com.ar');
   await login(d2, 'repartidor@repuestosaltoque.com.ar');
+  await d1.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click();
+  await d2.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click();
   await expect(d1.locator('.card', { hasText: desc }).first()).toBeVisible({ timeout: 15000 });
   await expect(d2.locator('.card', { hasText: desc }).first()).toBeVisible({ timeout: 15000 });
 
@@ -131,13 +133,15 @@ test('dos repartidores tocan "Tomar pedido" a la vez: gana uno solo', async ({ b
   ]);
 
   // invariante en la base: el pedido quedó asignado UNA sola vez (claim atómico),
-  // y ambas sesiones convergen al estado "tomado" (PIN visible) sin error de estado
+  // y ambas sesiones (mismo repartidor) convergen al viaje tomado sin error de estado
   await expect.poll(async () => {
     const o = await db().order.findFirst({ where: { request: { description: desc } }, select: { deliveryId: true } });
     return o?.deliveryId || null;
   }, { timeout: 10000 }).not.toBeNull();
-  await expect(d1.locator('.card', { hasText: desc }).getByText(/Mostrale este PIN/i)).toBeVisible({ timeout: 15000 });
-  await expect(d2.locator('.card', { hasText: desc }).getByText(/Mostrale este PIN/i)).toBeVisible({ timeout: 15000 });
+  await d1.locator('.rep-tabs').getByRole('button', { name: /Mi viaje/i }).click();
+  await d2.locator('.rep-tabs').getByRole('button', { name: /Mi viaje/i }).click();
+  await expect(d1.locator('.card', { hasText: desc }).first().getByRole('button', { name: /Llegué al comercio/i })).toBeVisible({ timeout: 15000 });
+  await expect(d2.locator('.card', { hasText: desc }).first().getByRole('button', { name: /Llegué al comercio/i })).toBeVisible({ timeout: 15000 });
 
   await mc.close(); await sc.close(); await d1c.close(); await d2c.close();
 });
@@ -263,6 +267,7 @@ test('claim consolida por patente: un repartidor toma TODO el auto (no se parte 
   const rep = await db().user.findUnique({ where: { email: 'repartidor@repuestosaltoque.com.ar' }, select: { id: true } });
   const dc = await browser.newContext(); const dd = await dc.newPage();
   await login(dd, 'repartidor@repuestosaltoque.com.ar');
+  await dd.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click();
 
   // DISPLAY consolidado: UNA sola card de viaje contiene AMBOS ítems (antes eran 2 cards),
   // con un solo botón "Tomar viaje".
@@ -279,6 +284,7 @@ test('claim consolida por patente: un repartidor toma TODO el auto (no se parte 
   // ya tomado: sigue siendo UN viaje con ambos ítems y UN solo PIN de retiro
   const viajeMio = dd.locator('.card').filter({ hasText: d1 }).filter({ hasText: d2 }).first();
   await expect(viajeMio).toBeVisible({ timeout: 15000 });
+  await viajeMio.getByRole('button', { name: /Llegué al comercio/i }).click();
   await expect(viajeMio.getByText(/Mostrale este PIN/i)).toHaveCount(1);
 
   await mc.close(); await sc.close(); await dc.close();
@@ -351,6 +357,7 @@ test('multi-comercio: un auto junta repuestos de 2 comercios -> 1 viaje, 1 flete
   // repartidor: UN viaje con AMBOS ítems y DOS retiros (un comercio cada uno)
   const dc = await browser.newContext(); const dd = await dc.newPage();
   await login(dd, 'repartidor@repuestosaltoque.com.ar');
+  await dd.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click();
   const viaje = dd.locator('.card').filter({ hasText: d1 }).filter({ hasText: d2 }).first();
   await expect(viaje).toBeVisible({ timeout: 15000 });
   await expect(viaje.getByRole('button', { name: /Tomar viaje/i })).toHaveCount(1); // un solo viaje

@@ -48,10 +48,12 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
   // reparto: tomar → retiro con PIN → entrega con PIN
   const dc = await browser.newContext(); const d = await dc.newPage();
   await login(d, 'repartidor@repuestosaltoque.com.ar');
+  await d.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click();
   const dCard = d.locator('.card', { hasText: desc }).first();
   await expect(dCard).toBeVisible({ timeout: 15000 });
   await dCard.getByRole('button', { name: /Tomar viaje/i }).click();
   const miCard = d.locator('.card', { hasText: desc }).first();
+  await miCard.getByRole('button', { name: /Llegué al comercio/i }).click();
   await expect(miCard.getByText(/Mostrale este PIN al vendedor/i)).toBeVisible({ timeout: 15000 });
   const pickupPin = (await miCard.locator('.pickup-pin').innerText()).replace(/\D/g, '');
 
@@ -69,6 +71,7 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
 
   await d.reload();
   const enCamino = d.locator('.card', { hasText: desc }).first();
+  await enCamino.getByRole('button', { name: /Llegué al taller/i }).click(); // el PIN aparece tras avisar la llegada
   await enCamino.getByPlaceholder('PIN').fill(dropPin);
   await enCamino.getByRole('button', { name: /Confirmar entrega/i }).click();
   await expect(d.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 15000 });
@@ -104,7 +107,7 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
 
   // el repartidor VE su reputación en el panel (estrella + entregas)
   await d.reload();
-  await expect(d.locator('.topbar .badge-yellow')).toContainText(String(delivAfter.avg), { timeout: 15000 });
+  await expect(d.locator('.topbar .rep-badge')).toContainText(String(delivAfter.avg), { timeout: 15000 });
 
   // (el panel del comercio ya no muestra el contador de puntos en el home —el diseño nuevo lo
   //  movió a /comercio/perfil—; los puntos ya quedaron verificados arriba contra la base)

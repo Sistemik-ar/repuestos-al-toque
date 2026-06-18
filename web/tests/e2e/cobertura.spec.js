@@ -109,10 +109,12 @@ test('repartidor: "Nadie me atendió" registra la incidencia', async ({ browser 
   // repartidor toma el viaje y avisa que no lo atendieron en el comercio
   const dc = await browser.newContext(); const d = await dc.newPage();
   await login(d, 'repartidor@repuestosaltoque.com.ar');
+  await d.locator('.rep-tabs').getByRole('button', { name: /Disponibles/i }).click();
   const dCard = d.locator('.card', { hasText: desc }).first();
   await expect(dCard).toBeVisible({ timeout: 15000 });
   await dCard.getByRole('button', { name: /Tomar viaje/i }).click();
   const mine = d.locator('.card', { hasText: desc }).first();
+  await mine.getByRole('button', { name: /Llegué al comercio/i }).click(); // "nadie me atendió" aparece tras avisar la llegada
   await mine.getByRole('button', { name: /Nadie me atendió/i }).click();
   await expect(d.getByText(/Incidencia registrada/i)).toBeVisible({ timeout: 10000 });
 

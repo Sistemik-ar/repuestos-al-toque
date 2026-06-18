@@ -7,6 +7,7 @@ import { createPaymentLink } from '@/lib/mercadopago';
 import { jobChargePlan } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, inBariloche, searchBariloche } from '@/lib/geo';
+import { haversineKm } from '@/lib/shipping';
 import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
 import { aliasLabel } from '@/lib/alias';
@@ -455,14 +456,60 @@ export async function getMyDeliveries() {
   }
   return [...trips.values()].map((t) => {
     const pickups = [...t.pickupsMap.values()];
+    // distancia + ETA aproximadas (primer retiro -> taller) con las coords que ya tenemos
+    let distStr = null;
+    const p0 = pickups[0];
+    if (p0?.lat && p0?.lng && t.dropoff?.lat && t.dropoff?.lng) {
+      const km = haversineKm({ lat: p0.lat, lng: p0.lng }, { lat: t.dropoff.lat, lng: t.dropoff.lng });
+      distStr = km.toFixed(1).replace('.', ',') + ' km · ' + Math.max(5, Math.round(km * 3.5)) + ' min';
+    }
     return {
       tripId: t.tripId, mine: t.mine, plate: t.plate, veh: t.veh, orderIds: t.orderIds,
       freight: t.freight, pickupPin: t.pickupPin, dropoff: t.dropoff, issue: t.issue, arrivedDrop: t.arrivedDrop,
-      pickups, itemsCount: pickups.reduce((a, p) => a + p.items.length, 0),
+      pickups, itemsCount: pickups.reduce((a, p) => a + p.items.length, 0), distStr,
       allPicked: pickups.every((p) => p.allPicked), // todo retirado -> listo para entregar
       status: t.anyPaid ? 'PAID' : 'SHIPPED',
     };
   });
+}
+
+// Historial del repartidor: viajes ENTREGADOS (status DELIVERED), agrupados por patente+taller.
+// Devuelve resumen para la lista + métricas (el front filtra hoy/semana/rango por ts).
+export async function getMyDeliveryHistory() {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return [];
+  const orders = await prisma.order.findMany({
+    where: { deliveryId: s.id, status: 'DELIVERED' },
+    orderBy: { deliveredAt: 'desc' },
+    take: 400,
+    include: { request: { include: { category: true, job: { select: { plate: true } } } } },
+  });
+  const storeIds = [...new Set(orders.map((o) => o.storeId))];
+  const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
+  const [stores, mechs] = await Promise.all([
+    prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } }),
+    prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true } }),
+  ]);
+  const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
+  const mName = Object.fromEntries(mechs.map((x) => [x.userId, x.workshopName]));
+  const trips = new Map();
+  for (const o of orders) {
+    const plate = o.request?.job?.plate || o.requestId;
+    const key = `${plate}::${o.mechanicId}`;
+    if (!trips.has(key)) {
+      trips.set(key, {
+        tripId: key,
+        veh: `${o.request?.brand || ''} ${o.request?.model || ''}`.trim() || 'Vehículo',
+        part: o.request?.description || o.request?.category?.name || 'Repuesto',
+        from: sName[o.storeId] || 'Comercio', to: mName[o.mechanicId] || 'Taller',
+        freight: 0, ts: 0,
+      });
+    }
+    const t = trips.get(key);
+    t.freight += num(o.freightAmount) || 0;
+    const ts = o.deliveredAt ? o.deliveredAt.getTime() : 0;
+    if (ts > t.ts) t.ts = ts;
+  }
+  return [...trips.values()].sort((a, b) => b.ts - a.ts);
 }
 
 const newPin = () => String(Math.floor(1000 + Math.random() * 9000)); // 4 dígitos

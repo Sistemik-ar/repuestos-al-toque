@@ -779,7 +779,8 @@ function Pricing() {
   // Arranca con valores vacíos para que la sección SIEMPRE se muestre (no queda en blanco si la
   // carga es lenta/falla, ni por el re-render del replaceState); se rellena al resolver el fetch.
   const [s, setS] = useState({ commissionPct: '', mpFeePct: '', mpFeeEnabled: false, minShip: '' });
-  useEffect(() => { getBusinessSettings().then((v) => v && setS(v)); }, []);
+  const [ready, setReady] = useState(false); // recién cargado: NO se puede guardar antes (evita pisar settings con vacío)
+  useEffect(() => { getBusinessSettings().then((v) => { if (v) setS(v); setReady(true); }); }, []);
   const set = (k, v) => setS((p) => ({ ...p, [k]: v }));
   async function save() { const r = await saveBusinessSettings(s); if (r?.ok) toast({ title: 'Configuración guardada', icon: 'fa-check', type: 'green' }); }
   return (
@@ -799,7 +800,7 @@ function Pricing() {
         <span className="text-sm">Sumar el recargo de Mercado Pago al total que paga el cliente</span>
       </label>
       <p className="text-xs muted mb-12">La fee de MP varía por plazo de acreditación (al instante 6,39% · 18 días 3,44% · 35 días 1,51%) + IVA. Cargá el % que quieras trasladar al cliente.</p>
-      <button className="btn btn-yellow btn-sm" onClick={save}><i className="fa-solid fa-floppy-disk"></i> Guardar</button>
+      <button className="btn btn-yellow btn-sm" disabled={!ready} onClick={save}><i className="fa-solid fa-floppy-disk"></i> Guardar</button>
     </div>
   );
 }
