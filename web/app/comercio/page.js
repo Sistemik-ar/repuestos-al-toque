@@ -8,6 +8,7 @@ import { useTitleBell } from '@/lib/useTitleBell';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
+import { data } from '@/lib/data';
 import Loading from '@/components/Loading';
 import PushButton from '@/components/PushButton';
 import FontScale from '@/components/FontScale';
@@ -427,7 +428,8 @@ function CreditRequestsStore() {
 function CotizarModal({ lead, label, veh, onClose, onSend }) {
   const [price, setPrice] = useState('');
   const [sending, setSending] = useState(false); // evita doble-envío mientras el request está en vuelo
-  const [brand, setBrand] = useState('Bosch');
+  const [brand, setBrand] = useState(data.partBrands[0]);
+  const [brandOther, setBrandOther] = useState('');
   const [opcion, setOpcion] = useState('Original / OEM');
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState([]);
@@ -461,7 +463,13 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         <p className="text-sm muted mb-16">{label} · {veh}{lead.myCount > 0 ? ' · podés ofrecer otra alternativa' : ''}</p>
         <div className="field"><label>Precio final</label><input className="input" inputMode="numeric" placeholder="$ 0" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
         <div className="grid-2">
-          <div className="field"><label>Marca de la pieza</label><select className="select" value={brand} onChange={(e) => setBrand(e.target.value)}><option>Bosch</option><option>TRW</option><option>Ferodo</option><option>Original / OEM</option><option>Alternativa</option></select></div>
+          <div className="field"><label>Marca de la pieza</label>
+            <select className="select" value={brand} onChange={(e) => setBrand(e.target.value)}>
+              {data.partBrands.map((b) => <option key={b}>{b}</option>)}
+              <option>Otra marca</option>
+            </select>
+            {brand === 'Otra marca' && <input className="input mt-8" placeholder="¿Qué marca?" value={brandOther} onChange={(e) => setBrandOther(e.target.value)} />}
+          </div>
           <div className="field"><label>Tipo de opción</label><select className="select" value={opcion} onChange={(e) => setOpcion(e.target.value)}><option>Original / OEM</option><option>Alternativa</option><option>Usado</option><option>Reacondicionado</option></select></div>
         </div>
         <div className="field">
@@ -480,7 +488,7 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" maxLength={300} placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">
           <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} disabled={sending} onClick={tryClose}>Cancelar</button>
-          <button className="btn btn-yellow btn-block" disabled={!price || sending} onClick={async () => { setSending(true); try { await onSend({ price, partBrand: brand, optionLabel: opcion, note, photoUrls: photos }); } finally { setSending(false); } }}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Enviando…</> : <><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</>}</button>
+          <button className="btn btn-yellow btn-block" disabled={!price || sending} onClick={async () => { setSending(true); try { await onSend({ price, partBrand: brand === 'Otra marca' ? (brandOther.trim() || 'Otra') : brand, optionLabel: opcion, note, photoUrls: photos }); } finally { setSending(false); } }}>{sending ? <><span className="spinner" style={{ width: 16, height: 16 }}></span> Enviando…</> : <><i className="fa-solid fa-paper-plane"></i> Enviar Cotización</>}</button>
         </div>
       </div>
     </div>
