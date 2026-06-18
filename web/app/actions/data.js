@@ -1175,6 +1175,27 @@ export async function closeJobWindow(jobId) {
   return { ok: true };
 }
 
+// Autocompletar el vehículo desde la patente: trae los datos del ÚLTIMO trabajo del mecánico
+// con esa patente (el historial se agrupa por patente). Devuelve null si no hay antecedentes.
+export async function getVehicleByPlate(plate) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return null;
+  const p = normPlate(plate);
+  if (!PLATE_RE.test(p)) return null;
+  const job = await prisma.job.findFirst({
+    where: { mechanicId: s.id, plate: p },
+    orderBy: { createdAt: 'desc' },
+    select: { brand: true, model: true, year: true, vin: true, requests: { orderBy: { createdAt: 'desc' }, take: 1, select: { extraInfo: true } } },
+  });
+  if (!job || !job.brand) return null;
+  return {
+    brand: job.brand || '',
+    model: job.model || '',
+    year: job.year ? String(job.year) : '',
+    vin: job.vin || '',
+    engine: job.requests?.[0]?.extraInfo || '',
+  };
+}
+
 export async function getMyJobs() {
   const s = await getSession(); if (!s) return [];
   await sweepExpirations(); // cancela borradores viejos y trabajos sin pagar (24hs)
