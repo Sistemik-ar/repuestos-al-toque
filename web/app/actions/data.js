@@ -643,6 +643,88 @@ export async function getAdminData() {
   };
 }
 
+// Estadísticas del admin para un período [from, to] (fechas 'YYYY-MM-DD'). Compara con el período
+// anterior de igual largo (tendencias) y agrega por comercio / mecánico / repartidor + puntajes.
+export async function getAdminStats({ from, to } = {}) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const now = Date.now();
+  const toMs = to ? new Date(to + 'T23:59:59.999').getTime() : now;
+  const fromMs = from ? new Date(from + 'T00:00:00').getTime() : toMs - 30 * 86400000;
+  const len = Math.max(86400000, toMs - fromMs);
+  const prevFrom = fromMs - len;
+  const CONCRETADA = ['PAID', 'SHIPPED', 'DELIVERED'];
+
+  const [orders, reqs, quotes, ratings, users] = await Promise.all([
+    prisma.order.findMany({ where: { status: { in: CONCRETADA }, createdAt: { gte: new Date(prevFrom), lte: new Date(toMs) } }, include: { request: { select: { createdAt: true } } } }),
+    prisma.request.findMany({ where: { createdAt: { gte: new Date(fromMs), lte: new Date(toMs) } }, select: { mechanicId: true } }),
+    prisma.requestQuote.findMany({ where: { createdAt: { gte: new Date(fromMs), lte: new Date(toMs) } }, select: { storeId: true, createdAt: true, request: { select: { createdAt: true } } } }),
+    prisma.rating.findMany({ where: { kind: 'DELIVERY', createdAt: { gte: new Date(fromMs), lte: new Date(toMs) } }, select: { toId: true, stars: true } }),
+    prisma.user.findMany({ select: { id: true, role: true, name: true, lastLoginAt: true, store: { select: { tradeName: true } }, mechanic: { select: { workshopName: true } } } }),
+  ]);
+
+  const nameOf = {}, loginOf = {};
+  for (const u of users) { nameOf[u.id] = u.store?.tradeName || u.mechanic?.workshopName || u.name || 'Usuario'; loginOf[u.id] = u.lastLoginAt ? u.lastLoginAt.getTime() : null; }
+
+  const inCur = (d) => { const t = d.getTime(); return t >= fromMs && t <= toMs; };
+  const cur = orders.filter((o) => inCur(o.createdAt));
+  const prev = orders.filter((o) => { const t = o.createdAt.getTime(); return t >= prevFrom && t < fromMs; });
+  const agg = (l) => { const gmv = l.reduce((a, o) => a + num(o.partAmount), 0), com = l.reduce((a, o) => a + num(o.commissionAmount), 0), fl = l.reduce((a, o) => a + num(o.freightAmount), 0); return { gmv, comision: com, flete: fl, pedidos: l.length, ticket: l.length ? gmv / l.length : 0 }; };
+  const g = agg(cur), gp = agg(prev);
+
+  // gráfico de barras: GMV por bucket (8)
+  const bars = [];
+  for (let i = 0; i < 8; i++) {
+    const b0 = fromMs + (len * i) / 8, b1 = fromMs + (len * (i + 1)) / 8;
+    const v = cur.filter((o) => o.createdAt.getTime() >= b0 && o.createdAt.getTime() < b1).reduce((a, o) => a + num(o.partAmount), 0);
+    bars.push({ v, label: new Date(b0).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) });
+  }
+
+  // por comercio
+  const com = {};
+  const ensure = (m, k, base) => (m[k] ||= { id: k, name: nameOf[k] || 'Usuario', lastLogin: loginOf[k], ...base });
+  for (const q of quotes) {
+    const c = ensure(com, q.storeId, { hechas: 0, conc: 0, vendido: 0, comision: 0, respMs: 0, respN: 0, lastResp: 0 });
+    c.hechas++; const r = q.createdAt.getTime() - (q.request?.createdAt?.getTime() || q.createdAt.getTime());
+    if (r >= 0) { c.respMs += r; c.respN++; } c.lastResp = Math.max(c.lastResp, q.createdAt.getTime());
+  }
+  for (const o of cur) { const c = ensure(com, o.storeId, { hechas: 0, conc: 0, vendido: 0, comision: 0, respMs: 0, respN: 0, lastResp: 0 }); c.conc++; c.vendido += num(o.partAmount); c.comision += num(o.commissionAmount); }
+  const comercios = Object.values(com).map((c) => {
+    const conv = c.hechas ? c.conc / c.hechas : 0, avgMin = c.respN ? c.respMs / c.respN / 60000 : null;
+    const sVel = avgMin == null ? 0 : Math.max(0, Math.min(100, 100 - (avgMin - 10) * (100 / 110)));
+    const score = Math.round(0.45 * conv * 100 + 0.30 * sVel + 0.25 * Math.min(100, (c.hechas / 20) * 100));
+    return { ...c, desc: Math.max(0, c.hechas - c.conc), conv, score };
+  }).sort((a, b) => b.vendido - a.vendido);
+
+  // por mecánico
+  const mec = {};
+  for (const r of reqs) { const m = ensure(mec, r.mechanicId, { pedidos: 0, conc: 0, gastado: 0, lastAct: 0 }); m.pedidos++; }
+  for (const o of cur) { const m = ensure(mec, o.mechanicId, { pedidos: 0, conc: 0, gastado: 0, lastAct: 0 }); m.conc++; m.gastado += num(o.total); m.lastAct = Math.max(m.lastAct, o.createdAt.getTime()); }
+  const mecanicos = Object.values(mec).map((m) => ({ ...m, ticket: m.conc ? m.gastado / m.conc : 0 })).sort((a, b) => b.gastado - a.gastado);
+
+  // por repartidor
+  const ratBy = {}; for (const rt of ratings) (ratBy[rt.toId] ||= []).push(rt.stars);
+  const rep = {};
+  for (const o of cur) {
+    if (!o.deliveryId) continue;
+    const r = ensure(rep, o.deliveryId, { entregas: 0, encurso: 0, cobrado: 0, timeMs: 0, timeN: 0, lastShip: 0 });
+    r.cobrado += num(o.freightAmount);
+    if (o.status === 'DELIVERED') { r.entregas++; r.lastShip = Math.max(r.lastShip, (o.deliveredAt || o.createdAt).getTime()); if (o.deliveredAt && o.pickedAt) { r.timeMs += o.deliveredAt.getTime() - o.pickedAt.getTime(); r.timeN++; } }
+    else r.encurso++;
+  }
+  const repartidores = Object.values(rep).map((r) => {
+    const st = ratBy[r.id] || [], rating = st.length ? st.reduce((a, b) => a + b, 0) / st.length : 0, avgMin = r.timeN ? r.timeMs / r.timeN / 60000 : null;
+    const sTime = avgMin == null ? 0 : Math.max(0, Math.min(100, 100 - (avgMin - 20)));
+    const score = Math.round(0.50 * (rating / 5) * 100 + 0.30 * sTime + 0.20 * Math.min(100, (r.entregas / 15) * 100));
+    return { ...r, rating, tiempoMin: avgMin, score };
+  }).sort((a, b) => b.entregas - a.entregas);
+
+  return {
+    range: { from: fromMs, to: toMs, prevFrom, prevTo: fromMs },
+    general: { ...g, prev: gp, conv: g.pedidos && reqs.length ? g.pedidos / reqs.length : 0, cotiz: quotes.length, bars, top: comercios.filter((c) => c.conc > 0).slice(0, 5).map((c) => ({ name: c.name, conc: c.conc, vendido: c.vendido })) },
+    comercios, mecanicos, repartidores,
+  };
+}
+
 // Historial de reparto de un pedido (para el modal del admin). On-demand, con timestamps reales.
 export async function getAdminTrip(orderId) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;

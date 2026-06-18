@@ -22,7 +22,7 @@ const SCREENS = [
   { path: '/mecanico/pedido', user: 'mecanico@repuestosaltoque.com.ar', mustSee: /patente|vehículo/i },
   { path: '/comercio', user: 'vendedor@repuestosaltoque.com.ar', mustSee: /Solicitudes/i },
   { path: '/repartidor', user: 'repartidor@repuestosaltoque.com.ar', mustSee: /Entregas/i },
-  { path: '/admin', user: 'admin@repuestosaltoque.com.ar', mustSee: /Usuarios|Backoffice|Resumen/i },
+  { path: '/admin', user: 'admin@repuestosaltoque.com.ar', mustSee: /Panel de control/i },
 ];
 
 for (const vp of VIEWPORTS) {

@@ -41,6 +41,7 @@ export async function loginAction(email, password) {
   if (!ok) { noteFail(e); return { error: 'Contraseña incorrecta.' }; }
 
   fails.delete(e); // login exitoso limpia el contador
+  prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }).catch(() => {}); // registra el ingreso (no bloquea el login)
   await createSession(user);
   return { ok: true, role: user.role };
 }

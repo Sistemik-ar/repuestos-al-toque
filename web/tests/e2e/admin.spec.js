@@ -12,10 +12,12 @@ async function login(page, email, home) {
 test.describe('Backoffice (admin)', () => {
   test('paneles del admin presentes', async ({ page }) => {
     await login(page, 'admin@repuestosaltoque.com.ar', /\/admin/);
-    // tab Usuarios (por defecto): alta + tabla de usuarios
+    // sección Usuarios por defecto (tabla)
+    await expect(page.getByRole('heading', { name: 'Usuarios' }).first()).toBeVisible();
+    // sub-nav Alta de usuario
+    await page.getByRole('button', { name: /Alta de usuario/i }).click();
     await expect(page.getByRole('heading', { name: 'Alta de usuario' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
-    // tab Ajustes: comisión + tarifas
+    // Ajustes: comisión + tarifas
     await page.getByRole('button', { name: /Ajustes/i }).click();
     await expect(page.getByRole('heading', { name: 'Comisión y recargo' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Tarifas de envío/ })).toBeVisible();
@@ -26,6 +28,7 @@ test.describe('Backoffice (admin)', () => {
 
   test('alta de un vendedor + login con contraseña temporal', async ({ page, browser }) => {
     await login(page, 'admin@repuestosaltoque.com.ar', /\/admin/);
+    await page.getByRole('button', { name: /Alta de usuario/i }).click(); // sub-nav Alta
     const email = `e2e-store-${Date.now()}@rat.test`;
     await page.getByPlaceholder('Repuestos Centro').fill('E2E Store');
     await page.getByPlaceholder('cuenta@email.com').fill(email);
