@@ -1,71 +1,130 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import Loading from '@/components/Loading';
 import PushButton from '@/components/PushButton';
 import FontScale from '@/components/FontScale';
-import { tierFor, toast, ping } from '@/lib/ui';
+import { toast, ping } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
-import { useRef } from 'react';
 import { getMe, getMyJobs } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
+
+const PER = 6;
+// estado mostrado por trabajo -> [badgeCls, badgeIcon, badgeLabel, hintCls, hintIcon, hintText, btnCls, btnLabel]
+const META = {
+  cotizando: ['badge-purple', 'fa-tower-broadcast', 'Buscando precios', 'muted', 'fa-clock', 'Estamos pidiendo precios a los comercios de tus rubros.', 'btn-ghost', 'Ver pedido'],
+  elegir: ['badge-yellow', 'fa-hand-pointer', 'Elegí un precio', 'text-yellow', 'fa-hand-pointer', 'Llegaron precios — entrá a elegir el que más te convenga.', 'btn-yellow', 'Ver precios y elegir'],
+  pagar: ['badge-yellow', 'fa-credit-card', 'Falta pagar', 'text-yellow', 'fa-credit-card', 'Ya elegiste. Falta pagar para que salga la pieza.', 'btn-yellow', 'Pagar ahora'],
+  en_camino: ['badge-orange', 'fa-truck-fast', 'En camino', 'subtle', 'fa-truck-fast', 'El repartidor lleva la pieza a tu taller.', 'btn-ghost', 'Seguir pedido'],
+  llego: ['badge-green', 'fa-location-dot', 'Llegó a tu taller', 'text-yellow', 'fa-location-dot', 'El repartidor está en tu taller. Recibí la pieza con tu PIN.', 'btn-yellow', 'Recibir con PIN'],
+  entregado: ['badge-green', 'fa-box-open', 'Recibido', '', '', '', 'btn-ghost', 'Ver detalle'],
+  cancelado: ['badge-red', 'fa-ban', 'Cancelado', '', '', '', 'btn-ghost', 'Ver detalle'],
+};
+const PRIO = { llego: 0, elegir: 1, pagar: 2, en_camino: 3, cotizando: 4 };
+function dstate(jb) {
+  if (jb.status === 'CANCELLED') return 'cancelado';
+  if (jb.status === 'DONE') return 'entregado';
+  if (jb.status === 'PAID') return (jb.items || []).some((i) => i.arrivedDrop) ? 'llego' : 'en_camino';
+  if (jb.status === 'CLOSED') return 'pagar';
+  if (jb.status === 'OPEN') return (jb.items || []).some((i) => i.status === 'QUOTED') ? 'elegir' : 'cotizando';
+  return 'cotizando';
+}
+const veh = (jb) => `${jb.brand || ''} ${jb.model || ''}`.trim() || 'Vehículo';
+const partsStr = (jb) => (jb.items || []).map((i) => i.desc || i.catLabel).filter(Boolean).join(' · ') || 'Repuesto';
+const timeAgo = (ts) => { if (!ts) return ''; const s = (Date.now() - ts) / 1000; if (s < 3600) return `hace ${Math.max(1, Math.round(s / 60))} min`; if (s < 86400) return `hace ${Math.round(s / 3600)} h`; const d = Math.round(s / 86400); return `hace ${d} día${d === 1 ? '' : 's'}`; };
+
+function JobCard({ jb, st, compact }) {
+  const m = META[st];
+  if (compact) return (
+    <Link href={`/mecanico/trabajo?id=${jb.id}`} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, textDecoration: 'none', color: 'inherit', opacity: st === 'cancelado' ? 0.75 : 1 }}>
+      <div className="flex-between gap-12" style={{ alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}><div className="text-xs" style={{ fontWeight: 800, color: 'var(--purple-light)' }}>Pedido #{jb.code}</div><div className="text-sm mt-4" style={{ fontWeight: 700 }}>{veh(jb)}{(jb.plate || jb.vin) ? ` · ${jb.plate || jb.vin}` : ''}</div><div className="text-xs muted">{partsStr(jb)}</div></div>
+        <span className={`badge ${m[0]}`} style={{ flexShrink: 0 }}><i className={`fa-solid ${m[1]}`}></i> {m[2]}</span>
+      </div>
+      <div className="flex-between"><span className="muted text-sm">{timeAgo(jb.createdAt)}</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver detalle →</span></div>
+    </Link>
+  );
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 20 }}>
+      <div>
+        <div className="flex-between gap-12 mb-8" style={{ alignItems: 'center' }}>
+          <span className="badge badge-purple" style={{ fontSize: 15, fontWeight: 800 }}>Pedido #{jb.code}</span>
+          <span className={`badge ${m[0]}`}><i className={`fa-solid ${m[1]}`}></i> {m[2]}</span>
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800 }}>{veh(jb)}</div>
+        <div className="subtle mt-4" style={{ fontSize: 16 }}>{partsStr(jb)}</div>
+        <div className="muted mt-4" style={{ fontSize: 15 }}>{jb.plate || jb.vin}</div>
+      </div>
+      {m[5] && <div className={m[3]} style={{ fontSize: 16, fontWeight: 700 }}><i className={`fa-solid ${m[4]}`}></i> {m[5]}</div>}
+      <Link href={`/mecanico/trabajo?id=${jb.id}`} className={`btn ${m[6]} btn-lg btn-block`} style={{ textDecoration: 'none' }}>{m[7]}</Link>
+    </div>
+  );
+}
+
+function MecPager({ total, page, setPage }) {
+  const pages = Math.max(1, Math.ceil(total / PER));
+  if (pages <= 1) return null;
+  const cur = Math.min(page, pages);
+  return (
+    <div className="mec-pager">
+      <span className="text-xs muted">{(cur - 1) * PER + 1}–{Math.min(cur * PER, total)} de {total}</span>
+      <div className="flex gap-8" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn btn-ghost btn-sm mec-pgbtn" onClick={() => setPage(Math.max(1, cur - 1))} disabled={cur <= 1}><i className="fa-solid fa-chevron-left"></i></button>
+        <span className="text-sm muted" style={{ padding: '0 4px' }}>{cur} / {pages}</span>
+        <button className="btn btn-ghost btn-sm mec-pgbtn" onClick={() => setPage(Math.min(pages, cur + 1))} disabled={cur >= pages}><i className="fa-solid fa-chevron-right"></i></button>
+      </div>
+    </div>
+  );
+}
 
 export default function MecanicoDashboard() {
   const router = useRouter();
   const [me, setMe] = useState(null);
   const [jobs, setJobs] = useState([]);
-  const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
-  const [dismissed, setDismissed] = useState([]); // banners de llegada cerrados con la X
+  const [loaded, setLoaded] = useState(false);
+  const [tab, setTab] = useState('curso');
+  const [recPage, setRecPage] = useState(1);
+  const arrivalsRef = useRef(null);
 
-  const arrivalsRef = useRef(null); // avisar UNA vez (sonido) cuando el repartidor llega al taller
   const load = async () => {
     try {
       const [m, js] = await Promise.all([getMe(), getMyJobs()]);
       setMe((p) => keep(p, m || null)); setJobs((p) => keep(p, js || [])); setLoaded(true);
       const items = (js || []).flatMap((jb) => jb.items || []);
       const ahora = new Set(items.filter((i) => i.arrivedDrop).map((i) => i.id));
-      if (arrivalsRef.current) {
-        for (const i of items) {
-          if (ahora.has(i.id) && !arrivalsRef.current.has(i.id)) {
-            ping(3); // sonido insistente + vibración: el repartidor está esperando (el aviso visual es el banner persistente de abajo)
-          }
-        }
-      }
+      if (arrivalsRef.current) for (const i of items) if (ahora.has(i.id) && !arrivalsRef.current.has(i.id)) ping(3);
       arrivalsRef.current = ahora;
     } catch {}
   };
   usePoll(load, 4000);
 
-  // vuelta desde Mercado Pago (?pago=ok | pend). Avisamos y limpiamos la URL.
+  // vuelta desde Mercado Pago (?pago=ok | pend)
   useEffect(() => {
     const pago = new URLSearchParams(window.location.search).get('pago');
     if (!pago) return;
     if (pago === 'ok') { ping(); toast({ title: '¡Pago confirmado!', sub: 'El trabajo quedó pago — coordinamos el envío', icon: 'fa-circle-check', type: 'green', duration: 9000 }); }
-    else if (pago === 'pend') toast({ title: 'Pago en proceso', sub: 'Estamos esperando que Mercado Pago lo acredite. Apenas se confirme, el pedido avanza solo.', icon: 'fa-clock', type: 'yellow', duration: 11000 });
+    else if (pago === 'pend') toast({ title: 'Pago en proceso', sub: 'Esperando que Mercado Pago lo acredite. Apenas se confirme, el pedido avanza solo.', icon: 'fa-clock', type: 'yellow', duration: 11000 });
     router.replace('/mecanico');
   }, []); // eslint-disable-line
 
-  const activos = jobs.filter((jb) => ['DRAFT', 'OPEN', 'CLOSED'].includes(jb.status));
-  const enEntrega = jobs.filter((jb) => jb.status === 'PAID'); // pagado, en tránsito
-  const entregados = jobs.filter((jb) => jb.status === 'DONE'); // todos los ítems entregados
-  const cancelados = jobs.filter((jb) => jb.status === 'CANCELLED');
-  const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-pen', 'En armado'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado'] };
-  const veh = (jb) => `${jb.brand || ''} ${jb.model || ''}`.trim() || 'Vehículo';
   const initials = (me?.name || 'TP').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-  // insignia por operaciones REALES (ítems entregados), no el número del mock
-  const concretados = jobs.flatMap((jb) => jb.items || []).filter((i) => i.status === 'DELIVERED').length;
-  const badge = tierFor('mechanic', concretados);
-  // campanita en el tab: cotizaciones recibidas para decidir + repartidor que llegó al taller
-  const alertas = jobs.flatMap((jb) => jb.items || []).filter((i) => i.status === 'QUOTED' || i.arrivedDrop).length;
-  useTitleBell(alertas);
+  const withState = jobs.map((jb) => ({ jb, st: dstate(jb) }));
+  const enCurso = withState.filter((x) => PRIO[x.st] !== undefined).sort((a, b) => PRIO[a.st] - PRIO[b.st] || b.jb.createdAt - a.jb.createdAt);
+  const recibidos = withState.filter((x) => x.st === 'entregado').sort((a, b) => b.jb.createdAt - a.jb.createdAt);
+  const cancelados = withState.filter((x) => x.st === 'cancelado');
+  const arrivedItems = jobs.flatMap((jb) => (jb.items || []).filter((i) => i.arrivedDrop));
+  const elegirCount = enCurso.filter((x) => x.st === 'elegir').length;
+  const pagarCount = enCurso.filter((x) => x.st === 'pagar').length;
+  useTitleBell(elegirCount + pagarCount + arrivedItems.length);
 
+  const firstTrabajo = (st) => { const x = enCurso.find((y) => y.st === st); return x ? `/mecanico/trabajo?id=${x.jb.id}` : '/mecanico'; };
   async function logout() { await logoutAction(); router.push('/login'); }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell mec">
       <div className="topbar">
         <Link href="/mecanico" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>RepuestosAlToque</span></Link>
         <div className="topbar-actions">
@@ -76,116 +135,61 @@ export default function MecanicoDashboard() {
       </div>
 
       <div className="container">
-        {/* Llegada del repartidor: banner PERSISTENTE (no se autocierra; solo con la X). Lleva al pedido para mostrar el PIN. */}
-        {jobs.flatMap((jb) => jb.items || []).filter((i) => i.arrivedDrop && !dismissed.includes(i.id)).map((i) => (
-          <div key={i.id} className="float-notif mb-12" style={{ borderColor: 'rgba(250,204,21,0.55)', background: 'linear-gradient(135deg,rgba(250,204,21,0.14),rgba(31,41,55,0.5))' }}>
-            <i className="fa-solid fa-location-dot text-yellow"></i>
-            <div className="text-sm subtle" style={{ flex: 1 }}>
-              <b>¡El repartidor llegó a tu taller!</b>
-              <div className="text-xs muted mt-4">Trae «{i.desc || i.catLabel}» — recibí la pieza y dale tu PIN de entrega.</div>
-              <div className="mt-8"><Link className="btn btn-yellow btn-sm" href={`/mecanico/detalle?id=${i.id}`}><i className="fa-solid fa-key"></i> Ver PIN e ir al pedido</Link></div>
-            </div>
-            <button className="icon-btn" style={{ flexShrink: 0 }} onClick={() => setDismissed((p) => [...p, i.id])} title="Cerrar" aria-label="Cerrar"><i className="fa-solid fa-xmark"></i></button>
+        <div className="mec-wrap">
+          <div className="mb-24">
+            <h1 className="h-lg" style={{ fontSize: 26 }}>Hola, {me?.name || 'Taller'}</h1>
+            <p className="subtle mt-4" style={{ fontSize: 17 }}>¿Qué repuesto necesitás hoy? Pedilo y te llegan los precios.</p>
           </div>
-        ))}
+          <div className="mb-16"><PushButton /></div>
 
-        <div className="mb-16">
-          <div className="eyebrow">{me?.name || 'Taller'}</div>
-          <h1 className="h-lg">Hola 👋</h1>
-          <p className="text-sm muted">¿Qué repuesto necesitás hoy?</p>
-        </div>
-        <div className="mb-16"><PushButton /></div>
-
-        <div className="card glow mb-16" style={{ background: 'linear-gradient(135deg,rgba(109,40,217,0.28),rgba(31,41,55,0.6))' }}>
-          <div className="flex-between mb-12">
-            <div className="flex-center gap-12">
-              <div className="avatar" style={{ width: 46, height: 46, fontSize: 16 }}>{initials}</div>
-              <div>
-                <div style={{ fontWeight: 800 }}>{me?.name || 'Taller'}</div>
-                <div className="mt-4"><span className={`rep-badge ${badge.cls}`}><i className={`fa-solid ${badge.icon}`}></i> {badge.label}</span></div>
+          {arrivedItems.length > 0 && (
+            <div className="card mec-arrival mb-16">
+              <div className="flex-center gap-12 mb-16">
+                <div className="store-avatar" style={{ background: 'var(--yellow)', color: '#0B0B0F', flexShrink: 0 }}><i className="fa-solid fa-location-dot"></i></div>
+                <div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 19 }}>¡Llegó el repartidor!</div><div className="subtle" style={{ fontSize: 16 }}>Está en tu taller esperando. Recibí la pieza con tu PIN.</div></div>
               </div>
+              <Link className="btn btn-yellow btn-lg btn-block" href={`/mecanico/detalle?id=${arrivedItems[0].id}`} style={{ textDecoration: 'none' }}><i className="fa-solid fa-key"></i> Recibir ahora{arrivedItems.length > 1 ? ` (${arrivedItems.length})` : ''}</Link>
             </div>
-            <div style={{ textAlign: 'right' }}><div className="text-xs muted">Puntos</div><div className="h-md text-yellow">2.540</div></div>
+          )}
+
+          <Link href="/mecanico/pedido" className="btn btn-primary btn-lg btn-block mb-16" style={{ padding: 22, textDecoration: 'none' }}><i className="fa-solid fa-bolt"></i> Pedir un repuesto</Link>
+
+          {(elegirCount > 0 || pagarCount > 0) && (
+            <div className="mec-feed mb-24">
+              {elegirCount > 0 && <Link className="btn btn-ghost btn-block" href={firstTrabajo('elegir')} style={{ justifyContent: 'space-between', textDecoration: 'none' }}><span><i className="fa-solid fa-hand-pointer"></i> Tenés precios para elegir</span><span className="badge badge-yellow">{elegirCount}</span></Link>}
+              {pagarCount > 0 && <Link className="btn btn-ghost btn-block" href={firstTrabajo('pagar')} style={{ justifyContent: 'space-between', textDecoration: 'none' }}><span><i className="fa-solid fa-credit-card"></i> Tenés pedidos para pagar</span><span className="badge badge-yellow">{pagarCount}</span></Link>}
+            </div>
+          )}
+
+          <div className="mec-tabs">
+            <div className="pill-tabs">
+              <button type="button" className={tab === 'curso' ? 'active' : ''} onClick={() => setTab('curso')}>En curso{enCurso.length > 0 && <span className="badge badge-yellow" style={{ marginLeft: 6 }}>{enCurso.length}</span>}</button>
+              <button type="button" className={tab === 'rec' ? 'active' : ''} onClick={() => setTab('rec')}>Recibidos</button>
+              {cancelados.length > 0 && <button type="button" className={tab === 'cancel' ? 'active' : ''} onClick={() => setTab('cancel')}>Cancelados</button>}
+            </div>
           </div>
-          <div className="rep-stats card" style={{ background: 'var(--bg-1)', padding: 12 }}>
-            <div><div className="v">{jobs.length}</div><div className="l">Trabajos</div></div>
-            <div><div className="v">⭐ 4.9</div><div className="l">Calificación</div></div>
-            <div><div className="v">{entregados.length}</div><div className="l">Concretados</div></div>
+
+          {!loaded ? <Loading label="Cargando tus pedidos…" /> : (<>
+            {tab === 'curso' && (enCurso.length === 0
+              ? <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-list"></i></div><div className="text-sm">No tenés pedidos en curso</div><div className="text-xs">Tocá "Pedir un repuesto" para empezar.</div></div>
+              : <div className="mec-feed">{enCurso.map((x) => <JobCard key={x.jb.id} jb={x.jb} st={x.st} />)}</div>)}
+
+            {tab === 'rec' && (recibidos.length === 0
+              ? <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-box-open"></i></div><div className="text-sm">Todavía no recibiste pedidos</div></div>
+              : <>
+                <div className="mec-feed">{recibidos.slice((recPage - 1) * PER, recPage * PER).map((x) => <JobCard key={x.jb.id} jb={x.jb} st={x.st} compact />)}</div>
+                <MecPager total={recibidos.length} page={recPage} setPage={setRecPage} />
+              </>)}
+
+            {tab === 'cancel' && <div className="mec-feed">{cancelados.map((x) => <JobCard key={x.jb.id} jb={x.jb} st={x.st} compact />)}</div>}
+          </>)}
+
+          <div className="mt-24">
+            <Link href="/mecanico/cuentas" className="btn btn-ghost btn-block" style={{ justifyContent: 'space-between', textDecoration: 'none' }}><span><i className="fa-solid fa-id-card-clip"></i> Mis cuentas corrientes</span><i className="fa-solid fa-chevron-right"></i></Link>
           </div>
+
+          <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Mecánico</p>
         </div>
-
-        <Link href="/mecanico/pedido" className="card glow hoverable mb-16" style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'linear-gradient(135deg,rgba(109,40,217,0.35),rgba(31,41,55,0.7))' }}>
-          <div className="store-avatar" style={{ background: 'var(--yellow)', color: '#0B0B0F' }}><i className="fa-solid fa-bolt"></i></div>
-          <div style={{ flex: 1 }}><div className="h-md">Solicitar Repuesto</div><div className="text-sm subtle">Recibí cotizaciones en minutos</div></div>
-          <i className="fa-solid fa-arrow-right"></i>
-        </Link>
-
-        <Link href="/mecanico/cuentas" className="card hoverable mb-16" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div className="store-avatar"><i className="fa-solid fa-id-card-clip"></i></div>
-          <div style={{ flex: 1 }}><div className="text-sm" style={{ fontWeight: 700 }}>Mis Cuentas Corrientes</div><div className="text-xs muted">Vinculá tus proveedores habituales</div></div>
-          <i className="fa-solid fa-arrow-right"></i>
-        </Link>
-
-        <div className="section">
-          <div className="section-title"><h2>Trabajos activos</h2></div>
-          {!loaded ? (
-            <Loading label="Cargando tus trabajos…" />
-          ) : activos.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-clipboard-list"></i></div><div className="text-sm">Todavía no tenés trabajos</div><div className="text-xs">Tocá “Solicitar Repuesto” para crear el primero</div></div>
-          ) : <div className="cards-grid">{activos.map((jb) => {
-            const [cls, icon, txt] = JOB_BADGE[jb.status] || ['badge-gray', 'fa-circle', jb.status];
-            return (
-              <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
-                <div className="flex-between mb-8">
-                  <div className="flex-center">
-                    <div className="store-avatar" style={{ width: 38, height: 38 }}><i className="fa-solid fa-car"></i></div>
-                    <div><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate || jb.vin}</div><div className="text-xs muted">{jb.items.length} repuesto{jb.items.length === 1 ? '' : 's'} · #{jb.code}</div></div>
-                  </div>
-                  <span className={`badge ${cls}`}><i className={`fa-solid ${icon}`}></i> {txt}</span>
-                </div>
-                <div className="flex-between">
-                  <span className="text-xs muted">{jb.items.map((i) => i.desc || i.catLabel).filter(Boolean).slice(0, 3).join(' · ')}</span>
-                  <span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span>
-                </div>
-              </Link>
-            );
-          })}</div>}
-        </div>
-
-        {enEntrega.length > 0 && (
-          <div className="section">
-            <div className="section-title"><h2>En entrega</h2></div>
-            <div className="cards-grid">{enEntrega.map((jb) => (
-              <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
-                <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate} · #{jb.code}</div><span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span></div>
-                <div className="flex-between"><span className="text-xs muted">{jb.items.length} repuesto{jb.items.length === 1 ? '' : 's'} · seguilos desde el trabajo</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span></div>
-              </Link>
-            ))}</div>
-          </div>
-        )}
-
-        {entregados.length > 0 && (
-          <div className="section">
-            <div className="section-title"><h2>Entregados</h2><span className="text-xs muted">{entregados.length}</span></div>
-            <div className="cards-grid">{entregados.map((jb) => (
-              <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block' }}>
-                <div className="flex-between mb-12"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate} · #{jb.code}</div><span className="badge badge-green"><i className="fa-solid fa-box-open"></i> Entregado</span></div>
-                <div className="flex-between"><span className="text-xs muted">{jb.items.length} repuesto{jb.items.length === 1 ? '' : 's'} · entregado</span><span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span></div>
-              </Link>
-            ))}</div>
-          </div>
-        )}
-
-        {cancelados.length > 0 && (
-          <div className="section">
-            <div className="section-title"><h2>Cancelados</h2><span className="text-xs muted">{cancelados.length}</span></div>
-            <div className="cards-grid">{cancelados.map((jb) => (
-              <Link key={jb.id} href={`/mecanico/trabajo?id=${jb.id}`} className="card hoverable mb-12" style={{ display: 'block', opacity: 0.7 }}>
-                <div className="flex-between"><div className="text-sm" style={{ fontWeight: 700 }}>{veh(jb)} · {jb.plate || jb.vin} · #{jb.code}</div><span className="badge badge-red"><i className="fa-solid fa-ban"></i> Cancelado</span></div>
-              </Link>
-            ))}</div>
-          </div>
-        )}
       </div>
 
       <BottomNav />

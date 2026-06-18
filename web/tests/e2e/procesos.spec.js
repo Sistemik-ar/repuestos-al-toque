@@ -85,7 +85,8 @@ test('si no paga en 24hs: trabajo CANCELADO para el mecánico y "no pagó" para 
 
   // mecánico: el dashboard lo muestra en Cancelados y el trabajo queda bloqueado
   await m.goto('/mecanico');
-  await expect(m.getByRole('heading', { name: /^Cancelados$/ })).toBeVisible({ timeout: 15000 });
+  await m.getByRole('button', { name: /^Cancelados/i }).click(); // pestaña Cancelados
+  await expect(m.locator('.card', { hasText: plate }).first()).toBeVisible({ timeout: 15000 });
   await m.locator('.card', { hasText: plate }).first().click();
   await expect(m.getByText(/Trabajo cancelado/i)).toBeVisible({ timeout: 10000 });
   await expect(m.getByRole('button', { name: /Generar link de pago/i })).toHaveCount(0); // sin pagar un cancelado
@@ -198,11 +199,12 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await s.getByRole('button', { name: /Historial/i }).click();
   await expect(s.locator('.card', { hasText: desc }).getByText(/Entregado/i)).toBeVisible({ timeout: 15000 });
 
-  // 9) el MECÁNICO ve el trabajo como ENTREGADO (pasó de "Pagado" a "Entregado", sección "Entregados")
+  // 9) el MECÁNICO ve el trabajo como RECIBIDO -> en la pestaña "Recibidos" del home reskineado
   await m.goto('/mecanico');
+  await m.getByRole('button', { name: /^Recibidos/i }).click();
   const jobCard = m.locator('.card', { hasText: plate });
   await expect(jobCard.first()).toBeVisible({ timeout: 15000 });
-  await expect(jobCard.getByText(/Entregado/i).first()).toBeVisible({ timeout: 15000 });
+  await expect(jobCard.getByText(/Recibido/i).first()).toBeVisible({ timeout: 15000 });
   await expect(jobCard.getByText('Pagado')).toHaveCount(0); // ya no figura "Pagado"
 
   await mc.close(); await sc.close(); await dc.close();

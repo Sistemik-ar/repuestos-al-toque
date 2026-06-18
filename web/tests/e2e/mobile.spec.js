@@ -14,7 +14,7 @@ test('mobile: login del mecánico y dashboard', async ({ page }) => {
   await page.fill('input[type="password"]', 'repuestos123');
   await page.getByRole('button', { name: /Ingresar/i }).click();
   await expect(page).toHaveURL(/\/mecanico/);
-  await expect(page.getByRole('link', { name: /Solicitar Repuesto/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Pedir un repuesto/i })).toBeVisible();
 });
 
 test('mobile: el comercio ve sus pestañas', async ({ page }) => {

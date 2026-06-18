@@ -25,8 +25,8 @@ test('desestimar TODOS los ítems cancela el trabajo (no queda zombie activo)', 
   // el trabajo entero quedó CANCELADO (no activo)
   await expect.poll(async () => (await db().job.findUnique({ where: { id: jobId }, select: { status: true } }))?.status, { timeout: 10000 }).toBe('CANCELLED');
   await m.goto('/mecanico');
-  await expect(m.getByRole('heading', { name: /^Cancelados$/ })).toBeVisible({ timeout: 15000 });
-  await expect(m.locator('.card', { hasText: plate })).toBeVisible();
+  await m.getByRole('button', { name: /^Cancelados/i }).click(); // pestaña Cancelados del home reskineado
+  await expect(m.locator('.card', { hasText: plate })).toBeVisible({ timeout: 15000 });
 
   await mc.close();
 });
