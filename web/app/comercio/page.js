@@ -44,6 +44,13 @@ const timeAgo = (ts) => {
   if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
   const d = Math.round(s / 86400); return `hace ${d} día${d === 1 ? '' : 's'}`;
 };
+// cuánto le queda al mecánico para pagar (24hs desde que eligió) antes del autocancel
+const venceEn = (selectedAt) => {
+  const ms = (selectedAt || 0) + 24 * 3600 * 1000 - Date.now();
+  if (ms <= 0) return 'Vence ya';
+  const h = Math.floor(ms / 3600000), mn = Math.floor((ms % 3600000) / 60000);
+  return `Le quedan ${h}h ${mn}m para pagar`;
+};
 const label = (r) => r.desc || r.catLabel || 'Repuesto';
 const veh = (r) => `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim() + (r.engine ? ` · ${r.engine}` : '');
 const windowOpen = (r) => ['OPEN', 'QUOTED'].includes(r.status) && (!r.windowEndsAt || r.windowEndsAt > Date.now());
@@ -221,8 +228,9 @@ export default function Comercio() {
             ) : <div className="cmz-feed">{cot.map((r) => {
               const [cls, icon, txt] = cotBadge(r);
               const canAdd = ['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3;
+              const pendientePago = r.status === 'CLOSED' && r.mySelected;
               return (
-                <div className="card" key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="card" key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, borderColor: pendientePago ? 'rgba(250,204,21,0.35)' : undefined }}>
                   <div className="flex-between" style={{ gap: 12 }}>
                     <div style={{ minWidth: 0 }}><div className="text-xs" style={{ fontWeight: 800, color: 'var(--purple-light)' }}>Pedido Nº {r.code}</div><div className="text-sm mt-4" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)}</div></div>
                     <span className={`badge ${cls}`} style={{ flexShrink: 0 }}><i className={`fa-solid ${icon}`}></i> {txt}</span>
@@ -232,6 +240,7 @@ export default function Comercio() {
                     <span style={{ fontWeight: 800 }} className={r.mySelected ? 'text-yellow' : ''}>{r.mySelected && r.mySelectedPrice ? money(r.mySelectedPrice) : (r.myPrices || []).map((p) => money(p)).join(' · ')}</span>
                   </div>
                   <div className="text-xs muted"><i className="fa-regular fa-clock"></i> {timeAgo(r.createdAt)}</div>
+                  {pendientePago && <div className="text-sm" style={{ fontWeight: 700, color: 'var(--yellow)' }}><i className="fa-solid fa-stopwatch"></i> {venceEn(r.selectedAt)}</div>}
                   <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
                     {canAdd && <button className="btn btn-ghost btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar opción</button>}
