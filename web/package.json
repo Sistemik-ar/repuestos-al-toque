@@ -15,6 +15,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
+    "seed:staging": "node prisma/seed-staging.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
