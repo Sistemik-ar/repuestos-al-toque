@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
-import { addJobItem, publishJob } from '@/app/actions/data';
+import { addJobItem, publishJob, getVehicleByPlate } from '@/app/actions/data';
 import { uploadPhoto } from '@/lib/upload';
 import BusyButton from '@/components/BusyButton';
 
@@ -44,6 +44,25 @@ export default function Pedido() {
   const models = st.brand && data.models[st.brand] ? data.models[st.brand] : [];
   const needsOther = st.brand && (models.length === 0 || st.model === 'Otro');
   const set = (patch) => setSt((s) => ({ ...s, ...patch }));
+
+  // Autocompletar el vehículo desde el historial cuando se tipea una patente conocida.
+  const lastPlate = useRef('');
+  useEffect(() => {
+    const p = String(st.plate || '').trim();
+    if (!plateOk(p) || p === lastPlate.current) return;
+    const t = setTimeout(async () => {
+      lastPlate.current = p;
+      const v = await getVehicleByPlate(p).catch(() => null);
+      if (!v || !v.brand) return;
+      setSt((s) => {
+        if (s.brand || s.model || s.modelOther) return s; // no pisar lo que el usuario ya cargó a mano
+        const known = (data.models[v.brand] || []).includes(v.model);
+        return { ...s, brand: v.brand, model: known ? v.model : (v.model ? 'Otro' : ''), modelOther: known ? '' : (v.model || ''), year: v.year || '', engine: v.engine || '', vin: s.vin || v.vin || '' };
+      });
+      toast({ title: 'Vehículo autocompletado', sub: 'Lo trajimos de tu último pedido con esta patente — revisá y editá si cambió', icon: 'fa-wand-magic-sparkles', type: 'purple', duration: 3500 });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [st.plate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cuitOk = (v) => /^\d{11}$/.test(String(v || '').replace(/\D/g, ''));
   const idOk = plateOk(st.plate) || String(st.vin).trim().length === 17; // patente O VIN, obligatorio
@@ -144,7 +163,19 @@ export default function Pedido() {
         {step === 1 && (
           <div>
             <div className="eyebrow mb-8">Paso 1</div>
-            <h2 className="h-lg mb-16">¿Para qué vehículo?</h2>
+            <h2 className="h-lg mb-8">¿Para qué vehículo?</h2>
+            <p className="text-sm muted mb-16"><i className="fa-solid fa-wand-magic-sparkles text-purple"></i> Empezá por la patente: si ya pediste para este auto, te autocompletamos el resto.</p>
+            <div className="field">
+              <label>Patente *</label>
+              <input className="input" placeholder="ABC123 o AB123CD" style={{ textTransform: 'uppercase' }} value={st.plate} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} />
+              {st.plate && !plateOk(st.plate) && <div className="text-xs text-red mt-4">Formato: ABC123 o AB123CD</div>}
+              {tried && !idOk && !st.plate.trim() && !st.vin.trim() && <div className="text-xs text-red mt-4">Cargá la patente (o el VIN más abajo)</div>}
+              <div className="text-xs muted mt-4"><i className="fa-solid fa-truck-fast"></i> La patente agrupa los repuestos de este auto en un solo envío. ¡Cargala bien!</div>
+            </div>
+            <div className="field">
+              <label>VIN <span className="muted">(opcional si cargaste patente)</span></label>
+              <input className="input" placeholder="Ej: 8AJHA8CD9J1234567" value={st.vin} onChange={(e) => set({ vin: e.target.value })} />
+            </div>
             <div className="field">
               <label>Marca *</label>
               <select className="select" value={st.brand} onChange={(e) => set({ brand: e.target.value, model: '', modelOther: '' })}>
@@ -179,17 +210,6 @@ export default function Pedido() {
               <input className="input" placeholder="Ej: 1.4 · 1.3 Multijet · 1.8 TDI" value={st.engine} maxLength={60} onChange={(e) => set({ engine: e.target.value })} />
               {tried && !st.engine.trim() && <div className="text-xs text-red mt-4">Cargá la motorización (ej: 1.4)</div>}
               <div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Aclará la cilindrada/versión: evita que te coticen un repuesto de otro motor.</div>
-            </div>
-            <div className="field">
-              <label>Patente *</label>
-              <input className="input" placeholder="ABC123 o AB123CD" style={{ textTransform: 'uppercase' }} value={st.plate} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} />
-              {st.plate && !plateOk(st.plate) && <div className="text-xs text-red mt-4">Formato: ABC123 o AB123CD</div>}
-              {tried && !idOk && !st.plate.trim() && !st.vin.trim() && <div className="text-xs text-red mt-4">Cargá la patente (o el VIN más abajo)</div>}
-              <div className="text-xs muted mt-4"><i className="fa-solid fa-truck-fast"></i> La patente agrupa los repuestos de este auto en un solo envío. ¡Cargala bien!</div>
-            </div>
-            <div className="field">
-              <label>VIN <span className="muted">(opcional si cargaste patente)</span></label>
-              <input className="input" placeholder="Ej: 8AJHA8CD9J1234567" value={st.vin} onChange={(e) => set({ vin: e.target.value })} />
             </div>
             <div className="chip-row mb-8">
               <span className="text-xs muted" style={{ alignSelf: 'center' }}>Frecuentes:</span>
