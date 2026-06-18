@@ -2,10 +2,10 @@
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { toast, ping, fmtDateTime } from '@/lib/ui';
+import { toast, ping, fmtDateTime, tierFor } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getStoreCreditAccounts, registerCreditPayment } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getStoreCreditAccounts, registerCreditPayment, getMyReputation } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 import Loading from '@/components/Loading';
@@ -60,6 +60,31 @@ function cotBadge(r) {
   return ['badge-purple', 'fa-hourglass-half', 'Esperando decisión'];
 }
 
+// card de una cotización enviada (sirve para las "vivas" y para las "Sin respuesta" / zombies)
+function CotCard({ r, zombie = false, onDetail, onAdd }) {
+  const [cls, icon, txt] = zombie ? ['badge-gray', 'fa-moon', 'Sin respuesta'] : cotBadge(r);
+  const canAdd = !zombie && ['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3;
+  const pendientePago = r.status === 'CLOSED' && r.mySelected;
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, opacity: zombie ? 0.7 : 1, borderColor: pendientePago ? 'rgba(250,204,21,0.35)' : undefined }}>
+      <div className="flex-between" style={{ gap: 12 }}>
+        <div style={{ minWidth: 0 }}><div className="text-xs" style={{ fontWeight: 800, color: 'var(--purple-light)' }}>Pedido Nº {r.code}</div><div className="text-sm mt-4" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)}</div></div>
+        <span className={`badge ${cls}`} style={{ flexShrink: 0 }}><i className={`fa-solid ${icon}`}></i> {txt}</span>
+      </div>
+      <div className="flex-between text-sm">
+        <span className="muted">{r.mySelected ? 'Eligió tu precio' : 'Tus precios'}</span>
+        <span style={{ fontWeight: 800 }} className={r.mySelected ? 'text-yellow' : ''}>{r.mySelected && r.mySelectedPrice ? money(r.mySelectedPrice) : (r.myPrices || []).map((p) => money(p)).join(' · ')}</span>
+      </div>
+      <div className="text-xs muted"><i className="fa-regular fa-clock"></i> {timeAgo(r.createdAt)}</div>
+      {pendientePago && <div className="text-sm" style={{ fontWeight: 700, color: 'var(--yellow)' }}><i className="fa-solid fa-stopwatch"></i> {venceEn(r.selectedAt)}</div>}
+      <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+        <button className="btn btn-ghost btn-sm" onClick={onDetail}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
+        {canAdd && <button className="btn btn-ghost btn-sm" onClick={onAdd}><i className="fa-solid fa-plus"></i> Agregar opción</button>}
+      </div>
+    </div>
+  );
+}
+
 export default function Comercio() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -80,12 +105,14 @@ export default function Comercio() {
   const [loaded, setLoaded] = useState(false);
   const [histPage, setHistPage] = useState(1);
   const [cobPage, setCobPage] = useState(1);
+  const [rep, setRep] = useState(null);
 
   const arrivalsRef = useRef(null);
   const load = async () => {
     // secundarias (no bloquean el refresco crítico de solicitudes/ventas)
     getStoreCreditAccounts().then((a) => setAccounts((p) => keep(p, a || []))).catch(() => {});
     getStoreCreditRequests().then((r) => setCreditReqs((p) => keep(p, r || []))).catch(() => {});
+    getMyReputation().then((r) => r && setRep((p) => keep(p, r))).catch(() => {}); // badge secundario, fuera del crítico
     try {
       const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
       setMe((p) => keep(p, m || null));
@@ -110,12 +137,18 @@ export default function Comercio() {
   useEffect(() => { try { sessionStorage.setItem('rat_comercio_tab', tab); } catch {} }, [tab]);
 
   const initials = (me?.name || 'RC').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const badge = tierFor('store', rep?.points ?? 0); // insignia desde los puntos reales (ventas concretadas)
 
   // listas derivadas
   const pend = open
     .filter((r) => r.myCount === 0 && windowOpen(r) && !dismissed.includes(r.id))
     .sort((a, b) => (a.windowEndsAt || Infinity) - (b.windowEndsAt || Infinity) || (a.urgency === 'Necesito ahora' ? -1 : 1));
   const cot = open.filter((r) => r.myCount > 0).sort((a, b) => b.createdAt - a.createdAt);
+  // "Sin respuesta": ventana cerrada hace +24hs y el mecánico no decidió (siguen activas pero ya no compiten)
+  const ZOMBIE_MS = 24 * 3600 * 1000;
+  const esZombie = (r) => ['OPEN', 'QUOTED'].includes(r.status) && r.windowEndsAt && (Date.now() - r.windowEndsAt >= ZOMBIE_MS);
+  const cotVivas = cot.filter((r) => !esZombie(r));
+  const cotZombie = cot.filter(esZombie);
   const enCurso = sales.filter((r) => r.orderStatus === 'PAID' || r.orderStatus === 'SHIPPED').sort((a, b) => b.soldAt - a.soldAt);
   const hist = sales.filter((r) => r.orderStatus === 'DELIVERED').sort((a, b) => b.soldAt - a.soldAt);
   const pickupCount = sales.filter((r) => r.orderStatus === 'PAID' && r.arrivedPickup).length;
@@ -172,6 +205,15 @@ export default function Comercio() {
           <h1 className="h-lg" style={{ fontSize: 26 }}>Hola, {me?.name || 'Comercio'}</h1>
           <p className="subtle mt-4" style={{ fontSize: 17 }}>Acá ves los pedidos nuevos. Cargá tu precio y enviálo: es rápido.</p>
         </div>
+        {rep && (
+          <div className="card mb-16 flex-between" style={{ alignItems: 'center', gap: 12 }}>
+            <span className={`rep-badge ${badge.cls}`}><i className={`fa-solid ${badge.icon}`}></i> {badge.label}</span>
+            <div className="flex-center gap-16">
+              <div style={{ textAlign: 'right' }}><div className="text-xs muted">Puntos</div><div style={{ fontWeight: 800 }} className="text-yellow">{(rep?.points ?? 0).toLocaleString('es-AR')}</div></div>
+              <div className="text-xs muted">{rep?.rating != null ? <><i className="fa-solid fa-star text-yellow"></i> {rep.rating} ({rep.count} {rep.count === 1 ? 'reseña' : 'reseñas'})</> : 'Sin reseñas aún'}</div>
+            </div>
+          </div>
+        )}
         <div className="mb-16"><PushButton /></div>
 
         <div className="cmz-grid">
@@ -225,29 +267,14 @@ export default function Comercio() {
             {/* ENVIADAS (cotizadas) */}
             {tab === 'cot' && (!loaded ? <Loading label="Cargando tus cotizaciones…" /> : cot.length === 0 ? (
               <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-tags"></i></div><div className="text-sm">Todavía no cotizaste nada</div></div>
-            ) : <div className="cmz-feed">{cot.map((r) => {
-              const [cls, icon, txt] = cotBadge(r);
-              const canAdd = ['OPEN', 'QUOTED'].includes(r.status) && r.myCount < 3;
-              const pendientePago = r.status === 'CLOSED' && r.mySelected;
-              return (
-                <div className="card" key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, borderColor: pendientePago ? 'rgba(250,204,21,0.35)' : undefined }}>
-                  <div className="flex-between" style={{ gap: 12 }}>
-                    <div style={{ minWidth: 0 }}><div className="text-xs" style={{ fontWeight: 800, color: 'var(--purple-light)' }}>Pedido Nº {r.code}</div><div className="text-sm mt-4" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)}</div></div>
-                    <span className={`badge ${cls}`} style={{ flexShrink: 0 }}><i className={`fa-solid ${icon}`}></i> {txt}</span>
-                  </div>
-                  <div className="flex-between text-sm">
-                    <span className="muted">{r.mySelected ? 'Eligió tu precio' : 'Tus precios'}</span>
-                    <span style={{ fontWeight: 800 }} className={r.mySelected ? 'text-yellow' : ''}>{r.mySelected && r.mySelectedPrice ? money(r.mySelectedPrice) : (r.myPrices || []).map((p) => money(p)).join(' · ')}</span>
-                  </div>
-                  <div className="text-xs muted"><i className="fa-regular fa-clock"></i> {timeAgo(r.createdAt)}</div>
-                  {pendientePago && <div className="text-sm" style={{ fontWeight: 700, color: 'var(--yellow)' }}><i className="fa-solid fa-stopwatch"></i> {venceEn(r.selectedAt)}</div>}
-                  <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
-                    {canAdd && <button className="btn btn-ghost btn-sm" onClick={() => setModal(r)}><i className="fa-solid fa-plus"></i> Agregar opción</button>}
-                  </div>
-                </div>
-              );
-            })}</div>)}
+            ) : (<>
+              {cotVivas.length > 0 && <div className="cmz-feed">{cotVivas.map((r) => <CotCard key={r.id} r={r} onDetail={() => setDetalle(r)} onAdd={() => setModal(r)} />)}</div>}
+              {cotZombie.length > 0 && (<>
+                <div className="flex-between mt-16 mb-8" style={{ alignItems: 'center' }}><h2 className="h-md" style={{ fontSize: 16 }}><i className="fa-solid fa-moon text-purple" style={{ marginRight: 6 }}></i> Sin respuesta</h2><span className="text-xs muted">{cotZombie.length}</span></div>
+                <div className="float-notif mb-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-circle-info text-purple"></i><span className="text-xs subtle">Ventana cerrada hace más de 24 hs y el mecánico no decidió. Siguen activas — todavía puede elegir — pero no compiten con las nuevas.</span></div>
+                <div className="cmz-feed">{cotZombie.map((r) => <CotCard key={r.id} r={r} zombie onDetail={() => setDetalle(r)} />)}</div>
+              </>)}
+            </>))}
 
             {/* VENTAS (concretadas) */}
             {tab === 'ent' && (!loaded ? <Loading label="Cargando tus ventas…" /> : (

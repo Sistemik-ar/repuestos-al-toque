@@ -87,6 +87,7 @@ export default function MecanicoDashboard() {
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState('curso');
   const [recPage, setRecPage] = useState(1);
+  const [dismissed, setDismissed] = useState([]); // avisos de llegada cerrados con la X
   const arrivalsRef = useRef(null);
 
   const load = async () => {
@@ -115,7 +116,7 @@ export default function MecanicoDashboard() {
   const enCurso = withState.filter((x) => PRIO[x.st] !== undefined).sort((a, b) => PRIO[a.st] - PRIO[b.st] || b.jb.createdAt - a.jb.createdAt);
   const recibidos = withState.filter((x) => x.st === 'entregado').sort((a, b) => b.jb.createdAt - a.jb.createdAt);
   const cancelados = withState.filter((x) => x.st === 'cancelado');
-  const arrivedItems = jobs.flatMap((jb) => (jb.items || []).filter((i) => i.arrivedDrop));
+  const arrivedItems = jobs.flatMap((jb) => (jb.items || []).filter((i) => i.arrivedDrop && !dismissed.includes(i.id)));
   const elegirCount = enCurso.filter((x) => x.st === 'elegir').length;
   const pagarCount = enCurso.filter((x) => x.st === 'pagar').length;
   useTitleBell(elegirCount + pagarCount + arrivedItems.length);
@@ -144,9 +145,12 @@ export default function MecanicoDashboard() {
 
           {arrivedItems.length > 0 && (
             <div className="card mec-arrival mb-16">
-              <div className="flex-center gap-12 mb-16">
-                <div className="store-avatar" style={{ background: 'var(--yellow)', color: '#0B0B0F', flexShrink: 0 }}><i className="fa-solid fa-location-dot"></i></div>
-                <div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 19 }}>¡Llegó el repartidor!</div><div className="subtle" style={{ fontSize: 16 }}>Está en tu taller esperando. Recibí la pieza con tu PIN.</div></div>
+              <div className="flex-between gap-12 mb-16" style={{ alignItems: 'flex-start' }}>
+                <div className="flex-center gap-12" style={{ minWidth: 0 }}>
+                  <div className="store-avatar" style={{ background: 'var(--yellow)', color: '#0B0B0F', flexShrink: 0 }}><i className="fa-solid fa-location-dot"></i></div>
+                  <div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 19 }}>¡Llegó el repartidor!</div><div className="subtle" style={{ fontSize: 16 }}>Está en tu taller esperando. Recibí la pieza con tu PIN.</div></div>
+                </div>
+                <button className="icon-btn" style={{ flexShrink: 0 }} onClick={() => setDismissed((p) => [...p, ...arrivedItems.map((i) => i.id)])} title="Cerrar aviso" aria-label="Cerrar aviso"><i className="fa-solid fa-xmark"></i></button>
               </div>
               <Link className="btn btn-yellow btn-lg btn-block" href={`/mecanico/detalle?id=${arrivedItems[0].id}`} style={{ textDecoration: 'none' }}><i className="fa-solid fa-key"></i> Recibir ahora{arrivedItems.length > 1 ? ` (${arrivedItems.length})` : ''}</Link>
             </div>
