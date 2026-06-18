@@ -38,7 +38,7 @@ test.describe('Admin — refactor nuevo', () => {
     await page.locator('.card', { hasText: 'Comisión y recargo' }).getByRole('button', { name: /Guardar/ }).click();
     await expect(page.getByText(/Configuración guardada/i)).toBeVisible({ timeout: 10000 });
 
-    // tarifas de envío
+    // tarifas de envío (re-guarda las bandas existentes; el toast confirma)
     await page.getByRole('button', { name: /Guardar tarifas/i }).click();
     await expect(page.getByText(/Tarifas guardadas/i)).toBeVisible({ timeout: 10000 });
   });
@@ -53,6 +53,20 @@ test.describe('Admin — refactor nuevo', () => {
     await expect(desactivar).toBeVisible({ timeout: 10000 });
     await desactivar.click();
     await expect(page.getByText(/Relación desactivada/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('la sección queda en la URL y sobrevive el reload (F5)', async ({ page }) => {
+    await login(page, 'admin@repuestosaltoque.com.ar');
+    await page.getByRole('button', { name: /Estadísticas/i }).click();
+    await expect(page).toHaveURL(/[?&]sec=stats/);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Estadísticas' })).toBeVisible({ timeout: 15000 });
+    // Usuarios -> Alta de usuario queda como ?u=alta y también sobrevive el F5
+    await page.locator('.rat-navitem', { hasText: 'Usuarios' }).click(); // item del sidebar (no el bottomnav oculto)
+    await page.getByRole('button', { name: /Alta de usuario/i }).click();
+    await expect(page).toHaveURL(/[?&]u=alta/);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Alta de usuario' })).toBeVisible({ timeout: 15000 });
   });
 
   test('Pedidos: el admin abre el detalle de reparto (Ver reparto -> Historial)', async ({ page }) => {

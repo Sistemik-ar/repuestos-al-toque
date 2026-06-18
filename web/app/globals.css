@@ -700,3 +700,9 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
 .mec-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .mec-pgbtn { min-width: 44px; padding-left: 12px; padding-right: 12px; }
 .mec-arrival { border: 2px solid #FACC15 !important; background: rgba(250, 204, 21, 0.08) !important; padding: 20px; }
+
+/* Mapa para fijar la ubicación exacta del envío (Leaflet + OSM) */
+.rat-map { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.rat-map .leaflet-control-attribution { font-size: 9px; }
+.rat-pin { display: grid; place-items: center; color: #FACC15; font-size: 30px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); cursor: grab; }
+.rat-pin:active { cursor: grabbing; }

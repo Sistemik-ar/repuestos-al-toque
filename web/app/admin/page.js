@@ -5,8 +5,12 @@ import { useRouter } from 'next/navigation';
 import { money, toast, fmtDateTime } from '@/lib/ui';
 import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, searchAddresses, getUserDetail, updateUser, getAdminTrip, getAdminStats } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
+import dynamic from 'next/dynamic';
 import Loading from '@/components/Loading';
 import FontScale from '@/components/FontScale';
+
+// Leaflet toca window: solo en cliente, nunca SSR.
+const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
 const ST_BADGE = { ACTIVE: 'badge-green', PENDING: 'badge-yellow', SUSPENDED: 'badge-red' };
@@ -171,6 +175,28 @@ export default function Admin() {
   const [tab, setTab] = useState('usuarios');
   const [usuSub, setUsuSub] = useState('lista'); // Usuarios: Ver y editar | Alta
   const [collapsed, setCollapsed] = useState(false); // sidebar contraído (desktop)
+
+  // Navegación <-> URL: la sección (?sec=) y el alta (?u=alta) quedan en la URL para sobrevivir F5/recarga.
+  const skipWrite = useRef(true);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const sec = p.get('sec');
+    if (sec && NAV.some(([id]) => id === sec)) setTab(sec);
+    if (p.get('u') === 'alta') setUsuSub('alta');
+  }, []);
+  useEffect(() => {
+    if (skipWrite.current) { skipWrite.current = false; return; }
+    const p = new URLSearchParams();
+    if (tab !== 'usuarios') p.set('sec', tab);
+    if (tab === 'usuarios' && usuSub === 'alta') p.set('u', 'alta');
+    const qs = p.toString();
+    const search = qs ? `?${qs}` : '';
+    if (window.location.search === search) return;
+    // replaceState NATIVO (del prototipo): Next parchea window.history.replaceState y al usarlo
+    // re-renderiza/re-monta la ruta (perdía el estado de la sección). El del prototipo no está
+    // parcheado, así que solo cambia la barra de direcciones. Preservamos el state de Next.
+    try { History.prototype.replaceState.call(window.history, window.history.state, '', `/admin${search}`); } catch {}
+  }, [tab, usuSub]);
 
   // Carga al entrar + botón "Actualizar" + recarga después de cada acción (sin auto-poll: no pisa búsqueda/página).
   const load = async () => {
@@ -750,9 +776,10 @@ function Kpi({ label, value, icon, yellow }) {
 }
 
 function Pricing() {
-  const [s, setS] = useState(null);
-  useEffect(() => { getBusinessSettings().then(setS); }, []);
-  if (!s) return null;
+  // Arranca con valores vacíos para que la sección SIEMPRE se muestre (no queda en blanco si la
+  // carga es lenta/falla, ni por el re-render del replaceState); se rellena al resolver el fetch.
+  const [s, setS] = useState({ commissionPct: '', mpFeePct: '', mpFeeEnabled: false, minShip: '' });
+  useEffect(() => { getBusinessSettings().then((v) => v && setS(v)); }, []);
   const set = (k, v) => setS((p) => ({ ...p, [k]: v }));
   async function save() { const r = await saveBusinessSettings(s); if (r?.ok) toast({ title: 'Configuración guardada', icon: 'fa-check', type: 'green' }); }
   return (
@@ -838,6 +865,11 @@ function AltaUsuario({ onCreated }) {
                 onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
             </div>
             <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} placeholder="Centro" /></div>
+            {f.lat != null && f.lng != null && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <LocationPicker lat={f.lat} lng={f.lng} onChange={(la, ln) => setF((s) => ({ ...s, lat: la, lng: ln }))} />
+              </div>
+            )}
           </div>
         )}
         {isStore && (
@@ -961,6 +993,11 @@ function EditUserModal({ userId, onClose, onSaved }) {
               <div className="text-xs muted mt-4">Si no la cambiás, se conserva la dirección actual.</div>
             </div>
             <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} /></div>
+            {f.lat != null && f.lng != null && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <LocationPicker lat={f.lat} lng={f.lng} onChange={(la, ln) => setF((s) => ({ ...s, lat: la, lng: ln }))} />
+              </div>
+            )}
           </div>
         )}
         {isStore && (
