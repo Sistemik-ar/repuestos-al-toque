@@ -71,10 +71,6 @@ export default function Pedido() {
     (st.invoiceType !== 'factura_a' || (st.solicRazon.trim() && cuitOk(st.solicCuit)));
   const stepOk = step === 1 ? step1Valid : step === 3 ? step3Valid : true;
 
-  function quickVehicle(b, m, y) {
-    set({ brand: b, model: m, year: y, modelOther: '' });
-    toast({ title: `${b} ${m}`, sub: 'Vehículo cargado', icon: 'fa-car', type: 'purple', duration: 1800 });
-  }
 
   function next() {
     if (!stepOk) {
@@ -210,12 +206,6 @@ export default function Pedido() {
               <input className="input" placeholder="Ej: 1.4 · 1.3 Multijet · 1.8 TDI" value={st.engine} maxLength={60} onChange={(e) => set({ engine: e.target.value })} />
               {tried && !st.engine.trim() && <div className="text-xs text-red mt-4">Cargá la motorización (ej: 1.4)</div>}
               <div className="text-xs muted mt-4"><i className="fa-solid fa-circle-info"></i> Aclará la cilindrada/versión: evita que te coticen un repuesto de otro motor.</div>
-            </div>
-            <div className="chip-row mb-8">
-              <span className="text-xs muted" style={{ alignSelf: 'center' }}>Frecuentes:</span>
-              <button className="chip" onClick={() => quickVehicle('Toyota', 'Hilux', '2019')}>Toyota Hilux</button>
-              <button className="chip" onClick={() => quickVehicle('Volkswagen', 'Amarok', '2021')}>VW Amarok</button>
-              <button className="chip" onClick={() => quickVehicle('Ford', 'Ranger', '2020')}>Ford Ranger</button>
             </div>
           </div>
         )}

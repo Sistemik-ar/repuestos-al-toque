@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, uniquePlate } from './helpers';
+import { login, uniquePlate, pickVehiculo } from './helpers';
 
 // Validación del pedido: el botón "Continuar" NO queda gris (no daba feedback). Siempre responde,
 // y al intentar avanzar incompleto marca el campo faltante en rojo y no pasa de paso.
@@ -8,7 +8,7 @@ test.describe('Validación del pedido', () => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
     const continuar = page.getByRole('button', { name: /Continuar/i });
-    await page.locator('button:has-text("Toyota Hilux")').first().click(); // marca+modelo+año
+    await pickVehiculo(page); // marca+modelo+año
     await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización OK -> el único faltante es la patente
     await continuar.click(); // intenta avanzar incompleto
     await expect(page.getByText(/Cargá la patente/i).first()).toBeVisible(); // marca el faltante (toast + inline)
@@ -23,7 +23,7 @@ test.describe('Validación del pedido', () => {
   test('la descripción del repuesto es obligatoria', async ({ page }) => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
-    await page.locator('button:has-text("Toyota Hilux")').first().click();
+    await pickVehiculo(page);
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
     await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click();
@@ -40,7 +40,7 @@ test.describe('Validación del pedido', () => {
   test('Factura A: marca razón social / CUIT inválido, avanza con datos OK', async ({ page }) => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
-    await page.locator('button:has-text("Toyota Hilux")').first().click();
+    await pickVehiculo(page);
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
     await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click();

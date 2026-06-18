@@ -23,9 +23,17 @@ export async function pickAddress(page, query = 'Mitre 100') {
 }
 
 // arma un trabajo con 1 ítem y deja la pantalla en "¿seguir comprando?"
+// Carga marca/modelo/año en el paso 1 (ya no hay chips "Frecuentes"). Se setea ANTES que la
+// patente para que el autocomplete por patente no pise lo ya cargado a mano.
+export async function pickVehiculo(m) {
+  await m.locator('select').nth(0).selectOption('Toyota'); // Marca
+  await m.locator('select').nth(1).selectOption('Hilux');  // Modelo
+  await m.locator('select').nth(2).selectOption('2019');   // Año
+}
+
 export async function crearItem(m, desc, plate) {
   await m.goto('/mecanico/pedido');
-  await m.locator('button:has-text("Toyota Hilux")').first().click(); // setea marca/modelo/año
+  await pickVehiculo(m);
   await m.getByPlaceholder('ABC123 o AB123CD').fill(plate);
   await m.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
   await m.getByRole('button', { name: /Continuar/i }).click();
