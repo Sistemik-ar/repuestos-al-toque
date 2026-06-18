@@ -10,6 +10,12 @@ export const data = {
     "Andina Parts",
     "Patagonia Frenos"
   ],
+  "partBrands": [
+    "Bosch", "Cobreq", "Corven", "Denso", "Ferodo", "Fras-le", "Gates", "Goetze",
+    "Hella", "INA", "Luk", "Magneti Marelli", "Mahle", "Mann Filter", "Monroe",
+    "NGK", "Philips", "Prestolite", "Sachs", "SKF", "SNR", "Timken", "TRW",
+    "Valeo", "Varga", "VTH", "Wega", "Wix", "ZF", "3M"
+  ],
   "brands": [
     "Alfa Romeo",
     "Audi",
