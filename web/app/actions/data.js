@@ -346,7 +346,23 @@ export async function registerCreditPayment(mechanicId, amount, note) {
   if (!(amt > 0)) return { error: 'Ingresá un monto válido (mayor a 0).' };
   if (!mechanicId) return { error: 'Falta el taller.' };
   await prisma.creditPayment.create({ data: { storeId: s.id, mechanicId, amount: amt, note: note ? String(note).slice(0, 200) : null } });
+  await syncCreditSettlement(s.id, mechanicId);
   return { ok: true };
+}
+
+// Mantiene el flag por-orden `creditSettledAt` en sincronía con el saldo de la cuenta (modelo de pagos
+// parciales). Lo leen la vista CC del mecánico ("Cobrada por el comercio") y el detalle del comercio:
+// si la cuenta quedó saldada (pagado >= facturado), marca sus ventas como cobradas; si aún debe, pendientes.
+async function syncCreditSettlement(storeId, mechanicId) {
+  const [orders, payments] = await Promise.all([
+    prisma.order.findMany({ where: { storeId, mechanicId, creditAccount: true, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, select: { id: true, partAmount: true } }),
+    prisma.creditPayment.findMany({ where: { storeId, mechanicId }, select: { amount: true } }),
+  ]);
+  if (!orders.length) return;
+  const facturado = orders.reduce((a, o) => a + num(o.partAmount), 0);
+  const pagado = payments.reduce((a, p) => a + num(p.amount), 0);
+  const saldada = facturado > 0 && pagado >= facturado;
+  await prisma.order.updateMany({ where: { id: { in: orders.map((o) => o.id) } }, data: { creditSettledAt: saldada ? new Date() : null } });
 }
 
 export async function createQuote(requestId, input) {

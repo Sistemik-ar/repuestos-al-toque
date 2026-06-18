@@ -188,7 +188,11 @@ export default function Comercio() {
                   <div>
                     <div className="flex-between gap-12 mb-8" style={{ alignItems: 'center' }}>
                       <span className="badge badge-purple" style={{ fontSize: 15, fontWeight: 800 }}>Pedido Nº {r.code}</span>
-                      {urgent && <span className="badge badge-red" style={{ flexShrink: 0 }}>Urgente</span>}
+                      <div className="flex-center gap-8" style={{ flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {r.invoiceType === 'factura_a' && <span className="badge badge-gray"><i className="fa-solid fa-file-invoice"></i> Factura A</span>}
+                        {(r.photoUrls?.length > 0) && <span className="badge badge-purple"><i className="fa-solid fa-image"></i> {r.photoUrls.length}</span>}
+                        {urgent && <span className="badge badge-red">Urgente</span>}
+                      </div>
                     </div>
                     <div style={{ fontSize: 21, fontWeight: 800 }}>{label(r)}</div>
                     <div className="subtle mt-8" style={{ fontSize: 17 }}>{veh(r)}</div>

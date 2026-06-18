@@ -103,7 +103,15 @@ test('cuenta corriente: el comercio registra el pago y la cuenta del taller qued
   await s.getByRole('button', { name: /Todas/i }).click();
   await expect(s.locator('.cmz-acc', { hasText: 'Taller Patagonia' }).getByText(/Saldada/i)).toBeVisible({ timeout: 10000 });
 
-  await sc.close();
+  // MECÁNICO: con la cuenta saldada (pago full), su compra figura "Cobrada por el comercio"
+  const mc = await browser.newContext(); const m = await mc.newPage();
+  await login(m, MECANICO);
+  await m.goto('/mecanico/cuentas');
+  const mrow = m.locator('tr', { hasText: desc });
+  await expect(mrow).toBeVisible({ timeout: 15000 });
+  await expect(mrow.getByText(/Cobrada por el comercio/i)).toBeVisible();
+
+  await sc.close(); await mc.close();
 });
 
 test('comercio: el detalle de un PENDIENTE muestra el estado, y tocar fuera del modal de cotizar NO pierde el borrador', async ({ browser }) => {
