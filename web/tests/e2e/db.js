@@ -41,6 +41,28 @@ export async function backdateJobSelection(plate) {
   return job.id;
 }
 
+// Cierra la ventana hace +24hs (zombie): el comercio cotizó pero el mecánico no decidió -> "Sin respuesta".
+export async function zombieJobWindow(plate) {
+  const p = db();
+  const past = new Date(Date.now() - 25 * 3600 * 1000);
+  const job = await p.job.findFirst({ where: { plate }, orderBy: { createdAt: 'desc' } });
+  if (!job) throw new Error('job no encontrado: ' + plate);
+  await p.job.update({ where: { id: job.id }, data: { windowEndsAt: past } });
+  await p.request.updateMany({ where: { jobId: job.id }, data: { windowEndsAt: past } });
+  return job.id;
+}
+
+// Adjunta fotos a los repuestos de un trabajo (simula lo que sube el mecánico).
+// El upload real va por Supabase Storage, que no existe en el stack local: acá solo
+// sembramos las URLs para poder probar la VISUALIZACIÓN (badge + zoom) en el comercio.
+export async function attachPhotosByPlate(plate, urls = ['https://example.com/pieza.jpg']) {
+  const p = db();
+  const job = await p.job.findFirst({ where: { plate }, orderBy: { createdAt: 'desc' } });
+  if (!job) throw new Error('job no encontrado: ' + plate);
+  await p.request.updateMany({ where: { jobId: job.id }, data: { photoUrls: urls } });
+  return job.id;
+}
+
 // Limpia los rubros asignados al comercio (vuelve a "ve todas las categorías").
 // Se usa en afterAll del test de categorías para no afectar a los demás specs.
 export async function clearStoreCategories(email = 'vendedor@repuestosaltoque.com.ar') {
@@ -87,7 +109,7 @@ export async function ensureCC(mechEmail = 'mecanico@repuestosaltoque.com.ar', s
   const store = await p.user.findUnique({ where: { email: storeEmail } });
   await p.creditAccount.upsert({
     where: { mechanicId_storeId: { mechanicId: mech.id, storeId: store.id } },
-    update: { active: true, adminStatus: 'APPROVED', storeStatus: 'APPROVED' },
+    update: { active: true, adminStatus: 'APPROVED', storeStatus: 'APPROVED', disabledAt: null },
     create: { mechanicId: mech.id, storeId: store.id, active: true, adminStatus: 'APPROVED', storeStatus: 'APPROVED' },
   });
 }
