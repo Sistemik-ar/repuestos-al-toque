@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { login, uniquePlate } from './helpers';
+import { login, uniquePlate, pickVehiculo } from './helpers';
 
 // Cobertura de los cambios de UI del MVP (urgencia, categorías nuevas, vuelta de Mercado Pago).
 test.describe('Cambios MVP (UI)', () => {
   test('urgencia: solo "Necesito ahora" y "Hoy" (sin "Mañana")', async ({ page }) => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
-    await page.locator('button:has-text("Toyota Hilux")').first().click();
+    await pickVehiculo(page);
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
     await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click(); // -> paso 2
@@ -23,7 +23,7 @@ test.describe('Cambios MVP (UI)', () => {
   test('categorías del wizard: incluyen las nuevas y NO "Otros" ni "Lubricación"', async ({ page }) => {
     await login(page, 'mecanico@repuestosaltoque.com.ar');
     await page.goto('/mecanico/pedido');
-    await page.locator('button:has-text("Toyota Hilux")').first().click();
+    await pickVehiculo(page);
     await page.getByPlaceholder('ABC123 o AB123CD').fill(uniquePlate());
     await page.getByPlaceholder(/Multijet/i).fill('1.4'); // motorización (obligatoria)
     await page.getByRole('button', { name: /Continuar/i }).click(); // -> paso 2 (categorías)
