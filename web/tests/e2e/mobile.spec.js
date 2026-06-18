@@ -23,5 +23,5 @@ test('mobile: el comercio ve sus pestañas', async ({ page }) => {
   await page.fill('input[type="password"]', 'repuestos123');
   await page.getByRole('button', { name: /Ingresar/i }).click();
   await expect(page).toHaveURL(/\/comercio/);
-  await expect(page.getByRole('button', { name: /Pendientes/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Pedidos/i })).toBeVisible();
 });

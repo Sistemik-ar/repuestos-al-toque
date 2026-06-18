@@ -310,6 +310,45 @@ export async function markCreditSettled(orderId, settled = true) {
   return { ok: true };
 }
 
+// Cuentas corrientes del comercio: agrupa sus ventas CC por taller, con facturado / pagado / saldo + pagos.
+export async function getStoreCreditAccounts() {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return [];
+  const [orders, payments] = await Promise.all([
+    prisma.order.findMany({ where: { storeId: s.id, creditAccount: true, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, orderBy: { createdAt: 'desc' }, include: { request: { include: { category: true } } } }),
+    prisma.creditPayment.findMany({ where: { storeId: s.id }, orderBy: { createdAt: 'desc' } }),
+  ]);
+  const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
+  const mechs = await prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true } });
+  const mechName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
+  const acc = {};
+  for (const o of orders) {
+    const k = o.mechanicId;
+    if (!acc[k]) acc[k] = { mechanicId: k, mechanicName: mechName[k] || 'Taller', facturado: 0, pagado: 0, items: [], payments: [], lastAt: 0 };
+    const rb = reqBase(o.request);
+    acc[k].facturado += num(o.partAmount);
+    acc[k].items.push({ orderId: o.id, part: rb.desc || rb.catLabel || 'Repuesto', amount: num(o.partAmount), at: o.createdAt.getTime() });
+    acc[k].lastAt = Math.max(acc[k].lastAt, o.createdAt.getTime());
+  }
+  for (const p of payments) {
+    const k = p.mechanicId; if (!acc[k]) continue;
+    acc[k].pagado += num(p.amount);
+    acc[k].payments.push({ id: p.id, amount: num(p.amount), note: p.note || null, at: p.createdAt.getTime() });
+  }
+  return Object.values(acc)
+    .map((a) => ({ ...a, saldo: Math.max(0, a.facturado - a.pagado), itemsCount: a.items.length }))
+    .sort((a, b) => b.saldo - a.saldo || b.lastAt - a.lastAt);
+}
+
+// El comercio registra un pago (parcial o total) que le hizo el taller por su cuenta corriente.
+export async function registerCreditPayment(mechanicId, amount, note) {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  const amt = Math.round(Number(amount) || 0);
+  if (!(amt > 0)) return { error: 'Ingresá un monto válido (mayor a 0).' };
+  if (!mechanicId) return { error: 'Falta el taller.' };
+  await prisma.creditPayment.create({ data: { storeId: s.id, mechanicId, amount: amt, note: note ? String(note).slice(0, 200) : null } });
+  return { ok: true };
+}
+
 export async function createQuote(requestId, input) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
   const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true, mechanicId: true } });

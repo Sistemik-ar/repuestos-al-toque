@@ -49,6 +49,12 @@ export async function clearStoreCategories(email = 'vendedor@repuestosaltoque.co
   if (u) await p.storeCategory.deleteMany({ where: { storeId: u.id } });
 }
 
+// Limpia los pagos de cuenta corriente sembrados (evita que se acumulen entre corridas y
+// dejen una cuenta "saldada" antes de tiempo).
+export async function clearCreditPayments() {
+  await db().creditPayment.deleteMany({});
+}
+
 // Crea (o reutiliza) un SEGUNDO comercio para los tests multi-comercio, sin pasar por el alta
 // con Nominatim (evita flakiness). Devuelve su email. Le pone coords de Bariloche.
 export async function ensureStore2(email = 'e2e-store2@rat.test') {

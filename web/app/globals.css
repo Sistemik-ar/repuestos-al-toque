@@ -610,3 +610,30 @@ h1, h2, h3 { letter-spacing: -0.02em; margin: 0; }
   .rat-table td.rat-actions .flex { width: 100%; justify-content: flex-end; }
   .rat-table td:empty { display: none; }
 }
+
+/* ===== Comercio: modo calmo + legible (texto/botones grandes), scopeado a .cmz ===== */
+.cmz .card { background: var(--bg-1); }
+.cmz .card.glow { box-shadow: none; border-color: var(--border); }
+.cmz .text-sm { font-size: 16px; }
+.cmz .text-xs { font-size: 14px; }
+.cmz .btn { font-size: 17px; padding: 15px 20px; }
+.cmz .btn-sm { font-size: 15px; padding: 12px 16px; }
+.cmz .btn-lg { font-size: 19px; padding: 18px 24px; }
+.cmz .input, .cmz .select, .cmz .textarea { font-size: 18px; padding: 16px; }
+.cmz .field label { font-size: 16px; }
+.cmz .section-title h2 { font-size: 19px; }
+.cmz .modal { padding: 24px; }
+.cmz .timer-pill { font-size: 16px; padding: 8px 14px; }
+.cmz .timer-pill, .cmz .timer-pill i { animation: none; } /* sin parpadeo que estresa */
+/* layout del comercio */
+.cmz-tabs { overflow-x: auto; }
+.cmz-tabs::-webkit-scrollbar { display: none; }
+.cmz-tabs .pill-tabs { width: 100%; padding: 6px; gap: 6px; }
+.cmz-tabs .pill-tabs button { flex: 1; font-size: 15px; padding: 14px 8px; border-radius: 11px; white-space: nowrap; }
+.cmz-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.cmz-pgbtn { min-width: 44px; padding-left: 12px; padding-right: 12px; }
+.cmz-grid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+.cmz-feed { display: flex; flex-direction: column; gap: 14px; }
+.cmz-rail { display: flex; flex-direction: column; gap: 16px; }
+.cmz-opp.is-urgent { border-color: rgba(239, 68, 68, 0.5); }
+@media (min-width: 900px) { .cmz-grid { grid-template-columns: 1.7fr 1fr; } .cmz-rail { position: sticky; top: 84px; } }

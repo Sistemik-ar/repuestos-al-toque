@@ -52,18 +52,21 @@ test('un comercio puede enviar varias opciones para la misma solicitud', async (
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const pendCard = s.locator('.card', { hasText: desc });
   await expect(pendCard).toBeVisible({ timeout: 15000 });
-  await pendCard.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('45000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  // 1ra opción desde el modal de detalle
+  await pendCard.getByRole('button', { name: /Ver detalle/i }).click();
+  await s.locator('.modal').locator('input[inputmode="numeric"]').first().fill('45000');
+  await s.locator('.modal').getByRole('button', { name: /Enviar cotización/i }).click();
+  await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
+  await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 }); // salió de Pedidos
 
-  await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
-  await s.getByRole('button', { name: /Cotizadas/i }).click();
+  // 2da opción desde Enviadas → Agregar opción
+  await s.getByRole('button', { name: /Enviadas/i }).click();
   const cotCard = s.locator('.card', { hasText: desc });
-  await expect(cotCard.getByText(/1 opción/)).toBeVisible();
-  await cotCard.getByRole('button', { name: /Agregar otra opción/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('38000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
-  await expect(s.locator('.card', { hasText: desc }).getByText(/2 opciones/)).toBeVisible({ timeout: 10000 });
+  await expect(cotCard.getByText(/45\.000/)).toBeVisible();
+  await cotCard.getByRole('button', { name: /Agregar opción/i }).click();
+  await s.locator('.modal').locator('input[inputmode="numeric"]').first().fill('38000');
+  await s.locator('.modal').getByRole('button', { name: /Enviar cotización/i }).click();
+  await expect(s.locator('.card', { hasText: desc }).getByText(/38\.000/)).toBeVisible({ timeout: 10000 });
 
   await mc.close();
   await sc.close();

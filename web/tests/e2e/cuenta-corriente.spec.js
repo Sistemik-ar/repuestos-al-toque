@@ -66,7 +66,7 @@ test('aprobación: solicitar → admin valida → comercio aprueba → "Aprobada
   const sc = await browser.newContext();
   const s = await sc.newPage();
   await login(s, 'vendedor@repuestosaltoque.com.ar');
-  await s.getByRole('button', { name: /^Aprobar$/ }).first().click();
+  await s.getByRole('button', { name: /^Aceptar$/ }).first().click(); // el comercio acepta la CC (rail)
 
   await m.reload();
   await expect(m.locator('.card', { hasText: STORE }).first().getByText(/Aprobada/i)).toBeVisible({ timeout: 10000 });

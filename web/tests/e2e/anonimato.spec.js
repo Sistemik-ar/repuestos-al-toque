@@ -22,10 +22,10 @@ test('anonimato: el mecánico no ve el nombre del comercio y el comercio no ve e
   // la identidad del taller NO aparece en la solicitud (sí puede aparecer en la sección de
   // Cuenta Corriente, donde la relación es explícita por diseño)
   await expect(card).not.toContainText('Taller Patagonia');
-  await expect(s.locator('.cards-grid')).not.toContainText('Taller Patagonia');
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('30000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await expect(s.locator('.cmz-feed')).not.toContainText('Taller Patagonia');
+  // cotización rápida inline (precio + "Enviar precio")
+  await card.locator('input[inputmode="numeric"]').first().fill('30000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
 
   // MECÁNICO: ve la cotización con ALIAS, nunca el nombre real del comercio

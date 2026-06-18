@@ -20,9 +20,8 @@ test('ventana vencida: revela ofertas si las hay, o permite reintentar', async (
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: `Vence1 E2E ${stamp}` });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('25000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('25000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: `Vence1 E2E ${stamp}` })).toHaveCount(0, { timeout: 10000 });
 
   await expireJobWindow(plate); // pasa el tiempo
@@ -66,9 +65,8 @@ test('si no paga en 24hs: trabajo CANCELADO para el mecánico y "no pagó" para 
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: `NoPago E2E ${stamp}` });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('15000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('15000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: `NoPago E2E ${stamp}` })).toHaveCount(0, { timeout: 10000 });
 
   // mecánico elige y genera el link... pero nunca paga
@@ -94,7 +92,7 @@ test('si no paga en 24hs: trabajo CANCELADO para el mecánico y "no pagó" para 
 
   // vendedor: la cotización queda "Cancelado · no pagó"
   await s.reload();
-  await s.getByRole('button', { name: /Cotizadas/i }).click();
+  await s.getByRole('button', { name: /Enviadas/i }).click();
   await expect(s.locator('.card', { hasText: `NoPago E2E ${stamp}` }).getByText(/Cancelado · no pagó/i)).toBeVisible({ timeout: 10000 });
 
   await mc.close(); await sc.close();
@@ -118,9 +116,8 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('20000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('20000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
 
   await m.bringToFront();
@@ -153,7 +150,7 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
 
   // 4) vendedor: ve la llegada, PIN incorrecto rechazado, PIN correcto confirma retiro
   await s.reload();
-  await s.getByRole('button', { name: /Concretadas/i }).click();
+  await s.getByRole('button', { name: /Ventas/i }).click();
   const vCard = s.locator('.card', { hasText: desc }).first();
   await expect(vCard.getByText(/El repartidor está en tu local/i)).toBeVisible({ timeout: 15000 });
   await vCard.getByPlaceholder('PIN').fill('0000');
@@ -161,7 +158,7 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await expect(s.getByText(/PIN incorrecto/i)).toBeVisible({ timeout: 10000 });
   await vCard.getByPlaceholder('PIN').fill(pickupPin);
   await vCard.getByRole('button', { name: /Confirmar retiro/i }).click();
-  await expect(vCard.getByText(/Retirado · en camino/i)).toBeVisible({ timeout: 15000 });
+  await expect(vCard.getByText(/En camino al taller/i)).toBeVisible({ timeout: 15000 });
 
   // 5) mecánico: ítem en camino, tiene su PIN de entrega
   await m.goto(`/mecanico/trabajo?id=${jobId}`);
@@ -195,10 +192,11 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   // la escritura de la reseña puede tardar un instante en verse en la base -> poll
   await expect.poll(async () => (await storeRatingStats()).count, { timeout: 10000 }).toBeGreaterThan(before.count);
 
-  // 8) historial: el vendedor ve la venta "Entregado al mecánico"
+  // 8) historial: el vendedor ve la venta entregada en "Ventas › Historial"
   await s.reload();
-  await s.getByRole('button', { name: /Concretadas/i }).click();
-  await expect(s.locator('.card', { hasText: desc }).getByText(/Entregado al mecánico/i)).toBeVisible({ timeout: 15000 });
+  await s.getByRole('button', { name: /Ventas/i }).click();
+  await s.getByRole('button', { name: /Historial/i }).click();
+  await expect(s.locator('.card', { hasText: desc }).getByText(/Entregado/i)).toBeVisible({ timeout: 15000 });
 
   // 9) el MECÁNICO ve el trabajo como ENTREGADO (pasó de "Pagado" a "Entregado", sección "Entregados")
   await m.goto('/mecanico');

@@ -25,9 +25,8 @@ test('desestimar un ítem lo saca del pago del trabajo', async ({ browser }) => 
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: `Borde1 E2E ${stamp}` });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('30000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('30000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: `Borde1 E2E ${stamp}` })).toHaveCount(0, { timeout: 10000 });
 
   // mecánico: cierra, elige ítem 1, DESESTIMA ítem 2

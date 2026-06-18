@@ -17,9 +17,8 @@ async function trabajoElegido(browser, desc, plate, price = '30000') {
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill(price);
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill(price);
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
 
   await m.bringToFront();
@@ -95,15 +94,15 @@ test('cotización enviada justo después del cierre de ventana es rechazada', as
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('30000');
+  await card.getByRole('button', { name: /Ver detalle/i }).click(); // abre el modal (queda abierto aunque la card salga de Pedidos)
+  await s.locator('.modal input[inputmode="numeric"]').first().fill('30000');
 
   // ...mientras el mecánico cierra la ventana...
   await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
   await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
 
   // ...y recién ahí el vendedor aprieta Enviar -> rechazada con error claro
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await s.locator('.modal').getByRole('button', { name: /Enviar cotización/i }).click();
   await expect(s.getByText(/ventana de cotización ya cerró/i)).toBeVisible({ timeout: 10000 });
   const quotes = await db().requestQuote.count({ where: { request: { description: desc } } });
   expect(quotes).toBe(0); // no entró ninguna cotización tardía
@@ -178,15 +177,14 @@ test('doble-tap en la elección nunca deja dos cotizaciones SELECTED', async ({ 
   // 1ra opción: el pedido está en "Pendientes"
   const cardPend = s.locator('.card', { hasText: desc });
   await expect(cardPend).toBeVisible({ timeout: 15000 });
-  await cardPend.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('30000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await cardPend.locator('input[inputmode="numeric"]').first().fill('30000');
+  await cardPend.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
-  // 2da opción: al cotizar, el pedido pasó a "Cotizadas" → "Agregar otra opción"
-  await s.getByRole('button', { name: /Cotizadas/i }).click();
+  // 2da opción: al cotizar, el pedido pasó a "Cotizadas" → "Agregar opción"
+  await s.getByRole('button', { name: /Enviadas/i }).click();
   const cardCot = s.locator('.card', { hasText: desc });
   await expect(cardCot).toBeVisible({ timeout: 15000 });
-  await cardCot.getByRole('button', { name: /Agregar otra opción/i }).click();
+  await cardCot.getByRole('button', { name: /Agregar opción/i }).click();
   await s.locator('input[inputmode="numeric"]').first().fill('42000');
   await s.getByRole('button', { name: /Enviar Cotización/i }).click();
   await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
@@ -237,9 +235,8 @@ test('claim consolida por patente: un repartidor toma TODO el auto (no se parte 
   for (const d of [d1, d2]) {
     const card = s.locator('.card', { hasText: d });
     await expect(card).toBeVisible({ timeout: 15000 });
-    await card.getByRole('button', { name: /Cotizar/i }).click();
-    await s.locator('input[inputmode="numeric"]').first().fill('30000');
-    await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+    await card.locator('input[inputmode="numeric"]').first().fill('30000');
+    await card.getByRole('button', { name: /Enviar precio/i }).click();
     await expect(s.locator('.card', { hasText: d })).toHaveCount(0, { timeout: 10000 });
   }
 

@@ -21,9 +21,8 @@ test('trabajo: pedido → cotización → elegir → link de pago del trabajo', 
   await expect(s).toHaveURL(/\/comercio/);
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('39900');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('39900');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 }); // cotización confirmada
 
   // 3) Mecánico: cierra la ventana del trabajo y elige la oferta del ítem

@@ -19,9 +19,8 @@ test('el total del pago del trabajo = suma de repuesto + comisión + envío', as
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill(String(PRICE));
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill(String(PRICE));
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 }); // cotización confirmada
 
   await m.bringToFront();

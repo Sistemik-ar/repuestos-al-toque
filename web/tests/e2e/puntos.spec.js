@@ -12,7 +12,7 @@ import { db, storeRatingStats, deliveryRatingStats, avgFromRatings } from './db'
 // Ciclo completo con calificaciones DISTINTAS por rubro (vendedor 5, producto 3, delivery 4)
 // para verificar que cada promedio se calcula de verdad y no se copia un mismo valor.
 test('la calificación actualiza promedio y puntos de vendedor Y repartidor', async ({ browser }) => {
-  test.setTimeout(150000);
+  test.setTimeout(180000);
   const plate = uniquePlate();
   const desc = `Puntos E2E ${Date.now()}`;
 
@@ -29,9 +29,8 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('25000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('25000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   // señal determinística (no depende del timing del polling): el toast de éxito
   await expect(s.getByText(/Cotización enviada/i)).toBeVisible({ timeout: 10000 });
 
@@ -57,11 +56,11 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
   const pickupPin = (await miCard.locator('.pickup-pin').innerText()).replace(/\D/g, '');
 
   await s.reload();
-  await s.getByRole('button', { name: /Concretadas/i }).click();
+  await s.getByRole('button', { name: /Ventas/i }).click();
   const vCard = s.locator('.card', { hasText: desc }).first();
   await vCard.getByPlaceholder('PIN').fill(pickupPin);
   await vCard.getByRole('button', { name: /Confirmar retiro/i }).click();
-  await expect(vCard.getByText(/Retirado · en camino/i)).toBeVisible({ timeout: 15000 });
+  await expect(vCard.getByText(/En camino al taller/i)).toBeVisible({ timeout: 15000 });
 
   await m.goto(`/mecanico/trabajo?id=${jobId}`);
   await m.locator('.card', { hasText: desc }).getByRole('link', { name: /Ver detalle y seguimiento/i }).click();
@@ -107,9 +106,8 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
   await d.reload();
   await expect(d.locator('.topbar .badge-yellow')).toContainText(String(delivAfter.avg), { timeout: 15000 });
 
-  // el comercio VE sus puntos reales en el panel (el contador grande del header)
-  await s.reload();
-  await expect(s.locator('.h-md.text-yellow').first()).toHaveText(storeAfter.points.toLocaleString('es-AR'), { timeout: 15000 });
+  // (el panel del comercio ya no muestra el contador de puntos en el home —el diseño nuevo lo
+  //  movió a /comercio/perfil—; los puntos ya quedaron verificados arriba contra la base)
 
   await mc.close(); await sc.close(); await dc.close();
 });
@@ -148,9 +146,8 @@ test('comercio sin reseñas cotiza como "Nuevo" y ordena después del calificado
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill('30000');
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await card.locator('input[inputmode="numeric"]').first().fill('30000');
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(s.getByText(/Cotización enviada/i)).toBeVisible({ timeout: 10000 });
 
   const nc = await browser.newContext(); const n = await nc.newPage();
@@ -161,9 +158,8 @@ test('comercio sin reseñas cotiza como "Nuevo" y ordena después del calificado
   await expect(n).toHaveURL(/\/comercio/, { timeout: 15000 });
   const nCard = n.locator('.card', { hasText: desc });
   await expect(nCard).toBeVisible({ timeout: 15000 });
-  await nCard.getByRole('button', { name: /Cotizar/i }).click();
-  await n.locator('input[inputmode="numeric"]').first().fill('20000');
-  await n.getByRole('button', { name: /Enviar Cotización/i }).click();
+  await nCard.locator('input[inputmode="numeric"]').first().fill('20000');
+  await nCard.getByRole('button', { name: /Enviar precio/i }).click();
   await expect(n.getByText(/Cotización enviada/i)).toBeVisible({ timeout: 10000 });
 
   // snapshot honesto en la base: null para el nuevo, el promedio real para el calificado

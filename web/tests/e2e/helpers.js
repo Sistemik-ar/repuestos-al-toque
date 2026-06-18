@@ -41,10 +41,10 @@ export async function crearItem(m, desc, plate) {
 export async function cotizar(s, desc, price) {
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
-  await card.getByRole('button', { name: /Cotizar/i }).click();
-  await s.locator('input[inputmode="numeric"]').first().fill(price);
-  await s.getByRole('button', { name: /Enviar Cotización/i }).click();
-  await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 });
+  // cotización rápida inline (precio + "Enviar precio") del nuevo panel del comercio
+  await card.locator('input[inputmode="numeric"]').first().fill(price);
+  await card.getByRole('button', { name: /Enviar precio/i }).click();
+  await expect(s.getByText(/Precio enviado|Cotización enviada/i).first()).toBeVisible({ timeout: 10000 });
 }
 
 // publica el trabajo y queda en /mecanico/trabajo

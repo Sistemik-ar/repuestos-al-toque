@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, uniquePlate, crearItem, publicarTrabajo } from './helpers';
-import { seedCreditSale, seedChosenQuote, removeSeededSale, removeJobByPlate, clearStoreCategories } from './db';
+import { seedCreditSale, seedChosenQuote, removeSeededSale, removeJobByPlate, clearStoreCategories, clearCreditPayments } from './db';
 
 // Tests de las mejoras recientes: cuenta corriente "por cobrar", perfil read-only del comercio,
 // detalle de pedido (modal) y bloqueo de cambio de rol con trabajo activo.
@@ -13,7 +13,7 @@ let sale = null;            // venta CC sembrada (para cleanup)
 let chosen = null;          // cotización elegida sembrada (para cleanup)
 const platesToClean = [];   // patentes de trabajos creados por UI (para cleanup)
 
-test.beforeAll(async () => { await clearStoreCategories(VENDEDOR); }); // el comercio ve todos los rubros
+test.beforeAll(async () => { await clearStoreCategories(VENDEDOR); await clearCreditPayments(); }); // el comercio ve todos los rubros + sin pagos CC residuales
 test.afterAll(async () => {
   if (sale) await removeSeededSale(sale);
   if (chosen) await removeSeededSale(chosen);
@@ -49,9 +49,10 @@ test('comercio: "Ver detalle" abre el modal con el detalle del pedido', async ({
   await card.getByRole('button', { name: /Ver detalle/i }).click();
   const modal = s.locator('.modal');
   await expect(modal).toBeVisible({ timeout: 10000 });
-  await expect(modal.getByRole('heading', { name: desc })).toBeVisible(); // título del detalle
+  await expect(modal.getByRole('heading', { name: /Detalle del pedido/i })).toBeVisible(); // título del detalle
+  await expect(modal.getByText(desc)).toBeVisible(); // el repuesto en el subtítulo
   await expect(modal.getByText(/Consumidor Final|Factura A/i)).toBeVisible(); // fila "Factura"
-  await modal.getByRole('button', { name: /Cerrar/i }).click();
+  await modal.getByRole('button', { name: /Cancelar/i }).click();
   await expect(s.locator('.modal')).toHaveCount(0, { timeout: 10000 });
   await mc.close(); await sc.close();
 });
@@ -79,34 +80,30 @@ test('admin: con trabajo activo, el cambio de rol queda BLOQUEADO', async ({ bro
   await ac.close(); await mc.close();
 });
 
-test('cuenta corriente: el comercio la ve en "Por cobrar", confirma el cobro, y el mecánico la ve en sus compras', async ({ browser }) => {
+test('cuenta corriente: el comercio registra el pago y la cuenta del taller queda saldada', async ({ browser }) => {
   test.setTimeout(90000);
   const desc = `CC cobrar ${Date.now()}`;
   sale = await seedCreditSale({ desc, amount: 45000, status: 'DELIVERED', creditAccount: true });
 
-  // COMERCIO: la venta CC aparece en "Por cobrar" con su detalle
   const sc = await browser.newContext(); const s = await sc.newPage();
-  s.on('dialog', (d) => d.accept()); // confirma el "¿ya te pagó?"
   await login(s, VENDEDOR);
-  const row = s.locator('tr', { hasText: desc });
-  await expect(row).toBeVisible({ timeout: 15000 });
-  await expect(row.getByText('$45.000')).toBeVisible();        // monto
-  await expect(row.getByText(/Taller Patagonia/i)).toBeVisible(); // mecánico (nombre del taller seed)
-  await expect(row.getByText(/Pendiente de pago/i)).toBeVisible(); // estado inicial
-  // marcar cobrada (confirma el alertbox)
-  await row.getByRole('button', { name: /Marcar cobrada/i }).click();
-  await expect(s.getByText(/Cuenta corriente cobrada/i)).toBeVisible({ timeout: 10000 });
-  await expect(s.locator('tr', { hasText: desc }).getByText(/Cobrada/i)).toBeVisible({ timeout: 10000 }); // estado pasó a Cobrada
+  await s.getByRole('button', { name: /Por cobrar/i }).click(); // tab Por cobrar
+  const card = s.locator('.cmz-acc', { hasText: 'Taller Patagonia' }); // tarjeta de cuenta agrupada por taller
+  await expect(card).toBeVisible({ timeout: 15000 });
+  await expect(card.getByText('$45.000').first()).toBeVisible(); // saldo / facturado
 
-  // MECÁNICO: la ve en "Mis compras en cuenta corriente" como cobrada por el comercio
-  const mc = await browser.newContext(); const m = await mc.newPage();
-  await login(m, MECANICO);
-  await m.goto('/mecanico/cuentas');
-  const mrow = m.locator('tr', { hasText: desc });
-  await expect(mrow).toBeVisible({ timeout: 15000 });
-  await expect(mrow.getByText(/Cobrada por el comercio/i)).toBeVisible();
+  // registrar el pago (el monto viene prellenado con el saldo)
+  await card.getByRole('button', { name: /Registrar pago/i }).click();
+  const modal = s.locator('.modal');
+  await expect(modal.getByRole('heading', { name: /Registrar pago/i })).toBeVisible({ timeout: 10000 });
+  await modal.getByRole('button', { name: /Registrar pago/i }).click();
+  await expect(s.getByText(/Pago registrado/i)).toBeVisible({ timeout: 10000 });
 
-  await sc.close(); await mc.close();
+  // saldo a 0: sale del filtro "Con saldo"; en "Todas" aparece como Saldada
+  await s.getByRole('button', { name: /Todas/i }).click();
+  await expect(s.locator('.cmz-acc', { hasText: 'Taller Patagonia' }).getByText(/Saldada/i)).toBeVisible({ timeout: 10000 });
+
+  await sc.close();
 });
 
 test('comercio: el detalle de un PENDIENTE muestra el estado, y tocar fuera del modal de cotizar NO pierde el borrador', async ({ browser }) => {
@@ -123,14 +120,15 @@ test('comercio: el detalle de un PENDIENTE muestra el estado, y tocar fuera del 
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
 
-  // 1) Detalle del pendiente: muestra el estado de cotización
+  // 1) Detalle del pendiente: abre el modal de cotización con el detalle + el formulario
   await card.getByRole('button', { name: /Ver detalle/i }).click();
-  await expect(s.locator('.modal').getByText(/todav[íi]a no cotizaste/i)).toBeVisible({ timeout: 10000 });
-  await s.locator('.modal').getByRole('button', { name: /Cerrar/i }).click();
+  await expect(s.locator('.modal').getByRole('heading', { name: /Detalle del pedido/i })).toBeVisible({ timeout: 10000 });
+  await expect(s.locator('.modal').getByText(/Tu cotización/i)).toBeVisible();
+  await s.locator('.modal').getByRole('button', { name: /Cancelar/i }).click();
   await expect(s.locator('.modal')).toHaveCount(0, { timeout: 10000 });
 
-  // 2) Abro Cotizar, cargo precio, toco AFUERA -> pide confirmación; al rechazarla, NO se pierde
-  await card.getByRole('button', { name: /Cotizar/i }).click();
+  // 2) Abro de nuevo, cargo precio, toco AFUERA -> pide confirmación; al rechazarla, NO se pierde
+  await card.getByRole('button', { name: /Ver detalle/i }).click();
   const modal = s.locator('.modal');
   await expect(modal).toBeVisible({ timeout: 10000 });
   await modal.locator('input[inputmode="numeric"]').first().fill('45000');
@@ -149,7 +147,7 @@ test('comercio: el detalle de una cotización elegida sin pagar dice "Esperando 
 
   const sc = await browser.newContext(); const s = await sc.newPage();
   await login(s, VENDEDOR);
-  await s.getByRole('button', { name: /Cotizadas/i }).click();
+  await s.getByRole('button', { name: /Enviadas/i }).click();
   const card = s.locator('.card', { hasText: desc });
   await expect(card).toBeVisible({ timeout: 15000 });
   await card.getByRole('button', { name: /Ver detalle/i }).click();

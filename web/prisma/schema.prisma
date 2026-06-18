@@ -479,6 +479,20 @@ model CreditAccount {
   @@map("credit_accounts")
 }
 
+// Pagos parciales que el TALLER le hace al COMERCIO por compras en cuenta corriente.
+// El comercio los registra a mano (no mueve plata por la plataforma). Saldo = facturado - sum(pagos).
+model CreditPayment {
+  id         String   @id @default(cuid())
+  storeId    String   @map("store_id")
+  mechanicId String   @map("mechanic_id")
+  amount     Decimal  @db.Decimal(12, 2)
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([storeId, mechanicId])
+  @@map("credit_payments")
+}
+
 enum JobStatus {
   DRAFT
   OPEN
