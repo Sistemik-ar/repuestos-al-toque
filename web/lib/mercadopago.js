@@ -5,10 +5,12 @@
 
 const MP_API = 'https://api.mercadopago.com';
 
-// Modo test: activo cuando hay monto de prueba + token de prueba. Usa credenciales de TEST
-// (tarjetas de prueba con titular APRO) y NO mueve plata real.
+// Modo test: activo cuando hay un token de prueba (credenciales de TEST, tarjetas APRO, NO
+// mueve plata real). MP_TEST_AMOUNT es OPCIONAL: si está, capea el monto a ese valor (útil para
+// el E2E); si no, se cobra el total real del pedido (con usuario de prueba, sigue sin plata real).
+// IMPORTANTE: en PRODUCCIÓN, MP_TEST_ACCESS_TOKEN NO debe estar seteado (si no, cobraría en sandbox).
 export function mpIsTest() {
-  return !!process.env.MP_TEST_AMOUNT && !!process.env.MP_TEST_ACCESS_TOKEN;
+  return !!process.env.MP_TEST_ACCESS_TOKEN;
 }
 function mpToken() {
   const token = mpIsTest() ? process.env.MP_TEST_ACCESS_TOKEN : process.env.MP_ACCESS_TOKEN;
