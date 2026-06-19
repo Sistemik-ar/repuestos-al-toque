@@ -35,6 +35,7 @@ const CC_COLS = [
 const CC_SEARCH = ['mechanicName', 'storeName'];
 const ORDER_COLS = [
   { label: '#', key: 'code', type: 'str' },
+  { label: 'Mecánico', key: 'mechanicName', type: 'str' },
   { label: 'Repuesto', key: 'label', type: 'str' },
   { label: 'Vehículo', key: 'vehicle', type: 'str' },
   { label: 'Total', key: 'total', type: 'num' },
@@ -43,7 +44,7 @@ const ORDER_COLS = [
   { label: 'Concretada', key: 'concretada', type: 'num', date: true },
   { label: 'Reparto', key: 'tripRank', type: 'num' },
 ];
-const ORDER_SEARCH = ['code', 'label', 'vehicle', 'status', 'total'];
+const ORDER_SEARCH = ['code', 'mechanicName', 'mechanicEmail', 'label', 'vehicle', 'status', 'total'];
 
 // ----- helpers de tabla (búsqueda + orden + paginación, client-side) -----
 function applySort(arr, sort, typeByKey) {
@@ -407,17 +408,18 @@ function OrdersSection({ orders, loading }) {
   return (
     <div className="card">
       <div className="section-title"><h2>Últimos pedidos</h2><span className="text-xs muted">{t.total}</span></div>
-      <Search value={t.query} onChange={t.setQuery} placeholder="Buscar repuesto, vehículo o total…" />
+      <Search value={t.query} onChange={t.setQuery} placeholder="Buscar mecánico, repuesto, vehículo o total…" />
       <SortBar sortUI={t.sortUI} />
       <div style={{ overflowX: 'auto' }}>
         <table className="table rat-table">
           <Thead headers={t.headers} />
           <tbody>
-            {loading && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
-            {!loading && t.total === 0 && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
+            {loading && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
+            {!loading && t.total === 0 && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
             {t.visible.map((o) => (
               <tr key={o.id}>
                 <td data-label="#" className="text-xs">{o.code}</td>
+                <td data-label="Mecánico">{o.mechanicName}{o.mechanicEmail && o.mechanicEmail !== o.mechanicName && <div className="text-xs muted">{o.mechanicEmail}</div>}</td>
                 <td data-label="Repuesto">{o.label}</td>
                 <td data-label="Vehículo">{o.vehicle}</td>
                 <td data-label="Total">{o.totalStr}</td>

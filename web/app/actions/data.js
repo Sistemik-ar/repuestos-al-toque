@@ -563,7 +563,7 @@ export async function getAdminData() {
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
-    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true } }),
+    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } } } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
   ]);
@@ -576,6 +576,8 @@ export async function getAdminData() {
     stores: storeRows.map((st) => ({ id: st.userId, name: st.tradeName, categoryIds: st.categories.map((c) => c.categoryId) })),
     recent: recent.map((r) => ({
       id: r.id, code: r.code,
+      mechanicName: r.mechanic?.name || r.mechanic?.email || '—',
+      mechanicEmail: r.mechanic?.email || '',
       label: r.description || r.category?.name || 'Repuesto',
       vehicle: `${r.brand || ''} ${r.model || ''}`.trim(),
       status: r.status,
