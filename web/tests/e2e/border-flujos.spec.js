@@ -77,8 +77,6 @@ test('checkout con Cuenta Corriente: el repuesto NO se cobra acá (solo comisió
   await cotizar(s, desc, '50000');
 
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();

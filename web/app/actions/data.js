@@ -143,7 +143,7 @@ export async function acceptQuote(quoteId) {
   // guard de estado: una pestaña vieja no puede cambiar la elección de algo pagado/cancelado
   if (!['OPEN', 'QUOTED', 'CLOSED'].includes(q.request.status)) return { error: 'Este pedido ya no admite cambios' };
   if (q.request.job && !['DRAFT', 'OPEN'].includes(q.request.job.status)) return { error: 'El link de pago ya fue generado: la elección está bloqueada' };
-  if (q.request.windowEndsAt && q.request.windowEndsAt.getTime() > Date.now()) return { error: 'Esperá a que cierre la ventana para elegir' };
+  // el contador no vence: el mecánico puede elegir apenas tiene una oferta (no espera a que cierre)
   // transacción: des-seleccionar otras + seleccionar esta + cerrar request (un doble-tap no deja 2 SELECTED)
   await prisma.$transaction([
     prisma.requestQuote.updateMany({ where: { requestId: q.requestId, status: 'SELECTED' }, data: { status: 'SENT' } }),
@@ -241,7 +241,9 @@ export async function getOpenRequestsForStore() {
   // ve todas (no lo dejamos a ciegas hasta que el admin se las cargue).
   const myCats = await prisma.storeCategory.findMany({ where: { storeId: s.id }, select: { categoryId: true } });
   const catIds = myCats.map((c) => c.categoryId);
-  const openWhere = { status: { in: ['OPEN', 'QUOTED'] }, windowEndsAt: { not: null } };
+  // "publicado" = el job está OPEN (los borradores son job DRAFT y no se ven). No depende del
+  // contador: con quoteWindowMin=0 windowEndsAt es null y el pedido igual tiene que aparecer.
+  const openWhere = { status: { in: ['OPEN', 'QUOTED'] }, OR: [{ job: { status: 'OPEN' } }, { jobId: null, windowEndsAt: { not: null } }] };
   if (catIds.length) openWhere.categoryId = { in: catIds };
   const rows = await prisma.request.findMany({
     where: {
@@ -315,7 +317,7 @@ export async function createQuote(requestId, input) {
   const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true, mechanicId: true } });
   if (!req) return { error: 'Solicitud no encontrada' };
   if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
-  if (req.windowEndsAt && req.windowEndsAt.getTime() < Date.now()) return { error: 'La ventana de cotización ya cerró' };
+  // sin vencimiento: mientras el pedido esté abierto, el comercio puede cotizar (el contador es informativo)
   // El repuestero puede enviar varias opciones (ej. Original / Alternativa), hasta un tope.
   const MAX_OPCIONES = 3;
   const mine = await prisma.requestQuote.count({ where: { requestId, storeId: s.id } });
@@ -834,6 +836,7 @@ export async function saveBusinessSettings(input) {
     ['mpFeePct', String(Number(input.mpFeePct) || 0)],
     ['mpFeeEnabled', input.mpFeeEnabled ? 'true' : 'false'],
     ['minShip', String(Math.max(0, Number(input.minShip) || 0))],
+    ['quoteWindowMin', String(Math.max(0, Math.round(Number(input.quoteWindowMin) || 0)))],
   ];
   for (const [key, value] of entries) await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
   return { ok: true };
@@ -1012,21 +1015,35 @@ export async function addJobItem(input) {
   return { ok: true, jobId: job.id, itemId: res.id };
 }
 
-// "Eso es todo" -> publica el trabajo: arranca UNA ventana de 10 min para todos los ítems.
+// "Eso es todo" -> publica el trabajo. windowEndsAt es solo un CONTADOR informativo (no vence el
+// pedido): los comercios pueden cotizar siempre y el mecánico elige cuando quiera. Lo controla el
+// setting quoteWindowMin (0 = sin contador).
 export async function publishJob(jobId) {
   const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
   const job = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: true } });
   if (!job || job.mechanicId !== s.id) return { error: 'No autorizado' };
   if (job.requests.length === 0) return { error: 'Agregá al menos un repuesto' };
   if (job.status !== 'DRAFT') return { error: 'Este trabajo ya fue publicado' };
-  const ends = new Date(Date.now() + 10 * 60 * 1000);
+  const { quoteWindowMin } = await readSettings();
+  const ends = quoteWindowMin > 0 ? new Date(Date.now() + quoteWindowMin * 60 * 1000) : null;
   await prisma.job.update({ where: { id: jobId }, data: { status: 'OPEN', windowEndsAt: ends } });
   await prisma.request.updateMany({ where: { jobId }, data: { windowEndsAt: ends, status: 'OPEN' } });
   // push a los comercios que venden esos rubros (o que reciben de todo)
   const catIds = [...new Set(job.requests.map((r) => r.categoryId).filter(Boolean))];
   const stores = await prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { categories: { select: { categoryId: true } } } } } });
   const targets = stores.filter((u) => { const cats = u.store?.categories || []; return cats.length === 0 || catIds.length === 0 || cats.some((c) => catIds.includes(c.categoryId)); }).map((u) => u.id);
-  await sendPushMany(targets, { title: 'Nuevo pedido para cotizar 🔧', body: 'Un taller necesita un repuesto. Cotizá antes de que cierre la ventana (10 min).', url: '/comercio', tag: 'nuevo-pedido-' + jobId }).catch(() => {});
+  await sendPushMany(targets, { title: 'Nuevo pedido para cotizar 🔧', body: 'Un taller necesita un repuesto. Entrá y cotizá tu mejor precio.', url: '/comercio', tag: 'nuevo-pedido-' + jobId }).catch(() => {});
+  return { ok: true };
+}
+
+// Cancelar un trabajo OPEN/DRAFT (el mecánico decidió no comprar): lo saca del feed de los comercios.
+export async function cancelJob(jobId) {
+  const s = await getSession(); if (!s || s.role !== 'MECHANIC') return { error: 'No autorizado' };
+  const job = await prisma.job.findUnique({ where: { id: jobId }, select: { mechanicId: true, status: true } });
+  if (!job || job.mechanicId !== s.id) return { error: 'No autorizado' };
+  if (!['DRAFT', 'OPEN'].includes(job.status)) return { error: 'Este trabajo ya no se puede cancelar' };
+  await prisma.request.updateMany({ where: { jobId, status: { in: ['OPEN', 'QUOTED', 'CLOSED'] } }, data: { status: 'CANCELLED' } });
+  await prisma.job.update({ where: { id: jobId }, data: { status: 'CANCELLED' } });
   return { ok: true };
 }
 

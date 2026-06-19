@@ -6,6 +6,7 @@ export const DEFAULTS = {
   mpFeePct: 6.39, // % de Mercado Pago (según plazo de acreditación; incluí IVA si querés cubrirlo)
   mpFeeEnabled: false, // sumar el recargo de MP al total que paga el cliente
   minShip: 5000, // costo de envío mínimo (editable desde el backoffice)
+  quoteWindowMin: 60, // contador (en minutos) que ve el mecánico al publicar; NO vence el pedido (informativo)
 };
 
 export async function getSettings() {
@@ -17,6 +18,7 @@ export async function getSettings() {
       mpFeePct: m.mpFeePct != null ? Number(m.mpFeePct) : DEFAULTS.mpFeePct,
       mpFeeEnabled: m.mpFeeEnabled != null ? m.mpFeeEnabled === 'true' : DEFAULTS.mpFeeEnabled,
       minShip: m.minShip != null ? Number(m.minShip) : DEFAULTS.minShip,
+      quoteWindowMin: m.quoteWindowMin != null ? Number(m.quoteWindowMin) : DEFAULTS.quoteWindowMin,
     };
   } catch {
     return { ...DEFAULTS };

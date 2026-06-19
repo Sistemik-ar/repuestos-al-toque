@@ -25,8 +25,6 @@ test('el total del pago del trabajo = suma de repuesto + comisión + envío', as
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 }); // cotización confirmada
 
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 }); // ventana cerrada efectiva
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();

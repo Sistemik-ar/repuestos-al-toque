@@ -41,7 +41,7 @@ export default function Home() {
             <div className="phone">
               <div className="phone-screen">
                 <div style={{ padding: '14px 14px 10px', background: 'rgba(11,11,15,0.6)', borderBottom: '1px solid var(--border)' }}>
-                  <div className="text-xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.08em' }}>Ventana de ofertas · se revelan al cerrar</div>
+                  <div className="text-xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.08em' }}>Cotizaciones en vivo</div>
                   <div className="countdown-big text-yellow" style={{ fontSize: 38 }}>07:42</div>
                 </div>
                 <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -69,7 +69,7 @@ export default function Home() {
         <section className="sect">
           <div className="feat-grid">
             <div className="card text-center"><i className="fa-solid fa-bolt text-yellow" style={{ fontSize: 24 }}></i><div className="h-md mt-12">Velocidad</div><div className="text-sm muted mt-4">Optimizado para resolver, no para buscar el precio más bajo durante horas.</div></div>
-            <div className="card text-center"><i className="fa-solid fa-tower-broadcast text-purple" style={{ fontSize: 24 }}></i><div className="h-md mt-12">En vivo</div><div className="text-sm muted mt-4">Cotizaciones reales de casas de Bariloche en una ventana de 10 minutos.</div></div>
+            <div className="card text-center"><i className="fa-solid fa-tower-broadcast text-purple" style={{ fontSize: 24 }}></i><div className="h-md mt-12">En vivo</div><div className="text-sm muted mt-4">Cotizaciones reales de las casas de Bariloche, al toque.</div></div>
             <div className="card text-center"><i className="fa-solid fa-user-secret text-yellow" style={{ fontSize: 24 }}></i><div className="h-md mt-12">Anónimo</div><div className="text-sm muted mt-4">Las dos partes son anónimas hasta concretar la venta. Sin presiones.</div></div>
           </div>
         </section>

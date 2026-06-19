@@ -19,6 +19,12 @@ export function db() {
   return client;
 }
 
+// Setea un ajuste del negocio (settings) — p.ej. el contador de cotización quoteWindowMin.
+export async function setSetting(key, value) {
+  const p = db();
+  await p.setting.upsert({ where: { key }, update: { value: String(value) }, create: { key, value: String(value) } });
+}
+
 // "Viaja en el tiempo": vence la ventana de un trabajo ya
 export async function expireJobWindow(plate) {
   const p = db();

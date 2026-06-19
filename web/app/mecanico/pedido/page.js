@@ -113,7 +113,7 @@ export default function Pedido() {
   async function esoEsTodo() {
     const res = await publishJob(jobId);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: 'Presupuesto solicitado', sub: 'Los comercios tienen 10 minutos para cotizar', icon: 'fa-paper-plane', type: 'green' });
+    toast({ title: 'Presupuesto solicitado', sub: 'Los comercios ya pueden cotizar tu pedido', icon: 'fa-paper-plane', type: 'green' });
     router.push('/mecanico/trabajo?id=' + jobId);
   }
   async function otroAuto() {
@@ -292,7 +292,7 @@ export default function Pedido() {
             </div>
             <div className="float-notif">
               <i className="fa-solid fa-circle-info text-purple"></i>
-              <div className="text-sm subtle">Notificamos a las casas de <b>{st.catLabel || 'Frenos'}</b> en Bariloche. Recibís las ofertas al cerrarse la ventana de <b className="text-yellow">10 minutos</b>.</div>
+              <div className="text-sm subtle">Notificamos a las casas de <b>{st.catLabel || 'Frenos'}</b> en Bariloche. Vas a ir recibiendo las ofertas <b className="text-yellow">a medida que coticen</b>.</div>
             </div>
           </div>
         )}

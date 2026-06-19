@@ -36,8 +36,6 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
   await expect(s.getByText(/Cotización enviada/i)).toBeVisible({ timeout: 10000 });
 
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();
@@ -174,8 +172,6 @@ test('comercio sin reseñas cotiza como "Nuevo" y ordena después del calificado
 
   // 4) el mecánico cierra y compara: el calificado PRIMERO (con estrellas), el nuevo AL FINAL como "Nuevo"
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   const cards = m.locator('.quote-card');

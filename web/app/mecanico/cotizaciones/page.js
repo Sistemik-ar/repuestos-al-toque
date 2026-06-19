@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { money, ping, toast, fmtTime } from '@/lib/ui';
+import { money, toast, fmtTime } from '@/lib/ui';
 import Stars from '@/components/Stars';
-import { getRequestForMechanic, acceptQuote, reopenWindow, closeWindow } from '@/app/actions/data';
+import { getRequestForMechanic, acceptQuote } from '@/app/actions/data';
 import Loading from '@/components/Loading';
 import BusyButton from '@/components/BusyButton';
 
@@ -16,7 +16,6 @@ export default function Cotizaciones() {
   const [now, setNow] = useState(0);
   const [selected, setSelected] = useState(null);
   const [zoom, setZoom] = useState(null);
-  const announced = useRef(false);
 
   const [jobId, setJobId] = useState(null);
   useEffect(() => {
@@ -39,16 +38,10 @@ export default function Cotizaciones() {
 
   const endsAt = request?.windowEndsAt || 0;
   const secs = endsAt ? Math.max(0, Math.round((endsAt - now) / 1000)) : 0;
-  const revealed = (!!endsAt && now >= endsAt) || ['CLOSED', 'PAID'].includes(request?.status);
+  // el contador es informativo y NO vence: las ofertas se ven y se pueden elegir siempre
+  const revealed = true;
   // mejor calificado primero; los comercios sin reseñas (rating null) al final
   const quotes = (request?.quotes || []).slice().sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
-
-  useEffect(() => {
-    if (revealed && !announced.current && request) {
-      announced.current = true; ping();
-      toast({ title: quotes.length ? 'Ventana cerrada' : 'Ventana cerrada · sin ofertas', sub: quotes.length ? `${quotes.length} oferta(s)` : 'Podés reintentar', icon: 'fa-flag-checkered', type: quotes.length ? 'yellow' : 'purple' });
-    }
-  }, [revealed]); // eslint-disable-line
 
   async function choose(q) { setSelected(q.id); sessionStorage.setItem('rat_selectedQuote', JSON.stringify({ ...q, requestId: id })); }
   async function continuar() {
@@ -60,9 +53,6 @@ export default function Cotizaciones() {
     toast({ title: 'Elección confirmada', sub: 'Seguí con los demás ítems o generá el link', icon: 'fa-check', type: 'green' });
     router.push(jb ? `/mecanico/trabajo?id=${jb}` : '/mecanico');
   }
-  async function retry() { announced.current = false; await reopenWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
-  async function cerrar() { await closeWindow(id); const r = await getRequestForMechanic(id); setRequest(r); }
-
   const veh = request ? (`${request.brand || ''} ${request.model || ''} ${request.year || ''}`.trim() + (request.engine ? ` · ${request.engine}` : '')) : '—';
   const part = request ? (request.desc || request.catLabel) : '—';
 
@@ -88,9 +78,10 @@ export default function Cotizaciones() {
         ) : (
           <>
             <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
-              <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>{revealed ? 'Ventana cerrada · ofertas' : 'Ventana de ofertas — se revelan al cerrarse'}</div>
-              <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
-              {!revealed && <BusyButton className="btn btn-ghost btn-sm mt-12" busyLabel="Cerrando…" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y ver ofertas</BusyButton>}
+              <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>Los comercios están cotizando</div>
+              {secs > 0
+                ? <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
+                : <div className="text-sm subtle">Seguimos recibiendo cotizaciones — elegí cuando quieras</div>}
             </div>
 
             <div className="card mb-16" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
@@ -100,17 +91,13 @@ export default function Cotizaciones() {
             </div>
 
             {quotes.length === 0 ? (
-              !revealed ? (
-                <div className="card text-center" style={{ padding: 24 }}>
-                  <div className="text-sm" style={{ fontWeight: 700 }}>Todavía no hay cotizaciones</div>
-                  <div className="text-xs muted mt-4">Van a ir apareciendo acá a medida que los comercios coticen.</div>
-                </div>
-              ) : (
-                <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">No llegaron ofertas</div><div className="text-xs mb-16">Podés reintentar otra ventana</div><BusyButton className="btn btn-primary btn-sm" busyLabel="Reintentando…" onClick={retry}><i className="fa-solid fa-rotate-right"></i> Reintentar</BusyButton></div>
-              )
+              <div className="card text-center" style={{ padding: 24 }}>
+                <div className="text-sm" style={{ fontWeight: 700 }}>Todavía no hay cotizaciones</div>
+                <div className="text-xs muted mt-4">Van a ir apareciendo acá a medida que los comercios coticen.</div>
+              </div>
             ) : (
               <>
-                <div className="section-title"><h2>Cotizaciones recibidas ({quotes.length})</h2><span className="text-xs muted">{revealed ? 'orden por calificación' : 'elegís al cerrar la ventana'}</span></div>
+                <div className="section-title"><h2>Cotizaciones recibidas ({quotes.length})</h2><span className="text-xs muted">orden por calificación</span></div>
                 <div className="flex-col gap-12">
                   {quotes.map((q) => (
                     <div key={q.id} className={`quote-card animate-in ${selected === q.id ? 'selected' : ''}`}>
@@ -133,9 +120,7 @@ export default function Cotizaciones() {
                       <div className="divider" style={{ margin: '12px 0' }}></div>
                       <div className="flex-between">
                         <div><div className="text-xs muted">Precio final</div><div className="price">{money(q.price)}</div></div>
-                        {revealed
-                          ? <button className={`btn btn-sm ${selected === q.id ? 'btn-success' : 'btn-primary'}`} onClick={() => choose(q)}>{selected === q.id ? <><i className="fa-solid fa-check"></i> Elegida</> : 'Elegir oferta'}</button>
-                          : <button className="btn btn-sm btn-ghost" disabled><i className="fa-solid fa-lock"></i> Elegís al cerrar</button>}
+                        <button className={`btn btn-sm ${selected === q.id ? 'btn-success' : 'btn-primary'}`} onClick={() => choose(q)}>{selected === q.id ? <><i className="fa-solid fa-check"></i> Elegida</> : 'Elegir oferta'}</button>
                       </div>
                       <div className="locked-info mt-12"><i className="fa-solid fa-lock"></i> Vendedor: <span className="badge badge-gray" style={{ marginLeft: 4 }}>Anónimo hasta concretar</span></div>
                     </div>

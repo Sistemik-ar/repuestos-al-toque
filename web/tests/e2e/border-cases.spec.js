@@ -32,8 +32,6 @@ test('desestimar un ítem lo saca del pago del trabajo', async ({ browser }) => 
 
   // mecánico: cierra, elige ítem 1, DESESTIMA ítem 2
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.locator('.card', { hasText: `Borde1 E2E ${stamp}` }).getByRole('link', { name: /Ver cotizaciones/i }).click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();
@@ -78,7 +76,7 @@ test.describe('mobile (viewport celular)', () => {
     await expect(page.getByRole('button', { name: /Eso es todo/i })).toBeVisible();
     await publicarTrabajo(page);
     await expect(page.getByText(/Los comercios están cotizando/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Cerrar y elegir/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Cancelar pedido/i })).toBeVisible();
   });
 
   test('mobile: el repartidor ve sus secciones', async ({ page }) => {

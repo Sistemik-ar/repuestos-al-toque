@@ -3,7 +3,7 @@ export default function manifest() {
   return {
     name: 'RepuestosAlToque',
     short_name: 'AlToque',
-    description: 'Repuestos para tu taller en 10 minutos · Bariloche',
+    description: 'Repuestos para tu taller, al toque · Bariloche',
     start_url: '/',
     display: 'standalone',
     background_color: '#0B0B0F',

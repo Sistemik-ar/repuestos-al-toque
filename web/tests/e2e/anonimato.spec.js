@@ -30,8 +30,6 @@ test('anonimato: el mecánico no ve el nombre del comercio y el comercio no ve e
 
   // MECÁNICO: ve la cotización con ALIAS, nunca el nombre real del comercio
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await expect(m.getByText(/Proveedor [A-Z]/).first()).toBeVisible(); // alias rotativo (A/B/C…)

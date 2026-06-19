@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login, uniquePlate, crearItem, publicarTrabajo, cotizar } from './helpers';
-import { db, ensureStore2 } from './db';
+import { db, ensureStore2, expireJobWindow } from './db';
 
 // Escenarios de concurrencia y pestañas viejas — los que rompen plata en producción.
 
@@ -23,8 +23,6 @@ async function trabajoElegido(browser, desc, plate, price = '30000') {
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
 
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();
@@ -79,9 +77,9 @@ test('pestaña vieja no puede cambiar la elección de un trabajo pagado', async 
   await mc.close(); await sc.close();
 });
 
-test('cotización enviada justo después del cierre de ventana es rechazada', async ({ browser }) => {
+test('el pedido NO vence: el comercio puede cotizar aunque el contador ya haya pasado', async ({ browser }) => {
   test.setTimeout(90000);
-  const desc = `Tarde E2E ${Date.now()}`;
+  const desc = `NoVence E2E ${Date.now()}`;
   const plate = uniquePlate();
   const mc = await browser.newContext();
   const m = await mc.newPage();
@@ -89,24 +87,19 @@ test('cotización enviada justo después del cierre de ventana es rechazada', as
   await crearItem(m, desc, plate);
   await publicarTrabajo(m);
 
-  // vendedor deja el modal de cotizar ABIERTO...
+  await expireJobWindow(plate); // el contador ya pasó — pero el pedido NO debe cerrarse
+
   const sc = await browser.newContext();
   const s = await sc.newPage();
   await login(s, 'vendedor@repuestosaltoque.com.ar');
   const card = s.locator('.card', { hasText: desc });
-  await expect(card).toBeVisible({ timeout: 15000 });
+  await expect(card).toBeVisible({ timeout: 15000 }); // sigue visible para el comercio
   await card.getByRole('button', { name: /Cotizar/i }).click();
   await s.locator('input[inputmode="numeric"]').first().fill('30000');
-
-  // ...mientras el mecánico cierra la ventana...
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
-
-  // ...y recién ahí el vendedor aprieta Enviar -> rechazada con error claro
   await s.getByRole('button', { name: /Enviar Cotización/i }).click();
-  await expect(s.getByText(/ventana de cotización ya cerró/i)).toBeVisible({ timeout: 10000 });
+  await expect(s.locator('.modal-backdrop')).toHaveCount(0, { timeout: 10000 }); // cotización aceptada, no rechazada
   const quotes = await db().requestQuote.count({ where: { request: { description: desc } } });
-  expect(quotes).toBe(0); // no entró ninguna cotización tardía
+  expect(quotes).toBe(1); // entró igual, aunque el contador ya había pasado
 
   await mc.close(); await sc.close();
 });
@@ -193,8 +186,6 @@ test('doble-tap en la elección nunca deja dos cotizaciones SELECTED', async ({ 
 
   // cerrar ventana y abrir las cotizaciones en DOS pestañas
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   const itemId = (await db().request.findFirst({ where: { description: desc }, select: { id: true } })).id;
   const jobId = (await db().request.findFirst({ where: { description: desc }, select: { jobId: true } })).jobId;
 
@@ -245,8 +236,6 @@ test('claim consolida por patente: un repartidor toma TODO el auto (no se parte 
 
   // el mecánico cierra la ventana y elige ambos ítems
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   const jobId = new URL(m.url()).searchParams.get('id');
   for (const d of [d1, d2]) {
     await m.locator('.card', { hasText: d }).getByRole('link', { name: /Ver cotizaciones/i }).click();
@@ -331,8 +320,6 @@ test('multi-comercio: un auto junta repuestos de 2 comercios -> 1 viaje, 1 flete
 
   // mecánico cierra y elige una oferta por ítem (cada una de un comercio distinto)
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   const jobId = new URL(m.url()).searchParams.get('id');
   for (const d of [d1, d2]) {
     await m.locator('.card', { hasText: d }).getByRole('link', { name: /Ver cotizaciones/i }).click();

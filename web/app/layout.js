@@ -7,11 +7,11 @@ const SITE = 'https://repuestosaltoque.com.ar';
 export const metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: 'RepuestosAlToque · Repuestos para tu taller en 10 minutos · Bariloche',
+    default: 'RepuestosAlToque · Repuestos para tu taller, al toque · Bariloche',
     template: '%s · RepuestosAlToque',
   },
   description:
-    'Pedí el repuesto que necesitás y recibí cotizaciones de las casas de repuestos de Bariloche en 10 minutos. Pagás online y te lo llevamos al taller. Para mecánicos, repuesteros y repartidores.',
+    'Pedí el repuesto que necesitás y recibí cotizaciones de las casas de repuestos de Bariloche al toque. Pagás online y te lo llevamos al taller. Para mecánicos, repuesteros y repartidores.',
   keywords: ['repuestos', 'autopartes', 'Bariloche', 'taller mecánico', 'casa de repuestos', 'cotización de repuestos', 'envío de repuestos', 'mecánicos'],
   alternates: { canonical: '/' },
   openGraph: {
@@ -19,13 +19,13 @@ export const metadata = {
     locale: 'es_AR',
     url: SITE,
     siteName: 'RepuestosAlToque',
-    title: 'RepuestosAlToque · Repuestos para tu taller en 10 minutos',
-    description: 'Cotizaciones de las casas de repuestos de Bariloche en 10 minutos, pago online y envío al taller.',
+    title: 'RepuestosAlToque · Repuestos para tu taller, al toque',
+    description: 'Cotizaciones de las casas de repuestos de Bariloche al toque, pago online y envío al taller.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'RepuestosAlToque · Repuestos para tu taller en 10 minutos',
-    description: 'Cotizaciones de repuestos en 10 minutos, pago online y envío al taller. Bariloche.',
+    title: 'RepuestosAlToque · Repuestos para tu taller, al toque',
+    description: 'Cotizaciones de repuestos al toque, pago online y envío al taller. Bariloche.',
   },
   robots: { index: true, follow: true },
   applicationName: 'RepuestosAlToque',
@@ -44,7 +44,7 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'LocalBusiness',
   name: 'RepuestosAlToque',
-  description: 'Marketplace de repuestos para talleres mecánicos: cotizaciones en 10 minutos, pago online y envío al taller.',
+  description: 'Marketplace de repuestos para talleres mecánicos: cotizaciones al toque, pago online y envío al taller.',
   url: SITE,
   image: `${SITE}/opengraph-image.jpg`,
   address: { '@type': 'PostalAddress', addressLocality: 'San Carlos de Bariloche', addressRegion: 'Río Negro', addressCountry: 'AR' },

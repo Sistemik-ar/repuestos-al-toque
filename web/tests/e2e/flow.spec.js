@@ -26,10 +26,8 @@ test('trabajo: pedido → cotización → elegir → link de pago del trabajo', 
   await s.getByRole('button', { name: /Enviar Cotización/i }).click();
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 }); // cotización confirmada
 
-  // 3) Mecánico: cierra la ventana del trabajo y elige la oferta del ítem
+  // 3) Mecánico: ve la oferta del ítem y la elige (sin esperar ninguna ventana)
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 }); // ventana cerrada efectiva
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m).toHaveURL(/\/mecanico\/cotizaciones\?id=.*job=/);
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });

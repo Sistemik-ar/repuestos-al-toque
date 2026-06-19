@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { money, toast, fmtTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
-import { getJob, closeJobWindow, createJobCheckout, publishJob, setItemCredit, cancelItem } from '@/app/actions/data';
+import { getJob, cancelJob, createJobCheckout, publishJob, setItemCredit, cancelItem } from '@/app/actions/data';
 import Loading from '@/components/Loading';
 import BusyButton from '@/components/BusyButton';
 
@@ -32,7 +32,6 @@ export default function Trabajo() {
 
   const ends = j?.windowEndsAt || 0;
   const secs = ends ? Math.max(0, Math.round((ends - now) / 1000)) : 0;
-  const windowOpen = j?.status === 'OPEN' && ends && now < ends;
   const items = j?.items || [];
   const chosen = items.filter((i) => i.selected && i.status !== 'CANCELLED');
   // una vez generado el link (job CLOSED), pagado o cancelado, las elecciones quedan bloqueadas
@@ -52,7 +51,13 @@ export default function Trabajo() {
     setJ(await getJob(id));
   }
 
-  async function cerrar() { await closeJobWindow(id); const d = await getJob(id); setJ(d); }
+  async function cancelar() {
+    if (!window.confirm('¿Cancelar este pedido? Los comercios dejan de verlo y no vas a poder elegir ofertas.')) return;
+    const res = await cancelJob(id);
+    if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
+    toast({ title: 'Pedido cancelado', icon: 'fa-ban', type: 'purple' });
+    setJ(await getJob(id));
+  }
   async function pagar() {
     setPaying(true);
     const res = await createJobCheckout(id);
@@ -79,18 +84,20 @@ export default function Trabajo() {
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-car"></i></div><div className="text-sm">No encontramos el trabajo</div></div>
         ) : (
           <>
-            {/* Ventana única del trabajo */}
-            {windowOpen && (
+            {/* Trabajo publicado: los comercios cotizan. El contador es informativo y NO vence. */}
+            {j.status === 'OPEN' && (
               <div className="card glow mb-16" style={{ textAlign: 'center', background: 'linear-gradient(135deg,rgba(109,40,217,0.25),rgba(11,11,15,0.4))' }}>
                 <div className="text-xs muted mb-8" style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}>Los comercios están cotizando todo el trabajo</div>
-                <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
-                <BusyButton className="btn btn-ghost btn-sm mt-12" busyLabel="Cerrando…" onClick={cerrar}><i className="fa-solid fa-flag-checkered"></i> Cerrar y elegir</BusyButton>
+                {secs > 0
+                  ? <div className="countdown-big text-yellow">{fmtTime(secs)}</div>
+                  : <div className="text-sm subtle">Seguimos recibiendo cotizaciones — elegí cuando te llegue una</div>}
+                <BusyButton className="btn btn-ghost btn-sm mt-12" busyLabel="Cancelando…" onClick={cancelar}><i className="fa-solid fa-ban"></i> Cancelar pedido</BusyButton>
               </div>
             )}
 
             {j.status === 'CANCELLED' && (
               <div className="card mb-16" style={{ borderColor: 'rgba(239,68,68,0.45)' }}>
-                <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(239,68,68,0.16)', color: '#FCA5A5' }}><i className="fa-solid fa-ban"></i></div><div><div className="text-sm" style={{ fontWeight: 800 }}>Trabajo cancelado</div><div className="text-xs muted">Pasaron 24hs sin completar el pago. Podés volver a pedir cada repuesto desde su detalle.</div></div></div>
+                <div className="flex-center gap-12"><div className="store-avatar" style={{ background: 'rgba(239,68,68,0.16)', color: '#FCA5A5' }}><i className="fa-solid fa-ban"></i></div><div><div className="text-sm" style={{ fontWeight: 800 }}>Trabajo cancelado</div><div className="text-xs muted">Este trabajo se canceló. Podés volver a pedir cada repuesto cuando quieras.</div></div></div>
               </div>
             )}
 

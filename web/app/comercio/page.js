@@ -58,12 +58,12 @@ export default function Comercio() {
   useEffect(() => { const t = sessionStorage.getItem('rat_comercio_tab'); if (t) setTab(t); }, []);
   useEffect(() => { try { sessionStorage.setItem('rat_comercio_tab', tab); } catch {} }, [tab]);
 
-  // pendientes: solo con la ventana de cotización todavía abierta.
-  // Orden: la que VENCE ANTES primero (es donde hay que actuar ya); urgente desempata.
-  const windowOpen = (r) => ['OPEN', 'QUOTED'].includes(r.status) && (!r.windowEndsAt || r.windowEndsAt > Date.now());
+  // pendientes: cotizable mientras el pedido siga abierto (el contador NO vence el pedido).
+  // Orden: el más antiguo primero (es el que espera hace más); urgente desempata.
+  const windowOpen = (r) => ['OPEN', 'QUOTED'].includes(r.status);
   const pend = open
     .filter((r) => r.myCount === 0 && windowOpen(r) && !dismissed.includes(r.id))
-    .sort((a, b) => (a.windowEndsAt || Infinity) - (b.windowEndsAt || Infinity) || (a.urgency === 'Necesito ahora' ? -1 : 1));
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || (a.urgency === 'Necesito ahora' ? -1 : 1));
   const cot = open.filter((r) => r.myCount > 0);
   useTitleBell(pend.length, 'Comercio · RepuestosAlToque'); // campanita en el tab si hay pedidos nuevos para cotizar
   // "esperando decisión": vivas (ventana cerrada hace <24hs) vs zombies "sin respuesta"
@@ -99,7 +99,7 @@ export default function Comercio() {
     const res = await createQuote(modal.id, payload);
     setModal(null);
     if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
-    ping(); toast({ title: 'Cotización enviada', sub: 'El mecánico la ve al cerrar la ventana', icon: 'fa-paper-plane', type: 'green' });
+    ping(); toast({ title: 'Cotización enviada', sub: 'El mecánico ya la puede ver y elegir', icon: 'fa-paper-plane', type: 'green' });
     load();
   }
   async function logout() { await logoutAction(); router.push('/login'); }

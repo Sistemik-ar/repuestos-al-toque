@@ -1,53 +1,45 @@
 import { test, expect } from '@playwright/test';
 import { login, uniquePlate, crearItem, publicarTrabajo } from './helpers';
-import { expireJobWindow, backdateJobSelection, storeRatingStats } from './db';
+import { backdateJobSelection, storeRatingStats } from './db';
 
-// Procesos completos: expiración de ventana, cancelación por no pago,
+// Procesos completos: elección sin ventana, cancelación de pedido y por no pago,
 // y el ciclo entero de reparto con PINs + calificaciones + historial.
 
-test('ventana vencida: revela ofertas si las hay, o permite reintentar', async ({ browser }) => {
+test('el mecánico elige la oferta apenas llega (sin ventana) y puede cancelar un pedido', async ({ browser }) => {
   const stamp = Date.now();
   const plate = uniquePlate();
   const mc = await browser.newContext();
   const m = await mc.newPage();
   await login(m, 'mecanico@repuestosaltoque.com.ar');
 
-  // caso A: CON cotización -> al vencer se revela y se puede elegir
-  await crearItem(m, `Vence1 E2E ${stamp}`, plate);
+  // A: con una cotización, el mecánico la ve y la puede elegir directamente (sin cerrar ninguna ventana)
+  await crearItem(m, `Elige1 E2E ${stamp}`, plate);
   await publicarTrabajo(m);
   const sc = await browser.newContext();
   const s = await sc.newPage();
   await login(s, 'vendedor@repuestosaltoque.com.ar');
-  const card = s.locator('.card', { hasText: `Vence1 E2E ${stamp}` });
+  const card = s.locator('.card', { hasText: `Elige1 E2E ${stamp}` });
   await expect(card).toBeVisible({ timeout: 15000 });
   await card.getByRole('button', { name: /Cotizar/i }).click();
   await s.locator('input[inputmode="numeric"]').first().fill('25000');
   await s.getByRole('button', { name: /Enviar Cotización/i }).click();
-  await expect(s.locator('.card', { hasText: `Vence1 E2E ${stamp}` })).toHaveCount(0, { timeout: 10000 });
+  await expect(s.locator('.card', { hasText: `Elige1 E2E ${stamp}` })).toHaveCount(0, { timeout: 10000 });
 
-  await expireJobWindow(plate); // pasa el tiempo
-  await m.reload();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0); // ventana ya no corre
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
-  await expect(m.getByRole('button', { name: /Elegir oferta/i }).first()).toBeEnabled(); // revelado
+  await expect(m.getByRole('button', { name: /Elegir oferta/i }).first()).toBeEnabled(); // elegible al instante
 
-  // el vendedor ya no lo ve en Pendientes (ventana cerrada)
-  await s.reload();
-  await expect(s.locator('.card', { hasText: `Vence1 E2E ${stamp}` })).toHaveCount(0);
-
-  // caso B: SIN cotizaciones -> "No llegaron ofertas" + Reintentar reabre la ventana del trabajo
+  // B: un pedido nuevo se puede CANCELAR y sale del feed del comercio
   const plate2 = 'CD' + String((stamp + 7) % 1000).padStart(3, '0') + 'XY';
-  await crearItem(m, `Vence2 E2E ${stamp}`, plate2);
-  await publicarTrabajo(m);
-  await expireJobWindow(plate2);
-  await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
-  await expect(m.getByText(/No llegaron ofertas/i)).toBeVisible({ timeout: 15000 });
-  await m.getByRole('button', { name: /Reintentar/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y ver ofertas/i })).toBeVisible({ timeout: 10000 }); // ventana reabierta
-  // y el vendedor vuelve a verlo en Pendientes
+  const desc2 = `Cancela E2E ${stamp}`;
+  await crearItem(m, desc2, plate2);
+  await publicarTrabajo(m); // queda en /mecanico/trabajo del nuevo pedido
+  await expect(s.locator('.card', { hasText: desc2 })).toBeVisible({ timeout: 15000 }); // el comercio lo ve
+  m.on('dialog', (d) => d.accept()); // confirma el cancelar
+  await m.getByRole('button', { name: /Cancelar pedido/i }).click();
+  await expect(m.getByText(/Trabajo cancelado/i)).toBeVisible({ timeout: 10000 });
   await s.reload();
-  await expect(s.locator('.card', { hasText: `Vence2 E2E ${stamp}` })).toBeVisible({ timeout: 15000 });
+  await expect(s.locator('.card', { hasText: desc2 })).toHaveCount(0, { timeout: 15000 }); // ya no lo ve
 
   await mc.close(); await sc.close();
 });
@@ -73,8 +65,6 @@ test('si no paga en 24hs: trabajo CANCELADO para el mecánico y "no pagó" para 
 
   // mecánico elige y genera el link... pero nunca paga
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();
@@ -124,8 +114,6 @@ test('reparto completo con PINs + calificación + historial', async ({ browser }
   await expect(s.locator('.card', { hasText: desc })).toHaveCount(0, { timeout: 10000 });
 
   await m.bringToFront();
-  await m.getByRole('button', { name: /Cerrar y elegir/i }).click();
-  await expect(m.getByRole('button', { name: /Cerrar y elegir/i })).toHaveCount(0, { timeout: 10000 });
   await m.getByRole('link', { name: /Ver cotizaciones/i }).first().click();
   await expect(m.getByText(/Cotizaciones recibidas/i)).toBeVisible({ timeout: 15000 });
   await m.getByRole('button', { name: /Elegir oferta/i }).first().click();

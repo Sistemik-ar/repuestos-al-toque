@@ -599,10 +599,17 @@ function Pricing() {
         <div className="field" style={{ marginBottom: 0 }}><label>Comisión de la plataforma (%)</label><input className="input" inputMode="decimal" value={s.commissionPct} onChange={(e) => set('commissionPct', e.target.value)} /></div>
         <div className="field" style={{ marginBottom: 0 }}><label>Recargo Mercado Pago (%)</label><input className="input" inputMode="decimal" value={s.mpFeePct} onChange={(e) => set('mpFeePct', e.target.value)} /></div>
       </div>
-      <div className="field mb-12" style={{ maxWidth: 220 }}>
-        <label>Envío mínimo ($)</label>
-        <input className="input" inputMode="numeric" value={s.minShip} onChange={(e) => set('minShip', e.target.value)} />
-        <div className="text-xs muted mt-4">Ninguna banda de la tabla cobra menos que esto.</div>
+      <div className="grid-2 mb-12">
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Envío mínimo ($)</label>
+          <input className="input" inputMode="numeric" value={s.minShip} onChange={(e) => set('minShip', e.target.value)} />
+          <div className="text-xs muted mt-4">Ninguna banda de la tabla cobra menos que esto.</div>
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Contador de cotización (min)</label>
+          <input className="input" inputMode="numeric" value={s.quoteWindowMin} onChange={(e) => set('quoteWindowMin', e.target.value)} />
+          <div className="text-xs muted mt-4">Tiempo que ve el mecánico al publicar. <b>No vence el pedido</b> (informativo). 0 = sin contador.</div>
+        </div>
       </div>
       <label className="flex-center gap-8 mb-8" style={{ cursor: 'pointer' }}>
         <input type="checkbox" checked={s.mpFeeEnabled} onChange={(e) => set('mpFeeEnabled', e.target.checked)} />
