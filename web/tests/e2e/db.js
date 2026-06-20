@@ -133,6 +133,34 @@ export async function seedChosenQuote({ mechEmail = 'mecanico@repuestosaltoque.c
   return { jobId: job.id, requestId: req.id, quoteId: quote.id };
 }
 
+// Siembra una venta CONCRETADA con desglose REAL (repuesto + comisión% + envío + recargo MP),
+// repartidor y entrega opcionales. Para el desglose del admin y las estadísticas.
+export async function seedSale({
+  mechEmail = 'mecanico@repuestosaltoque.com.ar', storeEmail = 'vendedor@repuestosaltoque.com.ar',
+  riderEmail = null, desc = 'Venta E2E', part = 40000, commissionPct = 10, freight = 6000, mpFee = 0,
+  status = 'DELIVERED', creditAccount = false,
+} = {}) {
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: mechEmail } });
+  const store = await p.user.findUnique({ where: { email: storeEmail } });
+  const rider = riderEmail ? await p.user.findUnique({ where: { email: riderEmail } }) : null;
+  const stamp = Date.now() + Math.floor(Math.random() * 1000);
+  const commission = Math.round(part * (commissionPct / 100));
+  const total = (creditAccount ? 0 : part) + commission + freight + mpFee;
+  const delivered = status === 'DELIVERED';
+  const job = await p.job.create({ data: { code: 'JSL' + stamp, mechanicId: mech.id, plate: 'SL' + (stamp % 100000), brand: 'Toyota', model: 'Corolla', status: delivered ? 'DONE' : 'PAID' } });
+  const req = await p.request.create({ data: { code: 'RSL' + stamp, mechanicId: mech.id, jobId: job.id, description: desc, status, photoUrls: [] } });
+  const quote = await p.requestQuote.create({ data: { requestId: req.id, storeId: store.id, alias: 'Casa A', price: part, status: 'SELECTED', photoUrls: [] } });
+  const now = new Date();
+  const order = await p.order.create({ data: {
+    requestId: req.id, quoteId: quote.id, mechanicId: mech.id, storeId: store.id,
+    partAmount: part, commissionPct, commissionAmount: commission, freightAmount: freight, mpFeeAmount: mpFee,
+    total, creditAccount, status, deliveryId: rider?.id || null,
+    pickedAt: delivered ? now : null, deliveredAt: delivered ? now : null,
+  } });
+  return { jobId: job.id, requestId: req.id, quoteId: quote.id, orderId: order.id, desc, commission, total };
+}
+
 // Borra una venta/pedido sembrado (orden -> request[cascada quote] -> job).
 export async function removeSeededSale({ orderId, requestId, jobId } = {}) {
   const p = db();
