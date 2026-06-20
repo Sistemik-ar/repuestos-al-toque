@@ -48,8 +48,10 @@ test('admin: "Últ. ingreso" se puebla tras el login del comercio', async ({ pag
 // Editar un usuario desde el backoffice guarda los cambios.
 test('admin: editar un usuario guarda los cambios', async ({ page }) => {
   await login(page, 'admin@repuestosaltoque.com.ar'); // Usuarios es la sección por defecto
-  await page.getByPlaceholder(/Buscar por nombre/i).fill('Diego'); // repartidor seed
-  const row = page.locator('tr', { hasText: 'Diego' }).first();
+  // editamos al mecánico (no tiene docsOk y no le tocamos el nombre): no afecta a otros tests que
+  // comparten la DB. (Editar al repartidor recalcularía docsOk=false y lo dejaría sin poder tomar viajes.)
+  await page.getByPlaceholder(/Buscar por nombre/i).fill('Patagonia'); // Taller Patagonia (mecánico seed)
+  const row = page.locator('tr', { hasText: 'Patagonia' }).first();
   await expect(row).toBeVisible({ timeout: 10000 });
   await row.getByRole('button', { name: /Editar/i }).click();
   await expect(page.getByRole('heading', { name: /Editar usuario/i })).toBeVisible({ timeout: 10000 });
