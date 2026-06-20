@@ -127,6 +127,7 @@ test('comercio sin reseñas cotiza como "Nuevo" y ordena después del calificado
   // 1) alta de un comercio NUEVO desde el backoffice
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
+  await a.getByRole('button', { name: /Alta de usuario/i }).click(); // sub-nav Alta (rediseño admin)
   await a.getByPlaceholder('Repuestos Centro').fill('E2E Nuevo Store');
   await a.getByPlaceholder('cuenta@email.com').fill(email);
   await pickAddress(a); // dirección obligatoria por autocompletado

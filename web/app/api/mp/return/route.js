@@ -20,7 +20,7 @@ export async function GET(req) {
         confirmed = await confirmPaidByRef(pay.external_reference, pay.transaction_amount);
       }
     } else if (mpIsTest() && status === 'approved' && ref) {
-      // Atajo de PRUEBAS (sandbox local: requiere MP_TEST_AMOUNT + MP_TEST_ACCESS_TOKEN).
+      // Atajo de PRUEBAS (modo test: requiere MP_TEST_ACCESS_TOKEN).
       // En producción esta rama NO existe — no se puede forjar un pago desde la URL.
       confirmed = await confirmPaidByRef(ref);
     }

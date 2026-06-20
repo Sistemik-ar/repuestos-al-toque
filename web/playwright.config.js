@@ -18,12 +18,11 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 120000,
-    // El modo prueba de pagos (atajo de confirmación sin MP real) lo controla el harness E2E,
-    // NO el .env: en producción MP_TEST_AMOUNT va apagado. Así el suite es autónomo y reproducible.
-    // DATABASE_URL se propaga si está en el entorno (npm run e2e:local apunta a la DB local);
-    // si no, el server usa el .env (DB remota).
+    // El modo prueba de pagos lo activa MP_TEST_ACCESS_TOKEN (token de sandbox, en el .env): con él
+    // mpIsTest() es true y corre el atajo de confirmación sin cobrar plata real. En producción ese
+    // token NO va seteado. DATABASE_URL/AUTH_SECRET se propagan si están en el entorno (DB local).
     env: {
-      MP_TEST_AMOUNT: process.env.MP_TEST_AMOUNT || '10',
+      ...(process.env.MP_TEST_ACCESS_TOKEN ? { MP_TEST_ACCESS_TOKEN: process.env.MP_TEST_ACCESS_TOKEN } : {}),
       ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
       ...(process.env.AUTH_SECRET ? { AUTH_SECRET: process.env.AUTH_SECRET } : {}),
     },

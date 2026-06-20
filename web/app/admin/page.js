@@ -3,10 +3,14 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast, fmtDateTime } from '@/lib/ui';
-import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, searchAddresses, getUserDetail, updateUser, getAdminTrip } from '@/app/actions/data';
+import { getAdminData, setUserStatus, getShippingTariffs, saveShippingTariffs, createUser, getBusinessSettings, saveBusinessSettings, getCreditRequests, adminActOnCredit, disableCreditAccount, setStoreCategories, setUserTempPassword, searchAddresses, getUserDetail, updateUser, getAdminTrip, getAdminStats } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
+import dynamic from 'next/dynamic';
 import Loading from '@/components/Loading';
 import FontScale from '@/components/FontScale';
+
+// Leaflet toca window: solo en cliente, nunca SSR.
+const LocationPicker = dynamic(() => import('@/components/LocationPicker'), { ssr: false });
 
 const ROLE_LABEL = { ADMIN: 'Admin', MECHANIC: 'Mecánico', STORE: 'Vendedor', DELIVERY: 'Repartidor' };
 const ST_BADGE = { ACTIVE: 'badge-green', PENDING: 'badge-yellow', SUSPENDED: 'badge-red' };
@@ -153,37 +157,15 @@ function Pager({ pager }) {
 
 // Barra de tabs con indicador de scroll horizontal: en mobile no entran las 5 pestañas,
 // así que mostramos un degradé + chevron animado cuando quedan opciones ocultas a la derecha.
-function AdminTabs({ tab, setTab }) {
-  const ref = useRef(null);
-  const [more, setMore] = useState(false);
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const upd = () => setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 8);
-    upd();
-    el.addEventListener('scroll', upd, { passive: true });
-    window.addEventListener('resize', upd);
-    return () => { el.removeEventListener('scroll', upd); window.removeEventListener('resize', upd); };
-  }, []);
-  const TABS = [
-    ['usuarios', 'fa-users', 'Usuarios'],
-    ['comercios', 'fa-store', 'Comercios'],
-    ['cuentas', 'fa-id-card-clip', 'Cuenta corriente'],
-    ['pedidos', 'fa-receipt', 'Pedidos'],
-    ['ajustes', 'fa-sliders', 'Ajustes'],
-  ];
-  return (
-    <div className={`rat-tabs-wrap ${more ? 'has-more' : ''}`}>
-      <div className="rat-tabs" ref={ref}>
-        <div className="pill-tabs">
-          {TABS.map(([k, icon, label]) => (
-            <button key={k} type="button" className={tab === k ? 'active' : ''} onClick={() => setTab(k)}><i className={`fa-solid ${icon}`}></i> {label}</button>
-          ))}
-        </div>
-      </div>
-      <button type="button" className="rat-tabs-more" aria-label="Ver más pestañas" onClick={() => ref.current?.scrollBy({ left: 200, behavior: 'smooth' })}><i className="fa-solid fa-chevron-right"></i></button>
-    </div>
-  );
-}
+const NAV = [
+  ['usuarios', 'fa-users', 'Usuarios'],
+  ['comercios', 'fa-store', 'Comercios'],
+  ['pedidos', 'fa-receipt', 'Pedidos'],
+  ['cuentas', 'fa-id-card-clip', 'Cuenta corriente'],
+  ['stats', 'fa-chart-line', 'Estadísticas'],
+  ['ajustes', 'fa-sliders', 'Ajustes'],
+];
+const SEC_TITLE = { usuarios: 'Usuarios', comercios: 'Comercios', pedidos: 'Pedidos', cuentas: 'Cuenta corriente', stats: 'Estadísticas', ajustes: 'Ajustes' };
 
 export default function Admin() {
   const router = useRouter();
@@ -192,6 +174,30 @@ export default function Admin() {
   const [tariffs, setTariffs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('usuarios');
+  const [usuSub, setUsuSub] = useState('lista'); // Usuarios: Ver y editar | Alta
+  const [collapsed, setCollapsed] = useState(false); // sidebar contraído (desktop)
+
+  // Navegación <-> URL: la sección (?sec=) y el alta (?u=alta) quedan en la URL para sobrevivir F5/recarga.
+  const skipWrite = useRef(true);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const sec = p.get('sec');
+    if (sec && NAV.some(([id]) => id === sec)) setTab(sec);
+    if (p.get('u') === 'alta') setUsuSub('alta');
+  }, []);
+  useEffect(() => {
+    if (skipWrite.current) { skipWrite.current = false; return; }
+    const p = new URLSearchParams();
+    if (tab !== 'usuarios') p.set('sec', tab);
+    if (tab === 'usuarios' && usuSub === 'alta') p.set('u', 'alta');
+    const qs = p.toString();
+    const search = qs ? `?${qs}` : '';
+    if (window.location.search === search) return;
+    // replaceState NATIVO (del prototipo): Next parchea window.history.replaceState y al usarlo
+    // re-renderiza/re-monta la ruta (perdía el estado de la sección). El del prototipo no está
+    // parcheado, así que solo cambia la barra de direcciones. Preservamos el state de Next.
+    try { History.prototype.replaceState.call(window.history, window.history.state, '', `/admin${search}`); } catch {}
+  }, [tab, usuSub]);
 
   // Carga al entrar + botón "Actualizar" + recarga después de cada acción (sin auto-poll: no pisa búsqueda/página).
   const load = async () => {
@@ -226,7 +232,21 @@ export default function Admin() {
       </div>
 
       <div className="container">
-        <div className="mb-16"><div className="eyebrow">Panel de control</div><h1 className="h-lg">Resumen</h1></div>
+        <div className={`rat-layout ${collapsed ? 'rat-collapsed' : ''}`}>
+          <aside className="rat-sidebar">
+            <button className="rat-navtoggle" type="button" onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Expandir' : 'Contraer'}><i className={`fa-solid ${collapsed ? 'fa-angles-right' : 'fa-angles-left'}`}></i>{!collapsed && <span>Contraer</span>}</button>
+            {NAV.map(([id, icon, lbl]) => (
+              <div key={id}>
+                <button className={`rat-navitem ${tab === id ? 'active' : ''}`} type="button" onClick={() => setTab(id)} title={lbl}><i className={`fa-solid ${icon}`}></i><span>{lbl}</span>{id === 'usuarios' && <i className={`fa-solid fa-chevron-down rat-navchev ${tab === 'usuarios' ? 'open' : ''}`}></i>}</button>
+                {id === 'usuarios' && tab === 'usuarios' && (<>
+                  <button className={`rat-subitem ${usuSub === 'lista' ? 'active' : ''}`} type="button" onClick={() => setUsuSub('lista')}><i className="fa-solid fa-pen-to-square"></i><span>Ver y editar</span></button>
+                  <button className={`rat-subitem ${usuSub === 'alta' ? 'active' : ''}`} type="button" onClick={() => setUsuSub('alta')}><i className="fa-solid fa-user-plus"></i><span>Alta de usuario</span></button>
+                </>)}
+              </div>
+            ))}
+          </aside>
+          <div className="rat-main">
+        <div className="mb-16"><div className="eyebrow">Panel de control</div><h1 className="h-lg">{SEC_TITLE[tab]}</h1></div>
 
         {d === null ? (
           <Loading label="Cargando el resumen…" />
@@ -239,11 +259,14 @@ export default function Admin() {
           </div>
         )}
 
-        <AdminTabs tab={tab} setTab={setTab} />
-
         {tab === 'usuarios' && (<>
-          <AltaUsuario onCreated={load} />
-          <UsersSection users={d?.users} onReload={load} />
+          <div className="rat-submobile rat-tabs" style={{ marginBottom: 16 }}>
+            <div className="pill-tabs">
+              <button type="button" className={usuSub === 'lista' ? 'active' : ''} onClick={() => setUsuSub('lista')}>Ver y editar</button>
+              <button type="button" className={usuSub === 'alta' ? 'active' : ''} onClick={() => setUsuSub('alta')}>Alta de usuario</button>
+            </div>
+          </div>
+          {usuSub === 'alta' ? <AltaUsuario onCreated={load} /> : <UsersSection users={d?.users} onReload={load} />}
         </>)}
 
         {tab === 'comercios' && <StoreCategories stores={d?.stores} categories={d?.categories} onSaved={load} />}
@@ -251,6 +274,8 @@ export default function Admin() {
         {tab === 'cuentas' && <CreditSection rows={creds} onReload={load} />}
 
         {tab === 'pedidos' && <OrdersSection orders={d?.recent} loading={d === null} />}
+
+        {tab === 'stats' && <StatsSection />}
 
         {tab === 'ajustes' && (<>
           <Pricing />
@@ -281,8 +306,174 @@ export default function Admin() {
         </>)}
 
         <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Admin</p>
+          </div>
+        </div>
+      </div>
+      <nav className="rat-bottomnav">
+        {NAV.map(([id, icon, lbl]) => (
+          <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><i className={`fa-solid ${icon}`}></i><span>{lbl}</span></button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+// ===================== ESTADÍSTICAS =====================
+const SCORE_CLS = (s) => `badge ${s >= 75 ? 'badge-green' : s >= 50 ? 'badge-yellow' : 'badge-gray'}`;
+const pctTxt = (x) => `${Math.round((x || 0) * 100)}%`;
+const fmtMin = (m) => (m == null ? '—' : m < 60 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
+const dt = (ms) => (ms ? fmtDateTime(ms) : '—');
+function trendOf(cur, prev) {
+  if (!prev) return cur > 0 ? { cls: 'up', txt: '▲ nuevo' } : { cls: '', txt: '—' };
+  const ch = Math.round(((cur - prev) / prev) * 100);
+  if (ch === 0) return { cls: '', txt: '= igual' };
+  return ch > 0 ? { cls: 'up', txt: `▲ ${ch}%` } : { cls: 'down', txt: `▼ ${Math.abs(ch)}%` };
+}
+function downloadCSV(name, cols, rows) {
+  const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const csv = [cols.map((c) => esc(c.label)).join(',')].concat((rows || []).map((r) => cols.map((c) => esc(c.val(r))).join(','))).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+const todayStr = (d = new Date()) => { const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+
+const COM_COLS = [{ label: 'Comercio', key: 'name', type: 'str' }, { label: 'Cotizó', key: 'hechas', type: 'num' }, { label: 'Concretó', key: 'conc', type: 'num' }, { label: 'Descartó', key: 'desc', type: 'num' }, { label: 'Conversión', key: 'conv', type: 'num' }, { label: 'Vendido', key: 'vendido', type: 'num' }, { label: 'Comisión', key: 'comision', type: 'num' }, { label: 'Últ. respuesta', key: 'lastResp', type: 'num', date: true }, { label: 'Últ. ingreso', key: 'lastLogin', type: 'num', date: true }, { label: 'Puntaje', key: 'score', type: 'num' }];
+const MEC_COLS = [{ label: 'Mecánico', key: 'name', type: 'str' }, { label: 'Pedidos', key: 'pedidos', type: 'num' }, { label: 'Concretados', key: 'conc', type: 'num' }, { label: 'Gastado', key: 'gastado', type: 'num' }, { label: 'Ticket prom.', key: 'ticket', type: 'num' }, { label: 'Últ. actividad', key: 'lastAct', type: 'num', date: true }, { label: 'Últ. ingreso', key: 'lastLogin', type: 'num', date: true }];
+const REP_COLS = [{ label: 'Repartidor', key: 'name', type: 'str' }, { label: 'Entregas', key: 'entregas', type: 'num' }, { label: 'En curso', key: 'encurso', type: 'num' }, { label: 'Tiempo prom.', key: 'tiempoMin', type: 'num' }, { label: 'Cobrado envíos', key: 'cobrado', type: 'num' }, { label: 'Calificación', key: 'rating', type: 'num' }, { label: 'Últ. envío', key: 'lastShip', type: 'num', date: true }, { label: 'Puntaje', key: 'score', type: 'num' }];
+const NAME_SEARCH = ['name'];
+const comCells = (r) => [<td key="0" data-label="Comercio">{r.name}</td>, <td key="1" data-label="Cotizó">{r.hechas}</td>, <td key="2" data-label="Concretó"><span className="text-green" style={{ fontWeight: 700 }}>{r.conc}</span></td>, <td key="3" data-label="Descartó"><span className="muted">{r.desc}</span></td>, <td key="4" data-label="Conversión">{pctTxt(r.conv)}</td>, <td key="5" data-label="Vendido">{money(r.vendido)}</td>, <td key="6" data-label="Comisión" className="text-yellow">{money(r.comision)}</td>, <td key="7" data-label="Últ. respuesta" className="text-xs muted rat-th-date">{dt(r.lastResp)}</td>, <td key="8" data-label="Últ. ingreso" className="text-xs muted rat-th-date">{dt(r.lastLogin)}</td>, <td key="9" data-label="Puntaje"><span className={SCORE_CLS(r.score)}>{r.score}</span></td>];
+const mecCells = (r) => [<td key="0" data-label="Mecánico">{r.name}</td>, <td key="1" data-label="Pedidos">{r.pedidos}</td>, <td key="2" data-label="Concretados"><span className="text-green" style={{ fontWeight: 700 }}>{r.conc}</span></td>, <td key="3" data-label="Gastado">{money(r.gastado)}</td>, <td key="4" data-label="Ticket prom.">{money(r.ticket)}</td>, <td key="5" data-label="Últ. actividad" className="text-xs muted rat-th-date">{dt(r.lastAct)}</td>, <td key="6" data-label="Últ. ingreso" className="text-xs muted rat-th-date">{dt(r.lastLogin)}</td>];
+const repCells = (r) => [<td key="0" data-label="Repartidor">{r.name}</td>, <td key="1" data-label="Entregas"><span className="text-green" style={{ fontWeight: 700 }}>{r.entregas}</span></td>, <td key="2" data-label="En curso">{r.encurso}</td>, <td key="3" data-label="Tiempo prom.">{fmtMin(r.tiempoMin)}</td>, <td key="4" data-label="Cobrado envíos">{money(r.cobrado)}</td>, <td key="5" data-label="Calificación"><span className="text-yellow">★ {r.rating ? r.rating.toFixed(1) : '—'}</span></td>, <td key="6" data-label="Últ. envío" className="text-xs muted rat-th-date">{dt(r.lastShip)}</td>, <td key="7" data-label="Puntaje"><span className={SCORE_CLS(r.score)}>{r.score}</span></td>];
+const COM_CSV = [{ label: 'Comercio', val: (r) => r.name }, { label: 'Cotizo', val: (r) => r.hechas }, { label: 'Concreto', val: (r) => r.conc }, { label: 'Descarto', val: (r) => r.desc }, { label: 'Conversion', val: (r) => pctTxt(r.conv) }, { label: 'Vendido', val: (r) => Math.round(r.vendido) }, { label: 'Comision', val: (r) => Math.round(r.comision) }, { label: 'Ult. respuesta', val: (r) => dt(r.lastResp) }, { label: 'Ult. ingreso', val: (r) => dt(r.lastLogin) }, { label: 'Puntaje', val: (r) => r.score }];
+const MEC_CSV = [{ label: 'Mecanico', val: (r) => r.name }, { label: 'Pedidos', val: (r) => r.pedidos }, { label: 'Concretados', val: (r) => r.conc }, { label: 'Gastado', val: (r) => Math.round(r.gastado) }, { label: 'Ticket', val: (r) => Math.round(r.ticket) }, { label: 'Ult. actividad', val: (r) => dt(r.lastAct) }, { label: 'Ult. ingreso', val: (r) => dt(r.lastLogin) }];
+const REP_CSV = [{ label: 'Repartidor', val: (r) => r.name }, { label: 'Entregas', val: (r) => r.entregas }, { label: 'En curso', val: (r) => r.encurso }, { label: 'Tiempo prom (min)', val: (r) => (r.tiempoMin == null ? '' : Math.round(r.tiempoMin)) }, { label: 'Cobrado envios', val: (r) => Math.round(r.cobrado) }, { label: 'Calificacion', val: (r) => (r.rating ? r.rating.toFixed(1) : '') }, { label: 'Ult. envio', val: (r) => dt(r.lastShip) }, { label: 'Puntaje', val: (r) => r.score }];
+
+function StatsCard({ label, value, prev, yellow, green }) {
+  const t = trendOf(value.raw, prev);
+  return (
+    <div className="card stat-card">
+      <span className="stat-label">{label}</span>
+      <div className={`stat-value ${yellow ? 'text-yellow' : green ? 'text-green' : ''}`}>{value.txt}</div>
+      <div className={`stat-trend ${t.cls}`}>{t.txt}</div>
+    </div>
+  );
+}
+
+function StatsGeneral({ g }) {
+  const maxBar = Math.max(1, ...g.bars.map((b) => b.v));
+  return (
+    <>
+      <div className="rat-statgrid mb-16">
+        <StatsCard label="Ventas (GMV)" value={{ raw: g.gmv, txt: money(g.gmv) }} prev={g.prev.gmv} />
+        <StatsCard label="Comisión RAT" value={{ raw: g.comision, txt: money(g.comision) }} prev={g.prev.comision} yellow />
+        <StatsCard label="Pedidos concretados" value={{ raw: g.pedidos, txt: String(g.pedidos) }} prev={g.prev.pedidos} />
+        <StatsCard label="Ticket promedio" value={{ raw: g.ticket, txt: money(g.ticket) }} prev={g.prev.ticket} />
+        <StatsCard label="Envíos cobrados" value={{ raw: g.flete, txt: money(g.flete) }} prev={g.prev.flete} green />
+      </div>
+      <div className="text-xs muted mb-16" style={{ marginTop: -6 }}>▲▼ comparado con el período anterior de igual largo</div>
+      <div className="rat-genrow">
+        <div className="card">
+          <div className="flex-between mb-12" style={{ flexWrap: 'wrap', gap: 8 }}><h2 style={{ fontSize: 16, fontWeight: 700 }}>Ventas en el período</h2><span className="text-xs muted">Conversión {pctTxt(g.conv)} · {g.cotiz} cotizaciones</span></div>
+          <div className="bar-chart">{g.bars.map((b, i) => <div key={i} className="bar" style={{ height: `${Math.round((b.v / maxBar) * 100)}%` }} title={`${b.label}: ${money(b.v)}`}></div>)}</div>
+          <div className="bar-labels">{g.bars.map((b, i) => <span key={i}>{b.label}</span>)}</div>
+        </div>
+        <div className="card">
+          <div className="section-title"><h2>Top comercios por ventas</h2></div>
+          {g.top.map((t, i) => <div key={i} className="list-row"><div className="store-avatar" style={{ width: 36, height: 36, flexShrink: 0 }}><i className="fa-solid fa-store"></i></div><div style={{ flex: 1, minWidth: 0 }}><div className="text-sm" style={{ fontWeight: 700 }}>{t.name}</div><div className="text-xs muted">{t.conc} ventas</div></div><div style={{ fontWeight: 800, flexShrink: 0 }}>{money(t.vendido)}</div></div>)}
+          {g.top.length === 0 && <div className="empty-state" style={{ padding: 24 }}>Sin ventas en este período</div>}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function StatsTable({ title, rows, cols, initialSort, cells, csvName, csvCols, placeholder, onScore }) {
+  const t = useTable(rows || [], cols, NAME_SEARCH, initialSort);
+  return (
+    <div className="card">
+      <div className="section-title"><h2>{title}</h2><div className="flex-center gap-12">
+        <span className="text-xs muted">{(rows || []).length}</span>
+        {onScore && <button className="btn btn-ghost btn-sm" type="button" onClick={onScore}><i className="fa-solid fa-circle-question"></i> Puntaje</button>}
+        <button className="btn btn-ghost btn-sm" type="button" onClick={() => downloadCSV(`${csvName}.csv`, csvCols, rows)}><i className="fa-solid fa-download"></i> CSV</button>
+      </div></div>
+      <Search value={t.query} onChange={t.setQuery} placeholder={placeholder} />
+      <SortBar sortUI={t.sortUI} />
+      <div style={{ overflowX: 'auto' }}>
+        <table className="table rat-table">
+          <Thead headers={t.headers} />
+          <tbody>
+            {t.total === 0 && <tr><td colSpan={cols.length} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin resultados</td></tr>}
+            {t.visible.map((r) => <tr key={r.id}>{cells(r)}</tr>)}
+          </tbody>
+        </table>
+      </div>
+      <Pager pager={t.pager} />
+    </div>
+  );
+}
+
+function ScoreModal({ kind, onClose }) {
+  const isCom = kind === 'com';
+  const rows = isCom
+    ? [['Conversión', 'cotizaciones que terminaron en venta', '45%'], ['Velocidad de respuesta', 'qué tan rápido cotiza', '30%'], ['Actividad', 'volumen de cotizaciones', '25%']]
+    : [['Calificación', 'estrellas de mecánicos y comercios', '50%'], ['Tiempo de entrega', 'qué tan rápido entrega', '30%'], ['Volumen', 'cantidad de entregas completadas', '20%']];
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4"><h2 className="h-md">Cómo se calcula el puntaje</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
+        <p className="text-sm muted mb-16">El puntaje (0 a 100) de un {isCom ? 'comercio' : 'repartidor'} se arma con su historial en el período seleccionado:</p>
+        <div className="card mb-12" style={{ background: 'var(--bg-1)' }}>
+          {rows.map(([t, d, p], i) => <div key={i} className="flex-between" style={{ padding: '9px 0', gap: 12, borderTop: i ? '1px solid var(--border)' : 'none' }}><span className="text-sm"><b>{t}</b> — {d}</span><span className="badge badge-purple" style={{ flexShrink: 0 }}>{p}</span></div>)}
+        </div>
+        <div className="flex-center gap-8 mt-16" style={{ flexWrap: 'wrap' }}><span className="badge badge-green">≥ 75 muy bueno</span><span className="badge badge-yellow">50–74 regular</span><span className="badge badge-gray">&lt; 50 a mejorar</span></div>
+        <button className="btn btn-ghost btn-block mt-16" type="button" onClick={onClose}>Entendido</button>
       </div>
     </div>
+  );
+}
+
+function StatsSection() {
+  const [from, setFrom] = useState(todayStr(new Date(Date.now() - 30 * 86400000)));
+  const [to, setTo] = useState(todayStr());
+  const [preset, setPreset] = useState('30');
+  const [sub, setSub] = useState('gen');
+  const [data, setData] = useState(null);
+  const [score, setScore] = useState(null);
+
+  useEffect(() => { let alive = true; setData(null); getAdminStats({ from, to }).then((r) => { if (alive) setData(r); }).catch(() => { if (alive) setData(null); }); return () => { alive = false; }; }, [from, to]);
+
+  const setRange = (days, p) => { setPreset(p); setTo(todayStr()); setFrom(todayStr(new Date(Date.now() - days * 86400000))); };
+  const PRESETS = [['Hoy', 0, 'hoy'], ['7 días', 7, '7'], ['30 días', 30, '30'], ['90 días', 90, '90']];
+
+  return (
+    <>
+      <div className="card mb-16">
+        <div className="flex-between mb-12" style={{ flexWrap: 'wrap', gap: 8 }}><h2 style={{ fontSize: 18, fontWeight: 700 }}>Período</h2><span className="text-sm muted">{from} → {to}</span></div>
+        <div className="rat-daterange mb-12">{PRESETS.map(([lbl, days, p]) => <button key={p} type="button" className={`rat-preset ${preset === p ? 'active' : ''}`} onClick={() => setRange(days, p)}>{lbl}</button>)}</div>
+        <div className="flex gap-12" style={{ flexWrap: 'wrap' }}>
+          <div className="field" style={{ marginBottom: 0 }}><label>Desde</label><input className="input" type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset(''); }} style={{ maxWidth: 180 }} /></div>
+          <div className="field" style={{ marginBottom: 0 }}><label>Hasta</label><input className="input" type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset(''); }} style={{ maxWidth: 180 }} /></div>
+        </div>
+      </div>
+
+      <div className="rat-tabs mb-16"><div className="pill-tabs">
+        <button type="button" className={sub === 'gen' ? 'active' : ''} onClick={() => setSub('gen')}>General</button>
+        <button type="button" className={sub === 'com' ? 'active' : ''} onClick={() => setSub('com')}>Comercios</button>
+        <button type="button" className={sub === 'mec' ? 'active' : ''} onClick={() => setSub('mec')}>Mecánicos</button>
+        <button type="button" className={sub === 'rep' ? 'active' : ''} onClick={() => setSub('rep')}>Repartidores</button>
+      </div></div>
+
+      {!data ? <Loading label="Cargando estadísticas…" /> : (<>
+        {sub === 'gen' && <StatsGeneral g={data.general} />}
+        {sub === 'com' && <StatsTable title="Por comercio" rows={data.comercios} cols={COM_COLS} initialSort={{ key: 'vendido', dir: 'desc' }} cells={comCells} csvName="comercios" csvCols={COM_CSV} placeholder="Buscar comercio…" onScore={() => setScore('com')} />}
+        {sub === 'mec' && <StatsTable title="Por mecánico" rows={data.mecanicos} cols={MEC_COLS} initialSort={{ key: 'gastado', dir: 'desc' }} cells={mecCells} csvName="mecanicos" csvCols={MEC_CSV} placeholder="Buscar mecánico…" />}
+        {sub === 'rep' && <StatsTable title="Por repartidor" rows={data.repartidores} cols={REP_COLS} initialSort={{ key: 'entregas', dir: 'desc' }} cells={repCells} csvName="repartidores" csvCols={REP_CSV} placeholder="Buscar repartidor…" onScore={() => setScore('rep')} />}
+      </>)}
+
+      {score && <ScoreModal kind={score} onClose={() => setScore(null)} />}
+    </>
   );
 }
 
@@ -402,6 +593,7 @@ function CreditSection({ rows, onReload }) {
 // ===================== ÚLTIMOS PEDIDOS =====================
 function OrdersSection({ orders, loading }) {
   const [tripId, setTripId] = useState(null);
+  const [detail, setDetail] = useState(null); // pedido cuyo desglose (comisión/envío/MP) se muestra
   const rows = useMemo(() => (orders || []).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' })), [orders]);
   const t = useTable(rows, ORDER_COLS, ORDER_SEARCH, { key: 'created', dir: 'desc' });
 
@@ -422,7 +614,7 @@ function OrdersSection({ orders, loading }) {
                 <td data-label="Mecánico">{o.mechanicName}{o.mechanicEmail && o.mechanicEmail !== o.mechanicName && <div className="text-xs muted">{o.mechanicEmail}</div>}</td>
                 <td data-label="Repuesto">{o.label}</td>
                 <td data-label="Vehículo">{o.vehicle}</td>
-                <td data-label="Total">{o.totalStr}</td>
+                <td data-label="Total">{o.total ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setDetail(o)} title="Ver desglose">{o.totalStr} <i className="fa-solid fa-circle-info" style={{ fontSize: 11, opacity: 0.6 }}></i></button> : <span className="muted">—</span>}</td>
                 <td data-label="Estado"><span className="badge badge-gray">{o.status}</span></td>
                 <td data-label="Creado" className="text-xs muted rat-th-date">{fmtDateTime(o.created)}</td>
                 <td data-label="Concretada" className="text-xs muted rat-th-date">{fmtDateTime(o.concretada)}</td>
@@ -436,6 +628,36 @@ function OrdersSection({ orders, loading }) {
       </div>
       <Pager pager={t.pager} />
       {tripId && <TripModal orderId={tripId} onClose={() => setTripId(null)} />}
+      {detail && <OrderBreakdownModal o={detail} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
+
+// Desglose CONGELADO de un pedido: comisión % + $, envío y recargo MP aplicados ese día.
+// Audita el histórico — cambiar la comisión en Ajustes NO altera estos valores.
+function OrderBreakdownModal({ o, onClose }) {
+  const line = (icon, label, value, strong) => (
+    <div className="flex-between" style={{ padding: '11px 0', borderBottom: strong ? 'none' : '1px solid var(--border)' }}>
+      <span className="text-sm muted"><i className={`fa-solid ${icon}`} style={{ width: 18, marginRight: 8 }}></i>{label}</span>
+      <span className="text-sm" style={{ fontWeight: strong ? 800 : 600 }}>{value}</span>
+    </div>
+  );
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4"><h2 className="h-md">Desglose del pedido</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
+        <p className="text-sm muted mb-16">{o.code} · {o.label}{o.vehicle ? ` · ${o.vehicle}` : ''}</p>
+        <div className="card" style={{ background: 'var(--bg-1)' }}>
+          {line('fa-box', 'Repuesto', money(o.part))}
+          {line('fa-percent', `Comisión (${o.commissionPct != null ? o.commissionPct : '—'}%)`, money(o.commission))}
+          {line('fa-truck-fast', 'Envío', money(o.freight))}
+          {line('fa-credit-card', 'Recargo Mercado Pago', o.mpFee ? money(o.mpFee) : 'No aplicado')}
+          {o.creditAccount && line('fa-id-card-clip', 'Cuenta corriente', 'Sí · repuesto no cobrado acá')}
+          {line('fa-receipt', 'Total cobrado', money(o.total), true)}
+        </div>
+        <div className="text-xs muted mt-12"><i className="fa-solid fa-circle-info"></i> Valores congelados al crearse el pedido. Cambiar la comisión/recargo en Ajustes solo afecta pedidos nuevos.</div>
+      </div>
     </div>
   );
 }
@@ -587,9 +809,11 @@ function Kpi({ label, value, icon, yellow }) {
 }
 
 function Pricing() {
-  const [s, setS] = useState(null);
-  useEffect(() => { getBusinessSettings().then(setS); }, []);
-  if (!s) return null;
+  // Arranca con valores vacíos para que la sección SIEMPRE se muestre (no queda en blanco si la
+  // carga es lenta/falla, ni por el re-render del replaceState); se rellena al resolver el fetch.
+  const [s, setS] = useState({ commissionPct: '', mpFeePct: '', mpFeeEnabled: false, minShip: '', quoteWindowMin: '' });
+  const [ready, setReady] = useState(false); // recién cargado: NO se puede guardar antes (evita pisar settings con vacío)
+  useEffect(() => { getBusinessSettings().then((v) => { if (v) setS(v); setReady(true); }); }, []);
   const set = (k, v) => setS((p) => ({ ...p, [k]: v }));
   async function save() { const r = await saveBusinessSettings(s); if (r?.ok) toast({ title: 'Configuración guardada', icon: 'fa-check', type: 'green' }); }
   return (
@@ -616,7 +840,7 @@ function Pricing() {
         <span className="text-sm">Sumar el recargo de Mercado Pago al total que paga el cliente</span>
       </label>
       <p className="text-xs muted mb-12">La fee de MP varía por plazo de acreditación (al instante 6,39% · 18 días 3,44% · 35 días 1,51%) + IVA. Cargá el % que quieras trasladar al cliente.</p>
-      <button className="btn btn-yellow btn-sm" onClick={save}><i className="fa-solid fa-floppy-disk"></i> Guardar</button>
+      <button className="btn btn-yellow btn-sm" disabled={!ready} onClick={save}><i className="fa-solid fa-floppy-disk"></i> Guardar</button>
     </div>
   );
 }
@@ -682,6 +906,11 @@ function AltaUsuario({ onCreated }) {
                 onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
             </div>
             <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} placeholder="Centro" /></div>
+            {f.lat != null && f.lng != null && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <LocationPicker lat={f.lat} lng={f.lng} onChange={(la, ln) => setF((s) => ({ ...s, lat: la, lng: ln }))} />
+              </div>
+            )}
           </div>
         )}
         {isStore && (
@@ -805,6 +1034,11 @@ function EditUserModal({ userId, onClose, onSaved }) {
               <div className="text-xs muted mt-4">Si no la cambiás, se conserva la dirección actual.</div>
             </div>
             <div className="field" style={{ marginBottom: 0 }}><label>Barrio / zona</label><input className="input" value={f.barrio} onChange={(e) => set('barrio', e.target.value)} /></div>
+            {f.lat != null && f.lng != null && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <LocationPicker lat={f.lat} lng={f.lng} onChange={(la, ln) => setF((s) => ({ ...s, lat: la, lng: ln }))} />
+              </div>
+            )}
           </div>
         )}
         {isStore && (
