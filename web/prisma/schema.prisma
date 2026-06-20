@@ -104,6 +104,7 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at")
   createdById     String?    @map("created_by_id")
   termsAcceptedAt DateTime?  @map("terms_accepted_at")
+  lastLoginAt     DateTime?  @map("last_login_at") // último ingreso (lo usa el panel de stats del admin)
 
   mechanic      MechanicProfile?
   store         StoreProfile?
