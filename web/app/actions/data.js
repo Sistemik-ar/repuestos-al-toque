@@ -11,36 +11,13 @@ import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
 import { aliasLabel } from '@/lib/alias';
 import { sendPush, sendPushMany } from '@/lib/push';
-
-const URGENCY = { 'Necesito ahora': 'AHORA', Hoy: 'HOY', 'Mañana': 'MANANA' };
-const URGENCY_LABEL = { AHORA: 'Necesito ahora', HOY: 'Hoy', MANANA: 'Mañana' };
+import { URGENCY, URGENCY_LABEL, txt, num, reqBase, quotePublic, newPin, tripWhere, TRIP_INCLUDE, PLATE_RE, normPlate, jobBase } from '@/lib/data-helpers';
 
 // Texto libre con tope: estos campos viajan en cada poll de cada panel; sin tope,
 // un texto gigante (pegado por error) engorda todas las respuestas.
-const txt = (v, max) => { const t = String(v ?? '').trim(); return t ? t.slice(0, max) : null; };
 
-
-const num = (d) => (d == null ? null : Number(d));
-
-function reqBase(r) {
-  return {
-    id: r.id, code: r.code, brand: r.brand, model: r.model, year: r.year, vin: r.vin,
-    engine: r.extraInfo, // motor / versión (campo libre)
-    cat: r.category?.slug || null, catLabel: r.category?.name || null,
-    desc: r.description, urgency: URGENCY_LABEL[r.urgency] || 'Necesito ahora',
-    status: r.status, photoUrls: r.photoUrls || [],
-    invoiceType: r.invoiceType === 'FACTURA_A' ? 'factura_a' : 'consumidor_final',
-    emisorRazon: r.invEmisorName, emisorCuit: r.invEmisorCuit, solicRazon: r.invBuyerName, solicCuit: r.invBuyerCuit,
-    windowEndsAt: r.windowEndsAt ? r.windowEndsAt.getTime() : null,
-    selectedAt: r.selectedAt ? r.selectedAt.getTime() : null,
-    createdAt: r.createdAt?.getTime() || 0,
-  };
-}
 // Para el mecánico: sin identidad del vendedor (anónimo)
 // rating null = comercio todavía sin calificaciones (la UI muestra "Nuevo", no un número inventado)
-function quotePublic(q, creditEligible = false) {
-  return { id: q.id, alias: q.alias, optionLabel: q.optionLabel, partBrand: q.partBrand, price: num(q.price), warranty: q.warranty, note: q.note, photoUrls: q.photoUrls || [], rating: q.ratingSnapshot == null ? null : num(q.ratingSnapshot), status: q.status, creditEligible };
-}
 
 export async function getMe() {
   const s = await getSession();
@@ -227,7 +204,6 @@ export async function reopenWindow(requestId) {
   return { ok: true };
 }
 
-
 async function ccActiveBetween(mechanicId, storeId) {
   const cc = await prisma.creditAccount.findFirst({ where: { mechanicId, storeId, active: true }, select: { id: true } });
   return !!cc;
@@ -412,22 +388,10 @@ export async function getMyDeliveries() {
   });
 }
 
-const newPin = () => String(Math.floor(1000 + Math.random() * 9000)); // 4 dígitos
-
 // Un VIAJE es por PATENTE + MECÁNICO: el mismo auto puede juntar repuestos de VARIOS comercios y
 // se entrega TODO en un solo viaje al taller (un flete por patente). El claim agrupa con el mismo
 // deliveryId y PINs. La ENTREGA/llegada-al-taller son del viaje entero; el RETIRO es por comercio
 // (perStore), porque cada comercio entrega lo suyo. Sin patente (legacy), cae a la orden sola.
-function tripWhere(o, { perStore = false } = {}) {
-  const plate = o.request?.job?.plate;
-  if (plate && o.deliveryId) {
-    const w = { deliveryId: o.deliveryId, mechanicId: o.mechanicId, request: { job: { plate } } };
-    if (perStore) w.storeId = o.storeId; // acota a los ítems de ESE comercio (retiro por comercio)
-    return w;
-  }
-  return { id: o.id };
-}
-const TRIP_INCLUDE = { request: { select: { jobId: true, job: { select: { plate: true } } } } };
 
 // Tomar pedido — claim ATÓMICO: el updateMany con deliveryId:null garantiza que
 // solo UN repartidor puede quedárselo aunque varios toquen el botón a la vez.
@@ -1037,17 +1001,6 @@ export async function disableCreditAccount(id) {
 }
 
 // ================= Trabajos (pedidos por vehículo) =================
-const PLATE_RE = /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}\s?[A-Z]{2})$/i; // ABC123 / AB123CD
-const normPlate = (p) => String(p || '').toUpperCase().replace(/\s+/g, '');
-
-function jobBase(j) {
-  const items = (j.requests || []).map((r) => ({ ...reqBase(r), arrivedDrop: !!(r.order?.arrivedDropAt && r.order?.status === 'SHIPPED') }));
-  return {
-    id: j.id, code: j.code, brand: j.brand, model: j.model, year: j.year, plate: j.plate, vin: j.vin,
-    status: j.status, windowEndsAt: j.windowEndsAt ? j.windowEndsAt.getTime() : null,
-    createdAt: j.createdAt?.getTime() || 0, items,
-  };
-}
 
 // Crea el Trabajo (borrador) + primer ítem, o agrega un ítem a un trabajo en armado.
 export async function addJobItem(input) {
