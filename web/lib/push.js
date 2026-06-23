@@ -14,6 +14,9 @@ if (configured) {
 // Envía una push a TODOS los dispositivos de un usuario.
 export async function sendPush(userId, payload) {
   if (!configured || !userId) return;
+  // En STAGING (MP_TEST_ACCESS_TOKEN seteado; ausente en producción) marcamos la push como PRUEBAS,
+  // para no confundir un aviso de staging con uno real (p. ej. un push re-entregado por FCM).
+  if (process.env.MP_TEST_ACCESS_TOKEN && payload?.title) payload = { ...payload, title: '🧪 PRUEBAS · ' + payload.title };
   let subs;
   try { subs = await prisma.pushSubscription.findMany({ where: { userId } }); } catch { return; }
   const body = JSON.stringify(payload);
