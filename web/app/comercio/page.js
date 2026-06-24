@@ -201,7 +201,7 @@ export default function Comercio() {
                 const [bCls, bIcon, bTxt] = esZombie ? ['badge-gray', 'fa-moon', 'Sin respuesta'] : esPago ? ['badge-yellow', 'fa-stopwatch', venceEn(r.selectedAt)] : cotBadge(r);
                 return (
                   <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' || esZombie ? { opacity: 0.6 } : esPago ? { borderColor: 'rgba(250,204,21,0.35)' } : {}}>
-                    <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
+                    <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)}{r.plate ? ` · ${r.plate}` : ''} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
                     {esPago ? (
                       <div className="flex-between text-sm mb-8"><span className="muted">Eligió tu precio</span><span className="text-yellow" style={{ fontWeight: 800 }}>{r.mySelectedPrice ? '$' + r.mySelectedPrice.toLocaleString('es-AR') : '—'}</span></div>
                     ) : (
