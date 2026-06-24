@@ -159,6 +159,7 @@ export default function Comercio() {
             </div>
             <div className="flex-between mb-12">
               <div className="flex-center gap-8" style={{ flexWrap: 'wrap' }}>
+                {r.plate && <span className="badge badge-purple"><i className="fa-solid fa-car-side"></i> {r.plate}</span>}
                 <span className="badge badge-gray"><i className="fa-solid fa-layer-group"></i> {r.catLabel}</span>
                 <span className="badge badge-gray"><i className="fa-solid fa-file-invoice"></i> {r.invoiceType === 'factura_a' ? 'Factura A' : 'Cons. Final'}</span>
                 {r.urgency === 'Necesito ahora' && <span className="badge badge-red"><i className="fa-solid fa-bolt"></i> Urgente</span>}
@@ -249,7 +250,7 @@ function DetalleModal({ r, onClose }) {
       <div className="modal">
         <div className="modal-handle"></div>
         <div className="flex-between mb-4"><h2 className="h-md">{r.desc || r.catLabel || 'Repuesto'}</h2>{r.code && <span className="badge badge-gray">#{r.code}</span>}</div>
-        <p className="text-sm muted mb-16">{veh || 'Vehículo'}{r.catLabel ? ` · ${r.catLabel}` : ''}</p>
+        <p className="text-sm muted mb-16">{veh || 'Vehículo'}{r.plate ? ` · Patente ${r.plate}` : ''}{r.catLabel ? ` · ${r.catLabel}` : ''}</p>
 
         <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
           <DRow k="Repuesto" v={r.desc || r.catLabel || '—'} />
@@ -461,6 +462,7 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         <div className="modal-handle"></div>
         <h2 className="h-md mb-4">Enviar cotización{lead.myCount > 0 ? ` · opción ${lead.myCount + 1}` : ''}</h2>
         <p className="text-sm muted mb-16">{label} · {veh}{lead.myCount > 0 ? ' · podés ofrecer otra alternativa' : ''}</p>
+        {lead.plate && <div className="float-notif mb-16" style={{ padding: '10px 12px' }}><i className="fa-solid fa-car-side text-yellow"></i><div className="text-sm subtle">Patente del vehículo: <b>{lead.plate}</b></div></div>}
         <div className="field"><label>Precio final</label><input className="input" inputMode="numeric" placeholder="$ 0" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
         <div className="grid-2">
           <div className="field"><label>Marca de la pieza</label>

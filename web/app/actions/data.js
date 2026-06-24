@@ -231,11 +231,12 @@ export async function getOpenRequestsForStore() {
       ],
     },
     orderBy: { createdAt: 'asc' }, // las nuevas aparecen a la derecha
-    include: { category: true, quotes: { where: { storeId: s.id }, select: { id: true, price: true, status: true } } },
+    include: { category: true, job: { select: { plate: true } }, quotes: { where: { storeId: s.id }, select: { id: true, price: true, status: true } } },
   });
-  // sin identidad del mecánico
+  // sin identidad del mecánico (la patente del vehículo SÍ: el comercio la necesita para cotizar bien)
   return rows.map((r) => ({
     ...reqBase(r),
+    plate: r.job?.plate || null,
     myCount: r.quotes.length,
     myPrices: r.quotes.map((q) => num(q.price)),
     mySelected: r.quotes.some((q) => q.status === 'SELECTED'),
