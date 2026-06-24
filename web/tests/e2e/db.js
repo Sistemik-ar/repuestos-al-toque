@@ -149,7 +149,7 @@ export async function seedSale({
   const total = (creditAccount ? 0 : part) + commission + freight + mpFee;
   const delivered = status === 'DELIVERED';
   const job = await p.job.create({ data: { code: 'JSL' + stamp, mechanicId: mech.id, plate: 'SL' + (stamp % 100000), brand: 'Toyota', model: 'Corolla', status: delivered ? 'DONE' : 'PAID' } });
-  const req = await p.request.create({ data: { code: 'RSL' + stamp, mechanicId: mech.id, jobId: job.id, description: desc, status, photoUrls: [] } });
+  const req = await p.request.create({ data: { code: 'RSL' + stamp, mechanicId: mech.id, jobId: job.id, description: desc, brand: 'Toyota', model: 'Corolla', status, photoUrls: [] } });
   const quote = await p.requestQuote.create({ data: { requestId: req.id, storeId: store.id, alias: 'Casa A', price: part, status: 'SELECTED', photoUrls: [] } });
   const now = new Date();
   const order = await p.order.create({ data: {

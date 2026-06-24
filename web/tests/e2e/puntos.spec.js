@@ -103,7 +103,7 @@ test('la calificación actualiza promedio y puntos de vendedor Y repartidor', as
 
   // el repartidor VE su reputación en el panel (estrella + entregas)
   await d.reload();
-  await expect(d.locator('.topbar .badge-yellow')).toContainText(String(delivAfter.avg), { timeout: 15000 });
+  await expect(d.locator('.topbar .rep-pill')).toContainText(String(delivAfter.avg), { timeout: 15000 });
 
   // el comercio VE sus puntos reales en el panel (el contador grande del header)
   await s.reload();

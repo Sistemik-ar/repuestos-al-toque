@@ -529,6 +529,65 @@ export async function getMyReputation() {
   return { rating: p.ratingsCount > 0 ? num(p.ratingAvg) : null, count: p.ratingsCount, points: p.points };
 }
 
+// Historial del repartidor: viajes concretados (orders DELIVERED), consolidados por patente +
+// mecánico + día (igual criterio que getMyDeliveries), con flete, piezas, duración real (retiro →
+// entrega) y la reseña del mecánico (Rating kind=DELIVERY). Para la pestaña "Historial".
+export async function getDeliveryHistory() {
+  const s = await getSession(); if (!s || s.role !== 'DELIVERY') return [];
+  const orders = await prisma.order.findMany({
+    where: { deliveryId: s.id, status: 'DELIVERED' },
+    orderBy: { deliveredAt: 'desc' },
+    take: 300,
+    include: {
+      request: { include: { job: { select: { plate: true } } } },
+      ratings: { where: { kind: 'DELIVERY' }, select: { stars: true, comment: true } },
+    },
+  });
+  const storeIds = [...new Set(orders.map((o) => o.storeId))];
+  const mechIds = [...new Set(orders.map((o) => o.mechanicId))];
+  const [stores, mechs] = await Promise.all([
+    prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } }),
+    prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true } }),
+  ]);
+  const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
+  const mName = Object.fromEntries(mechs.map((x) => [x.userId, x.workshopName]));
+  const startOfDay = (ms) => { const x = new Date(ms); x.setHours(0, 0, 0, 0); return x.getTime(); };
+  const todayStart = startOfDay(Date.now());
+
+  const trips = new Map();
+  for (const o of orders) {
+    const whenMs = (o.deliveredAt || o.createdAt).getTime();
+    const plate = o.request?.job?.plate || o.requestId; // sin patente -> la orden es su propio viaje
+    const key = `${plate}::${o.mechanicId}::${startOfDay(whenMs)}`;
+    if (!trips.has(key)) {
+      trips.set(key, {
+        id: key, veh: `${o.request?.brand || ''} ${o.request?.model || ''}`.trim() || 'Vehículo',
+        plate: o.request?.job?.plate || null, taller: mName[o.mechanicId] || 'Taller',
+        stores: new Set(), pieces: 0, freight: 0, rating: null, comment: '',
+        minPicked: null, maxDelivered: null, whenMs,
+      });
+    }
+    const t = trips.get(key);
+    if (sName[o.storeId]) t.stores.add(sName[o.storeId]);
+    t.pieces += 1;
+    t.freight += num(o.freightAmount) || 0;
+    if (o.pickedAt) t.minPicked = t.minPicked == null ? o.pickedAt.getTime() : Math.min(t.minPicked, o.pickedAt.getTime());
+    if (o.deliveredAt) t.maxDelivered = t.maxDelivered == null ? o.deliveredAt.getTime() : Math.max(t.maxDelivered, o.deliveredAt.getTime());
+    if (whenMs > t.whenMs) t.whenMs = whenMs;
+    if (t.rating == null && o.ratings.length) { t.rating = o.ratings[0].stars; t.comment = o.ratings[0].comment || ''; }
+  }
+
+  return [...trips.values()].map((t) => ({
+    id: t.id,
+    daysAgo: Math.max(0, Math.round((todayStart - startOfDay(t.whenMs)) / 86400000)),
+    time: new Date(t.whenMs).toTimeString().slice(0, 5),
+    veh: t.veh, plate: t.plate, stores: [...t.stores], taller: t.taller,
+    pieces: t.pieces, freight: t.freight,
+    durationMin: (t.minPicked && t.maxDelivered && t.maxDelivered > t.minPicked) ? Math.round((t.maxDelivered - t.minPicked) / 60000) : 0,
+    rating: t.rating, comment: t.comment,
+  }));
+}
+
 export async function getMyRatingsForOrder(requestId) {
   const s = await getSession(); if (!s) return null;
   const o = await prisma.order.findUnique({ where: { requestId }, select: { id: true } });
