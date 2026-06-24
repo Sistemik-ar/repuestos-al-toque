@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { toast } from '@/lib/ui';
-import { setStoreCategories } from '@/app/actions/data';
+import { money, toast, fmtDateTime } from '@/lib/ui';
+import Loading from '@/components/Loading';
+import { setStoreCategories, getStoreQuotes } from '@/app/actions/data';
 import { pageButtons, Pager } from './table';
 
 function StoreCategories({ stores, categories, onSaved }) {
@@ -8,6 +9,7 @@ function StoreCategories({ stores, categories, onSaved }) {
   const [catFilter, setCatFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [quotesStore, setQuotesStore] = useState(null); // comercio cuyas cotizaciones se ven en el modal
   if (!stores || !categories || stores.length === 0) return null;
 
   const q = query.trim().toLowerCase();
@@ -43,13 +45,49 @@ function StoreCategories({ stores, categories, onSaved }) {
       </div>
       {total === 0
         ? <div className="empty-state" style={{ padding: '32px 20px' }}><div className="empty-icon"><i className="fa-solid fa-store-slash"></i></div>No hay comercios que coincidan con el filtro.</div>
-        : <div className="rat-store-grid">{visible.map((st) => <StoreCatCard key={st.id} store={st} categories={categories} onSaved={onSaved} />)}</div>}
+        : <div className="rat-store-grid">{visible.map((st) => <StoreCatCard key={st.id} store={st} categories={categories} onSaved={onSaved} onQuotes={() => setQuotesStore(st)} />)}</div>}
       <Pager pager={pager} />
+      {quotesStore && <StoreQuotesModal store={quotesStore} onClose={() => setQuotesStore(null)} />}
     </div>
   );
 }
 
-function StoreCatCard({ store, categories, onSaved }) {
+// Modal admin: lista las cotizaciones que hizo un comercio (pedido, precio, estado, si concretó).
+function StoreQuotesModal({ store, onClose }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => { getStoreQuotes(store.id).then((r) => setRows(r || [])).catch(() => setRows([])); }, [store.id]);
+  const ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ maxWidth: 640 }}>
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4"><h2 className="h-md">Cotizaciones de {store.name}</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
+        {rows === null ? <Loading label="Cargando cotizaciones…" />
+          : rows.length === 0 ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>Este comercio todavía no cotizó nada.</div>
+          : (<>
+            <p className="text-sm muted mb-12">{rows.length} cotización{rows.length === 1 ? '' : 'es'} · {rows.filter((r) => r.sold).length} concretada(s)</p>
+            <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {rows.map((r) => {
+                const [cls, txt] = ST[r.status] || ['badge-gray', r.status];
+                return (
+                  <div key={r.id} className="card mb-8" style={{ background: 'var(--bg-1)' }}>
+                    <div className="flex-between mb-4"><div className="text-sm" style={{ fontWeight: 700 }}>{r.label}</div><span className="price">{money(r.price)}</span></div>
+                    <div className="text-xs muted">#{r.reqCode} · {r.vehicle || 'Vehículo'}{r.plate ? ` · ${r.plate}` : ''}{r.partBrand ? ` · ${r.partBrand}` : ''}</div>
+                    <div className="flex-between mt-8" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      <span className="flex-center gap-8"><span className={`badge ${cls}`}>{txt}</span>{r.sold && <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Concretada</span>}</span>
+                      <span className="text-xs muted rat-th-date">{fmtDateTime(r.createdAt)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>)}
+      </div>
+    </div>
+  );
+}
+
+function StoreCatCard({ store, categories, onSaved, onQuotes }) {
   const [sel, setSel] = useState(() => new Set(store.categoryIds || []));
   const [saving, setSaving] = useState(false);
   // si el comercio cambió por recarga, re-sincronizar la selección
@@ -86,6 +124,7 @@ function StoreCatCard({ store, categories, onSaved }) {
           );
         })}
       </div>
+      <button className="btn btn-ghost btn-sm mt-12" type="button" onClick={() => onQuotes?.()}><i className="fa-solid fa-tags"></i> Ver cotizaciones</button>
     </div>
   );
 }

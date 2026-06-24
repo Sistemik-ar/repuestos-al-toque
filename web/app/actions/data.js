@@ -523,6 +523,25 @@ export async function getMyRatingsForOrder(requestId) {
 }
 
 // ---- Admin ----
+// Admin: todas las cotizaciones que hizo un comercio (qué pedido, precio, estado, si se concretó).
+export async function getStoreQuotes(storeId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const quotes = await prisma.requestQuote.findMany({
+    where: { storeId },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+    include: { request: { select: { code: true, description: true, brand: true, model: true, status: true, job: { select: { plate: true } }, order: { select: { id: true } } } } },
+  });
+  return quotes.map((q) => ({
+    id: q.id, price: num(q.price), status: q.status, partBrand: q.partBrand,
+    createdAt: q.createdAt?.getTime() || 0,
+    reqCode: q.request?.code || '', label: q.request?.description || 'Repuesto',
+    vehicle: `${q.request?.brand || ''} ${q.request?.model || ''}`.trim(),
+    plate: q.request?.job?.plate || null,
+    sold: q.status === 'SELECTED' && !!q.request?.order,
+  }));
+}
+
 export async function getAdminData() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   const [usersCount, reqCount, paid, users, recent, categories, storeRows] = await Promise.all([

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
-import { seedSale } from './db';
+import { seedSale, seedChosenQuote } from './db';
 
 // Desglose congelado de un pedido (modal del admin): comisión %, envío y recargo MP.
 test('admin: el desglose de un pedido muestra comisión %, envío y recargo MP', async ({ page }) => {
@@ -58,4 +58,18 @@ test('admin: editar un usuario guarda los cambios', async ({ page }) => {
   await page.locator('.modal .field', { hasText: 'WhatsApp' }).locator('input').fill(`11${Date.now() % 100000000}`);
   await page.getByRole('button', { name: /Guardar cambios/i }).click();
   await expect(page.getByText(/Usuario actualizado/i)).toBeVisible({ timeout: 10000 });
+});
+
+// El admin puede ver las cotizaciones que hizo un comercio.
+test('admin: ve las cotizaciones de un comercio', async ({ page }) => {
+  const desc = `QStore E2E ${Date.now()}`;
+  await seedChosenQuote({ desc }); // cotización del vendedor seed (Repuestos Centro)
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=comercios');
+  await page.getByPlaceholder(/Buscar comercio/i).fill('Repuestos Centro');
+  const card = page.locator('.rat-store-card', { hasText: 'Repuestos Centro' });
+  await expect(card).toBeVisible({ timeout: 10000 });
+  await card.getByRole('button', { name: /Ver cotizaciones/i }).click();
+  await expect(page.getByRole('heading', { name: /Cotizaciones de Repuestos Centro/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.modal')).toContainText(desc); // el pedido cotizado aparece en el modal
 });
