@@ -280,16 +280,18 @@ function DetalleModal({ r, onClose }) {
           </div>
         )}
 
-        {isSale && (
+        {isSale && (<>
+          <div className="section-title"><h2 style={{ fontSize: 15 }}><i className="fa-solid fa-receipt"></i> Comprobante de pago</h2></div>
           <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
             <DRow k="Mecánico" v={r.mechanicName || '—'} />
-            <DRow k="Fecha de venta" v={fmtDateTime(r.soldAt)} />
-            <DRow k="Monto de la venta" v={r.part ? '$' + r.part.toLocaleString('es-AR') : '—'} />
+            <DRow k="Fecha de pago" v={fmtDateTime(r.soldAt)} />
+            <DRow k="Monto del repuesto" v={r.part ? '$' + r.part.toLocaleString('es-AR') : '—'} />
+            <DRow k="Medio de pago" v={r.creditAccount ? 'Cuenta corriente (lo cobrás al taller)' : 'Mercado Pago'} />
             <DRow k="Estado" v={ESTADO[r.orderStatus] || r.orderStatus || '—'} />
             {r.creditAccount && <DRow k="Cuenta corriente" v={r.creditSettledAt ? 'Sí · cobrada' : 'Sí · pendiente de pago'} />}
             {r.issue && <DRow k="Incidencia" v={r.issue} />}
           </div>
-        )}
+        </>)}
 
         {r.photoUrls?.length > 0 && (
           <div className="mb-12">

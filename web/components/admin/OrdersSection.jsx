@@ -71,8 +71,14 @@ function OrderBreakdownModal({ o, onClose }) {
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ maxWidth: 460 }}>
         <div className="modal-handle"></div>
-        <div className="flex-between mb-4"><h2 className="h-md">Desglose del pedido</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
+        <div className="flex-between mb-4"><h2 className="h-md">Comprobante de pago</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
         <p className="text-sm muted mb-16">{o.code} · {o.label}{o.vehicle ? ` · ${o.vehicle}` : ''}</p>
+        <div className="card mb-12" style={{ background: 'var(--bg-1)' }}>
+          {line('fa-user', 'Mecánico', o.mechanicName || '—')}
+          {line('fa-calendar-check', 'Pagado el', o.concretada ? fmtDateTime(o.concretada) : '—')}
+          {line('fa-money-bill-wave', 'Medio de pago', o.creditAccount ? 'Cuenta corriente' : 'Mercado Pago', true)}
+        </div>
+        <div className="section-title"><h2 style={{ fontSize: 15 }}>Desglose</h2></div>
         <div className="card" style={{ background: 'var(--bg-1)' }}>
           {line('fa-box', 'Repuesto', money(o.part))}
           {line('fa-percent', `Comisión (${o.commissionPct != null ? o.commissionPct : '—'}%)`, money(o.commission))}

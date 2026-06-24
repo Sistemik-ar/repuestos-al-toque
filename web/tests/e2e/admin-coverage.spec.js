@@ -10,8 +10,9 @@ test('admin: el desglose de un pedido muestra comisión %, envío y recargo MP',
   await page.getByPlaceholder(/Buscar mec/i).fill(desc);
   const row = page.locator('tr', { hasText: desc });
   await expect(row).toBeVisible({ timeout: 10000 });
-  await row.locator('td[data-label="Total"] button').click(); // el Total abre el desglose
-  await expect(page.getByRole('heading', { name: /Desglose del pedido/i })).toBeVisible();
+  await row.locator('td[data-label="Total"] button').click(); // el Total abre el comprobante
+  await expect(page.getByRole('heading', { name: /Comprobante de pago/i })).toBeVisible();
+  await expect(page.getByText(/Medio de pago/i)).toBeVisible(); // bloque de pago del comprobante
   await expect(page.getByText(/Comisión \(10%\)/)).toBeVisible();
   await expect(page.getByText('$5.000')).toBeVisible(); // comisión = 10% de 50.000
   await expect(page.getByText(/Recargo Mercado Pago/i)).toBeVisible();
