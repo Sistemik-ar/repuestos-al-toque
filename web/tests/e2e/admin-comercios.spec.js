@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers';
-import { clearStoreCategories, ensureStore2 } from './db';
+import { clearStoreCategories, ensureStore2, seedChosenQuote } from './db';
 
 // Deja a los dos comercios "reciben de todo" para no afectar a otros specs (que asumen feed completo).
 test.afterAll(async () => {
@@ -54,4 +54,25 @@ test('admin/comercios: alterna vista Matriz/Lista (persiste) y "Descartar" revie
   await page.getByRole('button', { name: /Descartar/i }).click();
   await expect(page.getByText(/Cambios descartados/i)).toBeVisible({ timeout: 10000 });
   await expect(cell).toHaveAttribute('aria-pressed', 'false'); // volvió a destildarse
+});
+
+// Cotizaciones desde la matriz (botón por fila) y el modal global "Todas las cotizaciones".
+test('admin/comercios: ver cotizaciones por fila (matriz) y "Todas las cotizaciones"', async ({ page }) => {
+  const desc = `CotMatriz E2E ${Date.now()}`;
+  await seedChosenQuote({ desc }); // cotización del vendedor seed (Repuestos Centro)
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=comercios');
+  await expect(page.getByText('Poca cobertura')).toBeVisible({ timeout: 15000 });
+
+  // botón de cotizaciones en la fila de la matriz (icono de tags)
+  await page.locator('.cm-row', { hasText: 'Repuestos Centro' }).locator('.cm-cot').click();
+  await expect(page.getByRole('heading', { name: /Cotizaciones de Repuestos Centro/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.modal')).toContainText(desc);
+  await page.locator('.modal .icon-btn').click(); // cerrar
+
+  // botón global "Todas las cotizaciones": lista de todos los comercios, mostrando quién cotizó
+  await page.getByRole('button', { name: /Todas las cotizaciones/i }).click();
+  await expect(page.getByRole('heading', { name: /Todas las cotizaciones/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.modal')).toContainText(desc);
+  await expect(page.locator('.modal')).toContainText('Repuestos Centro');
 });

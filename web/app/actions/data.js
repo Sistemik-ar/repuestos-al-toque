@@ -616,6 +616,29 @@ export async function getStoreQuotes(storeId) {
   }));
 }
 
+// Admin: cotizaciones recientes de TODOS los comercios (para "Todas las cotizaciones"). Igual que
+// getStoreQuotes pero sin filtrar por comercio y agregando el nombre del comercio que cotizó.
+export async function getRecentQuotes() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const quotes = await prisma.requestQuote.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+    include: { request: { select: { code: true, description: true, brand: true, model: true, status: true, job: { select: { plate: true } }, order: { select: { id: true } } } } },
+  });
+  const storeIds = [...new Set(quotes.map((q) => q.storeId))];
+  const stores = await prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } });
+  const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
+  return quotes.map((q) => ({
+    id: q.id, price: num(q.price), status: q.status, partBrand: q.partBrand,
+    createdAt: q.createdAt?.getTime() || 0,
+    storeName: sName[q.storeId] || 'Comercio',
+    reqCode: q.request?.code || '', label: q.request?.description || 'Repuesto',
+    vehicle: `${q.request?.brand || ''} ${q.request?.model || ''}`.trim(),
+    plate: q.request?.job?.plate || null,
+    sold: q.status === 'SELECTED' && !!q.request?.order,
+  }));
+}
+
 export async function getAdminData() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   const [usersCount, reqCount, paid, users, recent, categories, storeRows] = await Promise.all([

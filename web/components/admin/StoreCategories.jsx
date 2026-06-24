@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { money, toast, fmtDateTime } from '@/lib/ui';
 import Loading from '@/components/Loading';
-import { setStoreCategories, getStoreQuotes } from '@/app/actions/data';
+import { setStoreCategories, getStoreQuotes, getRecentQuotes } from '@/app/actions/data';
 
 // "selección normalizada" de un comercio → string estable para comparar contra el baseline (dirty).
 const norm = (sel) => [...sel].sort((a, b) => a - b).join(',');
@@ -21,6 +21,7 @@ function StoreCategories({ stores, categories, onSaved }) {
   const [openAcc, setOpenAcc] = useState(() => new Set());
   const [saving, setSaving] = useState(false);
   const [quotesStore, setQuotesStore] = useState(null); // comercio cuyas cotizaciones se ven en el modal
+  const [allQuotes, setAllQuotes] = useState(false); // modal "Todas las cotizaciones" (todos los comercios)
 
   // (re)sincronizar con los datos: al montar y tras guardar (onSaved recarga stores).
   useEffect(() => {
@@ -92,7 +93,7 @@ function StoreCategories({ stores, categories, onSaved }) {
               <tr>
                 <th className="corner">
                   <div className="corner-title">Comercio</div>
-                  <div className="corner-sub">tildá los rubros que vende →</div>
+                  <div className="corner-sub">{rows.length} de {work.length} · tocá un rubro para resaltar la columna</div>
                 </th>
                 {rubros.map((r) => {
                   const cov = coverageExplicit(r.id);
@@ -120,8 +121,9 @@ function StoreCategories({ stores, categories, onSaved }) {
                         <Avatar />
                         <div className="cm-meta">
                           <div className="nm">{c.name}</div>
-                          <div className="ct">{c.sel.length === 0 ? <span className="badge-all">Recibe de todo</span> : `${c.sel.length} rubro${c.sel.length === 1 ? '' : 's'}`}</div>
+                          <div className="ct">{c.sel.length === 0 ? <span className="badge-all">Recibe de todos</span> : `${c.sel.length} de ${rubros.length} rubros`}</div>
                         </div>
+                        <button type="button" className="cm-cot" title={`Ver cotizaciones de ${c.name}`} onClick={() => setQuotesStore(c)}><i className="fa-solid fa-tags"></i></button>
                       </div>
                     </td>
                     {rubros.map((r) => {
@@ -158,7 +160,7 @@ function StoreCategories({ stores, categories, onSaved }) {
                 <div className="acc-meta">
                   <div className="nm">{c.name}</div>
                   <div className="ct">
-                    {c.sel.length === 0 ? <span className="badge-all">Recibe de todo</span> : <>{c.sel.length} rubro{c.sel.length === 1 ? '' : 's'}</>}
+                    {c.sel.length === 0 ? <span className="badge-all">Recibe de todos los rubros</span> : <>{c.sel.length} de {rubros.length} rubros</>}
                     <span className="cov-dots">{rubros.map((r) => <i key={r.id} className={has(c, r.id) ? 'on' : ''}></i>)}</span>
                     {isDirty(c) && <span className="badge badge-yellow"><i className="fa-solid fa-circle-dot"></i> Sin guardar</span>}
                   </div>
@@ -172,7 +174,7 @@ function StoreCategories({ stores, categories, onSaved }) {
                       const on = has(c, r.id);
                       return (
                         <button key={r.id} type="button" className={`rpill ${on ? 'on' : ''}`} onClick={() => toggle(c.id, r.id)} aria-pressed={on}>
-                          <span className="chk"><i className={`fa-solid ${on ? 'fa-check' : catIcon(r)}`}></i></span>{r.name}
+                          <span className="chk">{on ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-plus" style={{ opacity: 0.5 }}></i>}</span>{r.name}
                         </button>
                       );
                     })}
@@ -229,6 +231,7 @@ function StoreCategories({ stores, categories, onSaved }) {
           {rubros.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
         <div style={{ flex: 1 }}></div>
+        <button type="button" className="btn btn-ghost btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setAllQuotes(true)}><i className="fa-solid fa-tags"></i> Todas las cotizaciones</button>
         {!narrow && (
           <div className="view-toggle">
             <button type="button" className={view === 'matrix' ? 'active' : ''} onClick={() => setVw('matrix')}><i className="fa-solid fa-table-cells"></i> Matriz</button>
@@ -253,43 +256,58 @@ function StoreCategories({ stores, categories, onSaved }) {
       </div>
 
       {quotesStore && <StoreQuotesModal store={quotesStore} onClose={() => setQuotesStore(null)} />}
+      {allQuotes && <AllQuotesModal onClose={() => setAllQuotes(false)} />}
     </>
   );
 }
 
-// Modal admin: lista las cotizaciones que hizo un comercio (pedido, precio, estado, si concretó).
-function StoreQuotesModal({ store, onClose }) {
+const QUOTE_ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
+
+// Una fila de cotización (compartida entre el modal por-comercio y el de "Todas las cotizaciones").
+function QuoteRow({ q, showStore }) {
+  const [cls, txt] = QUOTE_ST[q.status] || ['badge-gray', q.status];
+  return (
+    <div className="card mb-8" style={{ background: 'var(--bg-1)' }}>
+      <div className="flex-between mb-4"><div className="text-sm" style={{ fontWeight: 700 }}>{q.label}</div><span className="price">{money(q.price)}</span></div>
+      <div className="text-xs muted">{showStore && q.storeName ? <><i className="fa-solid fa-store"></i> {q.storeName} · </> : ''}#{q.reqCode} · {q.vehicle || 'Vehículo'}{q.plate ? ` · ${q.plate}` : ''}{q.partBrand ? ` · ${q.partBrand}` : ''}</div>
+      <div className="flex-between mt-8" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <span className="flex-center gap-8"><span className={`badge ${cls}`}>{txt}</span>{q.sold && <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Concretada</span>}</span>
+        <span className="text-xs muted rat-th-date">{fmtDateTime(q.createdAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+// Cáscara de modal con la lista de cotizaciones (carga async + estados vacío/cargando).
+function QuotesModal({ title, load, deps, empty, showStore, onClose }) {
   const [rows, setRows] = useState(null);
-  useEffect(() => { getStoreQuotes(store.id).then((r) => setRows(r || [])).catch(() => setRows([])); }, [store.id]);
-  const ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
+  useEffect(() => { load().then((r) => setRows(r || [])).catch(() => setRows([])); }, deps); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ maxWidth: 640 }}>
         <div className="modal-handle"></div>
-        <div className="flex-between mb-4"><h2 className="h-md">Cotizaciones de {store.name}</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
+        <div className="flex-between mb-4"><h2 className="h-md">{title}</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button></div>
         {rows === null ? <Loading label="Cargando cotizaciones…" />
-          : rows.length === 0 ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>Este comercio todavía no cotizó nada.</div>
+          : rows.length === 0 ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>{empty}</div>
           : (<>
             <p className="text-sm muted mb-12">{rows.length} cotización{rows.length === 1 ? '' : 'es'} · {rows.filter((r) => r.sold).length} concretada(s)</p>
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {rows.map((r) => {
-                const [cls, txt] = ST[r.status] || ['badge-gray', r.status];
-                return (
-                  <div key={r.id} className="card mb-8" style={{ background: 'var(--bg-1)' }}>
-                    <div className="flex-between mb-4"><div className="text-sm" style={{ fontWeight: 700 }}>{r.label}</div><span className="price">{money(r.price)}</span></div>
-                    <div className="text-xs muted">#{r.reqCode} · {r.vehicle || 'Vehículo'}{r.plate ? ` · ${r.plate}` : ''}{r.partBrand ? ` · ${r.partBrand}` : ''}</div>
-                    <div className="flex-between mt-8" style={{ gap: 8, flexWrap: 'wrap' }}>
-                      <span className="flex-center gap-8"><span className={`badge ${cls}`}>{txt}</span>{r.sold && <span className="badge badge-green"><i className="fa-solid fa-circle-check"></i> Concretada</span>}</span>
-                      <span className="text-xs muted rat-th-date">{fmtDateTime(r.createdAt)}</span>
-                    </div>
-                  </div>
-                );
-              })}
+              {rows.map((q) => <QuoteRow key={q.id} q={q} showStore={showStore} />)}
             </div>
           </>)}
       </div>
     </div>
   );
+}
+
+// Cotizaciones de UN comercio.
+function StoreQuotesModal({ store, onClose }) {
+  return <QuotesModal title={`Cotizaciones de ${store.name}`} load={() => getStoreQuotes(store.id)} deps={[store.id]} empty="Este comercio todavía no cotizó nada." onClose={onClose} />;
+}
+
+// Cotizaciones de TODOS los comercios.
+function AllQuotesModal({ onClose }) {
+  return <QuotesModal title="Todas las cotizaciones" load={getRecentQuotes} deps={[]} empty="Todavía no hay cotizaciones." showStore onClose={onClose} />;
 }
 
 export default StoreCategories;

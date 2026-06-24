@@ -783,10 +783,13 @@ table.matrix tbody tr:hover td { background: rgba(255,255,255,0.025); }
 table.matrix tbody tr:hover td.cm-name { background: #161d2a; }
 .cm-name-inner { display: flex; align-items: center; gap: 12px; }
 .cm-av { width: 36px; height: 36px; border-radius: 10px; background: var(--bg-3); color: var(--purple-light); display: grid; place-items: center; font-size: 15px; flex-shrink: 0; }
-.cm-meta { min-width: 0; }
+.cm-meta { min-width: 0; flex: 1; }
 .cm-meta .nm { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .cm-meta .ct { font-size: 11.5px; color: var(--text-2); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
+.cm-cot { width: 30px; height: 30px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-2); display: grid; place-items: center; cursor: pointer; transition: all .15s ease; flex-shrink: 0; margin-left: 6px; }
+.cm-cot:hover { background: var(--purple); border-color: var(--purple); color: #fff; }
 .cm-row.dirty td.cm-name { box-shadow: inset 3px 0 0 var(--yellow); }
+.cm-row.dirty .cm-meta .nm::after { content: '•'; color: var(--yellow); margin-left: 6px; }
 .badge-all { font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(139,92,246,0.18); color: var(--purple-light); }
 table.matrix td.cell { text-align: center; padding: 0; }
 .cell-btn { width: 100%; height: 56px; display: grid; place-items: center; border: none; background: transparent; cursor: pointer; transition: background .12s ease; }
