@@ -210,7 +210,7 @@ function StoreCategories({ stores, categories, onSaved }) {
           onClick={thinAlert ? () => { setRubroSel(String(thin[0].id)); toast({ title: 'Filtrado por ' + thin[0].name, sub: `Solo ${coverageExplicit(thin[0].id)} comercio${coverageExplicit(thin[0].id) === 1 ? '' : 's'} lo cubre${coverageExplicit(thin[0].id) === 1 ? '' : 'n'}`, icon: 'fa-triangle-exclamation', type: 'yellow' }); } : undefined}>
           <div className="cv-label"><i className={`fa-solid ${thinAlert ? 'fa-triangle-exclamation' : 'fa-circle-check'}`}></i> Poca cobertura</div>
           <div className="cv-value">{thin.length}</div>
-          <div className="cv-sub">{thinAlert ? `${thin.map((r) => r.name).join(', ')} · 1 comercio o menos` : 'todos los rubros cubiertos'}</div>
+          <div className="cv-sub">{thinAlert ? `${thin.slice(0, 3).map((r) => r.name).join(', ')}${thin.length > 3 ? ` y ${thin.length - 3} más` : ''} · 1 comercio o menos` : 'todos los rubros cubiertos'}</div>
         </div>
         <div className="cov-card">
           <div className="cv-label"><i className="fa-solid fa-globe"></i> Reciben de todo</div>

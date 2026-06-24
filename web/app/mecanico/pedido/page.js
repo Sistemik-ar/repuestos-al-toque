@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { data } from '@/lib/data';
 import { toast } from '@/lib/ui';
 import { addJobItem, publishJob, getVehicleByPlate } from '@/app/actions/data';
-import { uploadPhoto } from '@/lib/upload';
+import { usePhotoUpload } from '@/lib/usePhotoUpload';
 import BusyButton from '@/components/BusyButton';
 
 const plateOk = (p) => /^([A-Z]{3}\s?\d{3}|[A-Z]{2}\s?\d{3}\s?[A-Z]{2})$/i.test(String(p || '').trim());
@@ -24,22 +24,11 @@ export default function Pedido() {
   const [added, setAdded] = useState(false); // pantalla "¿seguir comprando?"
   const [error, setError] = useState(''); // error persistente (no desaparece solo)
   const [tried, setTried] = useState(false); // intentó avanzar con campos incompletos -> marcamos los faltantes
-  const [uploading, setUploading] = useState(false);
-
-  async function onPickPhoto(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setUploading(true);
-    try {
-      const url = await uploadPhoto(file, 'pedidos');
-      setSt((s) => ({ ...s, photoUrls: [...s.photoUrls, url] }));
-      toast({ title: 'Foto subida', icon: 'fa-image', type: 'green' });
-    } catch (err) {
-      toast({ title: 'No se pudo subir la foto', sub: String(err?.message || err), icon: 'fa-triangle-exclamation', type: 'yellow' });
-    }
-    setUploading(false);
-  }
+  const photo = usePhotoUpload({
+    folder: 'pedidos',
+    onUploaded: (url) => setSt((s) => ({ ...s, photoUrls: [...s.photoUrls, url] })),
+    enabled: step === 3, // el campo de foto vive en el paso 3 (Descripción)
+  });
 
   const models = st.brand && data.models[st.brand] ? data.models[st.brand] : [];
   const needsOther = st.brand && (models.length === 0 || st.model === 'Otro');
@@ -237,12 +226,13 @@ export default function Pedido() {
             </div>
             <div className="field">
               <label>Foto <span className="muted">(opcional)</span></label>
-              <input id="reqPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPickPhoto} />
-              <label htmlFor="reqPhoto" className="upload-area" style={{ display: 'block', cursor: 'pointer' }}>
-                <i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`} style={{ fontSize: 24 }}></i>
-                <div className="text-sm mt-8" style={{ fontWeight: 600 }}>{uploading ? 'Subiendo…' : 'Agregar foto'}</div>
+              <input id="reqPhoto" type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { photo.addFiles(e.target.files); e.target.value = ''; }} />
+              <label htmlFor="reqPhoto" className={`upload-area ${photo.dragging ? 'dragover' : ''}`} style={{ display: 'block', cursor: 'pointer' }} {...photo.dropProps}>
+                <i className={`fa-solid ${photo.uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`} style={{ fontSize: 24 }}></i>
+                <div className="text-sm mt-8" style={{ fontWeight: 600 }}>{photo.uploading ? 'Subiendo…' : photo.dragging ? 'Soltá la foto acá' : 'Agregar foto'}</div>
                 <div className="text-xs">Sacá foto de la pieza o el número de parte</div>
               </label>
+              <div className="upload-hint"><i className="fa-solid fa-arrow-pointer"></i> Arrastrá una imagen, pegala con <kbd>Ctrl/⌘</kbd>+<kbd>V</kbd>, o tocá para elegir</div>
               {st.photoUrls.length > 0 && (
                 <div className="flex gap-8 mt-12" style={{ flexWrap: 'wrap' }}>
                   {st.photoUrls.map((url, i) => (

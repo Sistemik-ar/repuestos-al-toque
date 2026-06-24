@@ -7,7 +7,7 @@ import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
 import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled, dismissRequest } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
-import { uploadPhoto } from '@/lib/upload';
+import { usePhotoUpload } from '@/lib/usePhotoUpload';
 import { data } from '@/lib/data';
 import Loading from '@/components/Loading';
 import PushButton from '@/components/PushButton';
@@ -442,23 +442,17 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
   const [opcion, setOpcion] = useState('Original / OEM');
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState([]);
-  const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
-
-  async function onPick(e) {
-    const files = [...e.target.files].slice(0, 3 - photos.length);
-    e.target.value = '';
-    setUploading(true);
-    for (const f of files) {
-      try { const url = await uploadPhoto(f, 'cotizaciones'); setPhotos((p) => (p.length < 3 ? [...p, url] : p)); } catch (err) { toast({ title: 'No se pudo subir', icon: 'fa-triangle-exclamation', type: 'yellow' }); }
-    }
-    setUploading(false);
-  }
+  const photo = usePhotoUpload({
+    folder: 'cotizaciones',
+    remaining: () => 3 - photos.length, // hasta 3 fotos
+    onUploaded: (url) => setPhotos((p) => (p.length < 3 ? [...p, url] : p)),
+  });
 
   // Evita perder el borrador por un toque accidental (sobre todo en mobile): si hay algo cargado,
   // confirma antes de cerrar; y si una foto se está subiendo, no deja cerrar.
   function tryClose() {
-    if (uploading) { toast({ title: 'Esperá un toque', sub: 'Se está subiendo la foto…', icon: 'fa-spinner', type: 'yellow' }); return; }
+    if (photo.uploading) { toast({ title: 'Esperá un toque', sub: 'Se está subiendo la foto…', icon: 'fa-spinner', type: 'yellow' }); return; }
     const dirty = !!(String(price).trim() || photos.length || String(note).trim());
     if (dirty && !window.confirm('¿Descartar esta cotización? Vas a perder el precio y las fotos que cargaste.')) return;
     onClose();
@@ -484,16 +478,17 @@ function CotizarModal({ lead, label, veh, onClose, onSend }) {
         </div>
         <div className="field">
           <label>Fotos de la pieza <span className="muted">(hasta 3, opcional)</span></label>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onPick} />
-          <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => { photo.addFiles(e.target.files); e.target.value = ''; }} />
+          <div className="flex gap-8" style={{ flexWrap: 'wrap' }} {...photo.dropProps}>
             {photos.map((src, i) => (
               <div key={i} style={{ position: 'relative' }}>
                 <img src={src} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />
                 <button onClick={() => setPhotos((p) => p.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--red)', color: '#fff', cursor: 'pointer', fontSize: 11 }}>✕</button>
               </div>
             ))}
-            {photos.length < 3 && <button type="button" className="upload-area" style={{ width: 64, height: 64, padding: 0, display: 'grid', placeItems: 'center' }} onClick={() => fileRef.current?.click()}><i className={`fa-solid ${uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`}></i></button>}
+            {photos.length < 3 && <button type="button" className={`upload-area ${photo.dragging ? 'dragover' : ''}`} style={{ width: 64, height: 64, padding: 0, display: 'grid', placeItems: 'center' }} onClick={() => fileRef.current?.click()}><i className={`fa-solid ${photo.uploading ? 'fa-spinner fa-spin' : 'fa-camera'}`}></i></button>}
           </div>
+          {photos.length < 3 && <div className="upload-hint"><i className="fa-solid fa-arrow-pointer"></i> Arrastrá, pegá con <kbd>Ctrl/⌘</kbd>+<kbd>V</kbd>, o tocá la cámara</div>}
         </div>
         <div className="field"><label>Notas <span className="muted">(opcional)</span></label><textarea className="textarea" maxLength={300} placeholder="Stock disponible, garantía…" value={note} onChange={(e) => setNote(e.target.value)}></textarea></div>
         <div className="flex gap-12">

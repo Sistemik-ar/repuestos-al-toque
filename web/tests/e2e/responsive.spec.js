@@ -23,6 +23,7 @@ const SCREENS = [
   { path: '/comercio', user: 'vendedor@repuestosaltoque.com.ar', mustSee: /Solicitudes/i },
   { path: '/repartidor', user: 'repartidor@repuestosaltoque.com.ar', mustSee: /Entregas/i },
   { path: '/admin', user: 'admin@repuestosaltoque.com.ar', mustSee: /Panel de control/i },
+  { path: '/admin?sec=comercios', user: 'admin@repuestosaltoque.com.ar', mustSee: /Poca cobertura/i }, // matriz/lista comercio×rubro
 ];
 
 for (const vp of VIEWPORTS) {
