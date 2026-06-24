@@ -14,6 +14,7 @@ test('el admin setea una contraseña temporal a un comercio y este entra con ell
   // ADMIN: en la tabla Usuarios, "Pass" sobre el comercio -> ingresa la temporal en el prompt
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
+  await a.goto('/admin?sec=usuarios'); // el default ahora es "Inicio"
   a.on('dialog', (d) => d.accept(tempPass)); // responde el window.prompt de la contraseña
   await a.getByPlaceholder(/nombre, email o rol/i).fill('Repuestos Centro'); // nombre único del comercio seed (no el rol "Vendedor", que matchea a todos)
   const row = a.locator('tr', { hasText: VENDEDOR });
@@ -40,6 +41,7 @@ test('el admin edita un comercio y le cambia el email (modal Editar)', async ({ 
   const nuevo = `vendedor-edit-${Date.now()}@rat.test`;
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
+  await a.goto('/admin?sec=usuarios'); // el default ahora es "Inicio"
   await a.getByPlaceholder(/nombre, email o rol/i).fill('Repuestos Centro'); // nombre único del comercio seed (no el rol "Vendedor", que matchea a todos)
   const row = a.locator('tr', { hasText: VENDEDOR });
   await expect(row).toBeVisible({ timeout: 15000 });
@@ -58,6 +60,7 @@ test('el admin suspende un comercio: no puede entrar; al reactivarlo, sí', asyn
   test.setTimeout(60000);
   const ac = await browser.newContext(); const a = await ac.newPage();
   await login(a, 'admin@repuestosaltoque.com.ar');
+  await a.goto('/admin?sec=usuarios'); // el default ahora es "Inicio"
   await a.getByPlaceholder(/nombre, email o rol/i).fill('Repuestos Centro'); // nombre único del comercio seed (no el rol "Vendedor", que matchea a todos)
   const row = a.locator('tr', { hasText: VENDEDOR });
   await expect(row).toBeVisible({ timeout: 15000 });

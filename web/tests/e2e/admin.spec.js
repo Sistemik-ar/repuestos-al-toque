@@ -12,7 +12,11 @@ async function login(page, email, home) {
 test.describe('Backoffice (admin)', () => {
   test('paneles del admin presentes', async ({ page }) => {
     await login(page, 'admin@repuestosaltoque.com.ar', /\/admin/);
-    // sección Usuarios por defecto (tabla)
+    // Inicio es la sección por defecto (dashboard)
+    await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();
+    await expect(page.getByText(/Necesitan tu atención/i)).toBeVisible({ timeout: 15000 });
+    // sección Usuarios (tabla)
+    await page.goto('/admin?sec=usuarios');
     await expect(page.getByRole('heading', { name: 'Usuarios' }).first()).toBeVisible();
     // sub-nav Alta de usuario
     await page.getByRole('button', { name: /Alta de usuario/i }).click();
@@ -28,6 +32,7 @@ test.describe('Backoffice (admin)', () => {
 
   test('alta de un vendedor + login con contraseña temporal', async ({ page, browser }) => {
     await login(page, 'admin@repuestosaltoque.com.ar', /\/admin/);
+    await page.goto('/admin?sec=usuarios'); // el default ahora es "Inicio"
     await page.getByRole('button', { name: /Alta de usuario/i }).click(); // sub-nav Alta
     const email = `e2e-store-${Date.now()}@rat.test`;
     await page.getByPlaceholder('Repuestos Centro').fill('E2E Store');

@@ -50,7 +50,8 @@ test('admin: "Últ. ingreso" se puebla tras el login del comercio', async ({ pag
 
 // Editar un usuario desde el backoffice guarda los cambios.
 test('admin: editar un usuario guarda los cambios', async ({ page }) => {
-  await login(page, 'admin@repuestosaltoque.com.ar'); // Usuarios es la sección por defecto
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=usuarios'); // el default ahora es "Inicio"
   // editamos al mecánico (no tiene docsOk y no le tocamos el nombre): no afecta a otros tests que
   // comparten la DB. (Editar al repartidor recalcularía docsOk=false y lo dejaría sin poder tomar viajes.)
   await page.getByPlaceholder(/Buscar por nombre/i).fill('Patagonia'); // Taller Patagonia (mecánico seed)

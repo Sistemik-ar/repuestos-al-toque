@@ -682,6 +682,62 @@ export async function getAdminData() {
   };
 }
 
+// Dashboard "Inicio" del admin: KPIs (hoy vs ayer), acciones que necesitan atención (con su
+// deep-link), top comercios por ventas (30d) y ventas de hoy por hora. Todo de datos reales.
+export async function getAdminHome() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const now = Date.now();
+  const sod = new Date(); sod.setHours(0, 0, 0, 0);
+  const todayMs = sod.getTime(), yestMs = todayMs - 86400000;
+  const d30 = new Date(now - 30 * 86400000);
+  const CONCRETADA = ['PAID', 'SHIPPED', 'DELIVERED'];
+
+  const [orders30, users, stores, ccPending, stuck, cats, storeCats, quoteCounts] = await Promise.all([
+    prisma.order.findMany({ where: { status: { in: CONCRETADA }, createdAt: { gte: d30 } }, select: { storeId: true, partAmount: true, commissionAmount: true, total: true, createdAt: true } }),
+    prisma.user.findMany({ select: { id: true, role: true, status: true, createdAt: true } }),
+    prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, mpUserId: true } }),
+    prisma.creditAccount.count({ where: { adminStatus: 'PENDING' } }),
+    prisma.order.count({ where: { OR: [{ status: 'PAID', createdAt: { lt: new Date(now - 24 * 3600 * 1000) } }, { issue: { not: null }, status: { notIn: ['DELIVERED'] } }] } }),
+    prisma.category.findMany({ select: { id: true, name: true } }),
+    prisma.storeCategory.groupBy({ by: ['categoryId'], _count: { categoryId: true } }),
+    prisma.requestQuote.groupBy({ by: ['storeId'], where: { createdAt: { gte: d30 } }, _count: { _all: true } }),
+  ]);
+
+  // KPIs hoy vs ayer
+  const sum = (l, f) => l.reduce((a, o) => a + num(o[f]), 0);
+  const today = orders30.filter((o) => o.createdAt.getTime() >= todayMs);
+  const yest = orders30.filter((o) => { const t = o.createdAt.getTime(); return t >= yestMs && t < todayMs; });
+  const kpis = {
+    gmv: { value: sum(today, 'partAmount'), prev: sum(yest, 'partAmount'), money: true },
+    comision: { value: sum(today, 'commissionAmount'), prev: sum(yest, 'commissionAmount'), money: true },
+    pedidos: { value: today.length, prev: yest.length },
+    usuarios: { value: users.length, prev: users.filter((u) => u.createdAt.getTime() < todayMs).length },
+  };
+
+  // acciones pendientes
+  const statusOf = Object.fromEntries(users.map((u) => [u.id, u.status]));
+  const altas = users.filter((u) => u.role === 'STORE' && u.status === 'PENDING').length;
+  const sinMp = stores.filter((st) => statusOf[st.userId] === 'ACTIVE' && !st.mpUserId).length;
+  const covCount = Object.fromEntries(storeCats.map((g) => [g.categoryId, g._count.categoryId]));
+  const thinRubros = cats.filter((c) => (covCount[c.id] || 0) <= 1).map((c) => c.name);
+
+  // top comercios por ventas (30 días) + conversión (ventas / cotizaciones)
+  const sName = Object.fromEntries(stores.map((st) => [st.userId, st.tradeName]));
+  const qCount = Object.fromEntries(quoteCounts.map((g) => [g.storeId, g._count._all]));
+  const byStore = {};
+  for (const o of orders30) { const m = (byStore[o.storeId] ||= { vendido: 0, ventas: 0 }); m.vendido += num(o.partAmount); m.ventas++; }
+  const top = Object.entries(byStore).map(([id, m]) => ({
+    name: sName[id] || 'Comercio', vendido: m.vendido, ventas: m.ventas, conv: qCount[id] ? m.ventas / qCount[id] : 0,
+  })).sort((a, b) => b.vendido - a.vendido).slice(0, 5);
+
+  // ventas de hoy por hora — 8 franjas de 2 h (9–23), hora de Bariloche
+  const arHour = (d) => Number(new Intl.DateTimeFormat('es-AR', { hour: '2-digit', hour12: false, timeZone: 'America/Argentina/Buenos_Aires' }).format(d));
+  const bars = new Array(8).fill(0);
+  for (const o of today) { const i = Math.min(7, Math.max(0, Math.floor((arHour(o.createdAt) - 9) / 2))); bars[i] += num(o.total); }
+
+  return { kpis, pending: { cc: ccPending, stuck, altas, sinMp, thinRubros }, top, bars };
+}
+
 export async function getAdminStats({ from, to } = {}) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   const now = Date.now();

@@ -13,8 +13,10 @@ import CreditSection from '@/components/admin/CreditSection';
 import StoreCategories from '@/components/admin/StoreCategories';
 import OrdersSection from '@/components/admin/OrdersSection';
 import UsersSection, { AltaUsuario } from '@/components/admin/UsersSection';
+import HomeSection from '@/components/admin/HomeSection';
 
 const NAV = [
+  ['inicio', 'fa-house', 'Inicio'],
   ['usuarios', 'fa-users', 'Usuarios'],
   ['comercios', 'fa-store', 'Comercios'],
   ['pedidos', 'fa-receipt', 'Pedidos'],
@@ -22,7 +24,7 @@ const NAV = [
   ['stats', 'fa-chart-line', 'Estadísticas'],
   ['ajustes', 'fa-sliders', 'Ajustes'],
 ];
-const SEC_TITLE = { usuarios: 'Usuarios', comercios: 'Comercios', pedidos: 'Pedidos', cuentas: 'Cuenta corriente', stats: 'Estadísticas', ajustes: 'Ajustes' };
+const SEC_TITLE = { inicio: 'Inicio', usuarios: 'Usuarios', comercios: 'Comercios', pedidos: 'Pedidos', cuentas: 'Cuenta corriente', stats: 'Estadísticas', ajustes: 'Ajustes' };
 
 export default function Admin() {
   const router = useRouter();
@@ -30,7 +32,7 @@ export default function Admin() {
   const [creds, setCreds] = useState([]);
   const [tariffs, setTariffs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState('usuarios');
+  const [tab, setTab] = useState('inicio');
   const [usuSub, setUsuSub] = useState('lista'); // Usuarios: Ver y editar | Alta
   const [collapsed, setCollapsed] = useState(false); // sidebar contraído (desktop)
 
@@ -105,7 +107,7 @@ export default function Admin() {
           <div className="rat-main">
         <div className="mb-16"><div className="eyebrow">Panel de control</div><h1 className="h-lg">{SEC_TITLE[tab]}</h1></div>
 
-        {d === null ? (
+        {tab !== 'inicio' && (d === null ? (
           <Loading label="Cargando el resumen…" />
         ) : (
           <div className="dash-grid grid-2 mb-16">
@@ -114,7 +116,9 @@ export default function Admin() {
             <Kpi label="Ingresos (comisión)" value={money(k.commission)} icon="fa-coins" yellow />
             <Kpi label="Usuarios" value={String(k.users)} icon="fa-users" />
           </div>
-        )}
+        ))}
+
+        {tab === 'inicio' && <HomeSection onNav={setTab} />}
 
         {tab === 'usuarios' && (<>
           <div className="rat-submobile rat-tabs" style={{ marginBottom: 16 }}>
