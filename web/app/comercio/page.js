@@ -20,7 +20,16 @@ export default function Comercio() {
   const [sales, setSales] = useState([]);
   const [tab, setTab] = useState('pend');
   const [modal, setModal] = useState(null);
-  const [dismissed, setDismissed] = useState([]);
+  // "Sin stock" se persiste en el navegador del comercio: así no reaparece al recargar/pollear.
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(window.localStorage.getItem('rat_sinstock') || '[]'); } catch { return []; }
+  });
+  const marcarSinStock = (id) => setDismissed((d) => {
+    const n = d.includes(id) ? d : [...d, id];
+    try { window.localStorage.setItem('rat_sinstock', JSON.stringify(n)); } catch {}
+    return n;
+  });
   const [zoom, setZoom] = useState(null);
   const [detalle, setDetalle] = useState(null); // pedido cuyo detalle se ve en el modal
   const [rep, setRep] = useState(null);
@@ -174,7 +183,7 @@ export default function Comercio() {
             <div className="locked-info mb-12"><i className="fa-solid fa-user-secret"></i> Mecánico anónimo hasta concretar</div>
             <button className="btn btn-ghost btn-sm btn-block mb-8" onClick={() => setDetalle(r)}><i className="fa-solid fa-circle-info"></i> Ver detalle</button>
             <div className="flex gap-12">
-              <button className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} onClick={() => { setDismissed((d) => [...d, r.id]); toast({ title: 'Marcado sin stock', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' }); }}><i className="fa-solid fa-ban"></i> Sin stock</button>
+              <button className="btn btn-ghost btn-sm" style={{ flex: '0 0 auto' }} onClick={() => { marcarSinStock(r.id); toast({ title: 'Marcado sin stock', sub: 'No penaliza tu balance', icon: 'fa-ban', type: 'purple' }); }}><i className="fa-solid fa-ban"></i> Sin stock</button>
               <button className="btn btn-yellow btn-block" onClick={() => setModal(r)}><i className="fa-solid fa-tag"></i> Cotizar</button>
             </div>
           </div>
