@@ -40,7 +40,7 @@ export default function ComercioPerfil() {
                 <div className="avatar" style={{ width: 46, height: 46, fontSize: 16, background: 'linear-gradient(135deg,var(--yellow),var(--purple))' }}>{initials}</div>
                 <div>
                   <div style={{ fontWeight: 800 }}>{p.tradeName || p.name || 'Comercio'}</div>
-                  <div className="text-xs muted mt-4">{p.rating != null ? <><i className="fa-solid fa-star text-yellow"></i> {p.rating} ({p.ratingsCount}) · </> : ''}{p.points.toLocaleString('es-AR')} puntos</div>
+                  <div className="text-xs muted mt-4">{p.rating != null ? <><i className="fa-solid fa-star text-yellow"></i> {p.rating} ({p.ratingsCount}) · </> : ''}{p.points.toLocaleString('es-AR')} puntos de reputación</div>
                 </div>
               </div>
             </div>

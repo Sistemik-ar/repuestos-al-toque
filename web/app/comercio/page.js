@@ -133,7 +133,7 @@ export default function Comercio() {
               <div><div style={{ fontWeight: 800 }}>{me?.name || 'Comercio'}</div><div className="mt-4"><span className={`rep-badge ${badge.cls}`}><i className={`fa-solid ${badge.icon}`}></i> {badge.label}</span></div></div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div className="text-xs muted">Puntos</div><div className="h-md text-yellow">{(rep?.points ?? 0).toLocaleString('es-AR')}</div>
+              <div className="text-xs muted">Puntos de reputación</div><div className="h-md text-yellow">{(rep?.points ?? 0).toLocaleString('es-AR')}</div>
               <div className="text-xs muted mt-4">{rep?.rating != null ? <><i className="fa-solid fa-star text-yellow"></i> {rep.rating} ({rep.count} {rep.count === 1 ? 'reseña' : 'reseñas'})</> : 'Sin reseñas aún'}</div>
             </div>
           </div>
