@@ -13,6 +13,8 @@ test('admin: el desglose de un pedido muestra comisión %, envío y recargo MP',
   await row.locator('td[data-label="Total"] button').click(); // el Total abre el comprobante
   await expect(page.getByRole('heading', { name: /Comprobante de pago/i })).toBeVisible();
   await expect(page.getByText(/Medio de pago/i)).toBeVisible(); // bloque de pago del comprobante
+  await expect(page.getByText(/Vendido por/i)).toBeVisible(); // comercio que vendió
+  await expect(page.locator('.modal')).toContainText('Repuestos Centro'); // nombre del comercio vendedor
   await expect(page.getByText(/Comisión \(10%\)/)).toBeVisible();
   await expect(page.getByText('$5.000')).toBeVisible(); // comisión = 10% de 50.000
   await expect(page.getByText(/Recargo Mercado Pago/i)).toBeVisible();
@@ -68,9 +70,11 @@ test('admin: ve las cotizaciones de un comercio', async ({ page }) => {
   await login(page, 'admin@repuestosaltoque.com.ar');
   await page.goto('/admin?sec=comercios');
   await page.getByPlaceholder(/Buscar comercio/i).fill('Repuestos Centro');
-  const card = page.locator('.rat-store-card', { hasText: 'Repuestos Centro' });
-  await expect(card).toBeVisible({ timeout: 10000 });
-  await card.getByRole('button', { name: /Ver cotizaciones/i }).click();
+  await page.getByRole('button', { name: /Lista/i }).click(); // "Ver cotizaciones" vive en el acordeón de la vista Lista
+  const acc = page.locator('.cm-acc', { hasText: 'Repuestos Centro' });
+  await expect(acc).toBeVisible({ timeout: 10000 });
+  await acc.locator('.cm-acc-head').click(); // expandir el comercio
+  await acc.getByRole('button', { name: /Ver cotizaciones/i }).click();
   await expect(page.getByRole('heading', { name: /Cotizaciones de Repuestos Centro/i })).toBeVisible({ timeout: 10000 });
   await expect(page.locator('.modal')).toContainText(desc); // el pedido cotizado aparece en el modal
 });

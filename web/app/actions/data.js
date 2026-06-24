@@ -565,10 +565,11 @@ export async function getAdminData() {
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
     prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } } } }),
-    prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true } }),
+    prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true, icon: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
   ]);
   const commission = paid.reduce((a, o) => a + num(o.commissionAmount), 0);
+  const storeNameById = Object.fromEntries(storeRows.map((st) => [st.userId, st.tradeName])); // para "Vendido por" en el pedido
   return {
     kpis: { users: usersCount, requests: reqCount, paid: paid.length, commission },
     users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, status: u.status, createdAt: u.createdAt ? u.createdAt.getTime() : null })),
@@ -579,6 +580,7 @@ export async function getAdminData() {
       id: r.id, code: r.code,
       mechanicName: r.mechanic?.name || r.mechanic?.email || '—',
       mechanicEmail: r.mechanic?.email || '',
+      storeName: r.order ? (storeNameById[r.order.storeId] || 'Comercio') : null, // comercio que vendió (Vendido por)
       label: r.description || r.category?.name || 'Repuesto',
       vehicle: `${r.brand || ''} ${r.model || ''}`.trim(),
       status: r.status,

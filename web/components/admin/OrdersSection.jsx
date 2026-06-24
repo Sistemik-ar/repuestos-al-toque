@@ -75,6 +75,7 @@ function OrderBreakdownModal({ o, onClose }) {
         <p className="text-sm muted mb-16">{o.code} · {o.label}{o.vehicle ? ` · ${o.vehicle}` : ''}</p>
         <div className="card mb-12" style={{ background: 'var(--bg-1)' }}>
           {line('fa-user', 'Mecánico', o.mechanicName || '—')}
+          {line('fa-store', 'Vendido por', o.storeName || '—')}
           {line('fa-calendar-check', 'Pagado el', o.concretada ? fmtDateTime(o.concretada) : '—')}
           {line('fa-money-bill-wave', 'Medio de pago', o.creditAccount ? 'Cuenta corriente' : 'Mercado Pago', true)}
         </div>
