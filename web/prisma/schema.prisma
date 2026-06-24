@@ -280,6 +280,17 @@ model RequestQuote {
   @@map("request_quotes")
 }
 
+// "Sin stock": un comercio descarta un pedido para que no le aparezca más (en cualquier dispositivo).
+model RequestDismissal {
+  storeId   String   @map("store_id")
+  requestId String   @map("request_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([storeId, requestId])
+  @@index([storeId])
+  @@map("request_dismissals")
+}
+
 model Shipment {
   id               String          @id @default(cuid())
   mechanicId       String          @map("mechanic_id")

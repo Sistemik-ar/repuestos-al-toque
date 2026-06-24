@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor, fmtDateTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled, dismissRequest } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { uploadPhoto } from '@/lib/upload';
 import { data } from '@/lib/data';
@@ -20,16 +20,13 @@ export default function Comercio() {
   const [sales, setSales] = useState([]);
   const [tab, setTab] = useState('pend');
   const [modal, setModal] = useState(null);
-  // "Sin stock" se persiste en el navegador del comercio: así no reaparece al recargar/pollear.
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try { return JSON.parse(window.localStorage.getItem('rat_sinstock') || '[]'); } catch { return []; }
-  });
-  const marcarSinStock = (id) => setDismissed((d) => {
-    const n = d.includes(id) ? d : [...d, id];
-    try { window.localStorage.setItem('rat_sinstock', JSON.stringify(n)); } catch {}
-    return n;
-  });
+  // "Sin stock": el descarte se persiste server-side (sirve en cualquier dispositivo). En memoria lo
+  // ocultamos al instante (optimista); el server ya lo excluye del feed en el próximo poll/recarga.
+  const [dismissed, setDismissed] = useState([]);
+  const marcarSinStock = (id) => {
+    setDismissed((d) => (d.includes(id) ? d : [...d, id]));
+    dismissRequest(id).catch(() => {});
+  };
   const [zoom, setZoom] = useState(null);
   const [detalle, setDetalle] = useState(null); // pedido cuyo detalle se ve en el modal
   const [rep, setRep] = useState(null);

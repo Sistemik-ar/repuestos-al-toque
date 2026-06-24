@@ -217,10 +217,14 @@ export async function getOpenRequestsForStore() {
   // ve todas (no lo dejamos a ciegas hasta que el admin se las cargue).
   const myCats = await prisma.storeCategory.findMany({ where: { storeId: s.id }, select: { categoryId: true } });
   const catIds = myCats.map((c) => c.categoryId);
+  // "sin stock": pedidos que este comercio descartó — no se le muestran más (en cualquier dispositivo).
+  const dis = await prisma.requestDismissal.findMany({ where: { storeId: s.id }, select: { requestId: true } });
+  const disIds = dis.map((d) => d.requestId);
   // "publicado" = el job está OPEN (los borradores son job DRAFT y no se ven). No depende del
   // contador: con quoteWindowMin=0 windowEndsAt es null y el pedido igual tiene que aparecer.
   const openWhere = { status: { in: ['OPEN', 'QUOTED'] }, OR: [{ job: { status: 'OPEN' } }, { jobId: null, windowEndsAt: { not: null } }] };
   if (catIds.length) openWhere.categoryId = { in: catIds };
+  if (disIds.length) openWhere.id = { notIn: disIds };
   const rows = await prisma.request.findMany({
     where: {
       OR: [
@@ -242,6 +246,17 @@ export async function getOpenRequestsForStore() {
     mySelected: r.quotes.some((q) => q.status === 'SELECTED'),
     mySelectedPrice: num(r.quotes.find((q) => q.status === 'SELECTED')?.price) || null,
   }));
+}
+
+// "Sin stock": el comercio descarta un pedido (deja de aparecerle, en cualquier dispositivo). Idempotente.
+export async function dismissRequest(requestId) {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  await prisma.requestDismissal.upsert({
+    where: { storeId_requestId: { storeId: s.id, requestId } },
+    update: {},
+    create: { storeId: s.id, requestId },
+  });
+  return { ok: true };
 }
 
 export async function getStoreSales() {
