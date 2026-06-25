@@ -21,9 +21,11 @@ const SCREENS = [
   { path: '/mecanico', user: 'mecanico@repuestosaltoque.com.ar', mustSee: /Nuevo pedido|Hola/i },
   { path: '/mecanico/pedido', user: 'mecanico@repuestosaltoque.com.ar', mustSee: /patente|vehículo/i },
   { path: '/comercio', user: 'vendedor@repuestosaltoque.com.ar', mustSee: /Solicitudes/i },
+  { path: '/comercio/perfil', user: 'vendedor@repuestosaltoque.com.ar', mustSee: /Mis datos/i }, // incluye sección Cobros (MP)
   { path: '/repartidor', user: 'repartidor@repuestosaltoque.com.ar', mustSee: /Entregas/i },
   { path: '/admin', user: 'admin@repuestosaltoque.com.ar', mustSee: /Panel de control/i },
   { path: '/admin?sec=comercios', user: 'admin@repuestosaltoque.com.ar', mustSee: /Poca cobertura/i }, // matriz/lista comercio×rubro
+  { path: '/admin?sec=cobros', user: 'admin@repuestosaltoque.com.ar', mustSee: /Conectados/i }, // estado de conexión MP
 ];
 
 for (const vp of VIEWPORTS) {

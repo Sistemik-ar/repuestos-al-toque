@@ -28,6 +28,10 @@ test.describe('Backoffice (admin)', () => {
     // tab Cuenta corriente
     await page.getByRole('button', { name: /Cuenta corriente/i }).click();
     await expect(page.getByRole('heading', { name: /Solicitudes de Cuenta Corriente/ })).toBeVisible();
+    // tab Cobros: estado de conexión a Mercado Pago por comercio
+    await page.getByRole('button', { name: /Cobros/ }).click();
+    await expect(page.getByText('Conectados').first()).toBeVisible();
+    await expect(page.getByText(/Sin conectar/i).first()).toBeVisible();
   });
 
   test('alta de un vendedor + login con contraseña temporal', async ({ page, browser }) => {

@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { getSession, invalidateStatusCache } from '@/lib/session';
-import { createPaymentLink, mpIsTest } from '@/lib/mercadopago';
+import { createPaymentLink, mpIsTest, mpOAuthUrl, mpOAuthConfigured, mpRefresh } from '@/lib/mercadopago';
 import { jobChargePlan } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, inBariloche, searchBariloche } from '@/lib/geo';
@@ -271,7 +271,7 @@ export async function getStoreSales() {
     orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount,
     creditSettledAt: o.creditSettledAt ? o.creditSettledAt.getTime() : null,
     soldAt: o.createdAt?.getTime() || 0, mechanicName: mechName[o.mechanicId] || 'Taller',
-    arrivedPickup: !!o.arrivedPickupAt, issue: o.issue || null, total: num(o.total), part: num(o.partAmount), ...reqBase(o.request),
+    arrivedPickup: !!o.arrivedPickupAt, issue: o.issue || null, total: num(o.total), part: num(o.partAmount), commission: num(o.commissionAmount), ...reqBase(o.request),
   }));
 }
 
@@ -588,6 +588,43 @@ export async function getDeliveryHistory() {
   }));
 }
 
+// ---- Mercado Pago: vinculación del comercio (split de pagos) ----
+// Devuelve el access_token vigente del comercio (refresca si está por vencer). null si no vinculó.
+async function sellerMpToken(storeId) {
+  const sp = await prisma.storeProfile.findUnique({ where: { userId: storeId }, select: { mpAccessToken: true, mpRefreshToken: true, mpTokenExpires: true } });
+  if (!sp?.mpAccessToken) return null;
+  const soon = Date.now() + 5 * 60 * 1000;
+  if (sp.mpTokenExpires && sp.mpTokenExpires.getTime() < soon && sp.mpRefreshToken) {
+    try {
+      const tok = await mpRefresh(sp.mpRefreshToken);
+      await prisma.storeProfile.update({ where: { userId: storeId }, data: { mpAccessToken: tok.access_token, mpRefreshToken: tok.refresh_token || sp.mpRefreshToken, mpTokenExpires: tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000) : null } });
+      return tok.access_token;
+    } catch { return sp.mpAccessToken; } // si el refresh falla, probamos con el token actual
+  }
+  return sp.mpAccessToken;
+}
+
+// Link de autorización de MP para que el comercio logueado vincule su cuenta.
+export async function getMpLinkUrl() {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  if (!mpOAuthConfigured()) return { error: 'Mercado Pago todavía no está configurado.' };
+  const h = headers();
+  const host = h.get('host'); const proto = h.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https');
+  return { url: mpOAuthUrl({ state: s.id, redirectUri: `${proto}://${host}/api/mp/oauth/callback` }) };
+}
+
+export async function getMpLinkStatus() {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return null;
+  const p = await prisma.storeProfile.findUnique({ where: { userId: s.id }, select: { mpLinked: true } });
+  return { configured: mpOAuthConfigured(), linked: !!p?.mpLinked };
+}
+
+export async function unlinkMp() {
+  const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
+  await prisma.storeProfile.update({ where: { userId: s.id }, data: { mpLinked: false, mpAccessToken: null, mpRefreshToken: null, mpTokenExpires: null } });
+  return { ok: true };
+}
+
 export async function getMyRatingsForOrder(requestId) {
   const s = await getSession(); if (!s) return null;
   const o = await prisma.order.findUnique({ where: { requestId }, select: { id: true } });
@@ -648,7 +685,7 @@ export async function getAdminData() {
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
     prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } } } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true, icon: true } }),
-    prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
+    prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, mpLinked: true, categories: { select: { categoryId: true } } } }),
   ]);
   const commission = paid.reduce((a, o) => a + num(o.commissionAmount), 0);
   const storeNameById = Object.fromEntries(storeRows.map((st) => [st.userId, st.tradeName])); // para "Vendido por" en el pedido
@@ -657,7 +694,7 @@ export async function getAdminData() {
     users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, status: u.status, createdAt: u.createdAt ? u.createdAt.getTime() : null })),
     categories,
     // comercios con los rubros que tienen asignados (para el editor de categorías)
-    stores: storeRows.map((st) => ({ id: st.userId, name: st.tradeName, categoryIds: st.categories.map((c) => c.categoryId) })),
+    stores: storeRows.map((st) => ({ id: st.userId, name: st.tradeName, mpLinked: !!st.mpLinked, categoryIds: st.categories.map((c) => c.categoryId) })),
     recent: recent.map((r) => ({
       id: r.id, code: r.code,
       mechanicName: r.mechanic?.name || r.mechanic?.email || '—',
@@ -1360,6 +1397,14 @@ export async function createJobCheckout(jobId) {
   // por una URL interna *.vercel.app (preview), donde no queremos mandarlo.
   const reqBase = `${proto}://${host}`.replace(/\/+$/, '');
   const base = /\.vercel\.app$/i.test(host) && process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : reqBase;
+  // Split de pagos (Marketplace): solo si el trabajo es de UN comercio que vinculó su MP. El comercio
+  // recibe el/los repuesto(s) en su cuenta y la plataforma retiene marketplace_fee (comisión + flete +
+  // recargo). Multi-comercio o comercio sin vincular -> cobro centralizado (cuenta de Jorge).
+  let sellerToken = null, marketplaceFee = 0;
+  if (plan.stores === 1 && plan.items[0]?.storeId) {
+    sellerToken = await sellerMpToken(plan.items[0].storeId);
+    if (sellerToken) marketplaceFee = Math.max(0, plan.totals.total - plan.totals.parts);
+  }
   try {
     const { link } = await createPaymentLink({
       orderRef: `job::${jobId}`,
@@ -1367,6 +1412,8 @@ export async function createJobCheckout(jobId) {
       amount,
       backUrl: `${base}/api/mp/return`,
       notificationUrl: `${base}/api/mp/webhook`,
+      sellerToken: sellerToken || undefined,
+      marketplaceFee,
     });
     await prisma.job.update({ where: { id: jobId }, data: { selectedAt: new Date(), status: 'CLOSED', paymentLink: link } });
     return { link, breakdown };

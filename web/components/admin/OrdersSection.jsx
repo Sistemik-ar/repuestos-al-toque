@@ -88,7 +88,21 @@ function OrderBreakdownModal({ o, onClose }) {
           {o.creditAccount && line('fa-id-card-clip', 'Cuenta corriente', 'Sí · repuesto no cobrado acá')}
           {line('fa-receipt', 'Total cobrado', money(o.total), true)}
         </div>
-        <div className="text-xs muted mt-12"><i className="fa-solid fa-circle-info"></i> Valores congelados al crearse el pedido. Cambiar la comisión/recargo en Ajustes solo afecta pedidos nuevos.</div>
+        <div className="section-title"><h2 style={{ fontSize: 15 }}>Cómo se divide (split MP)</h2></div>
+        <div className="card" style={{ background: 'var(--bg-1)' }}>
+          <div className="mp-split-row">
+            <span className="ic store"><i className="fa-solid fa-store"></i></span>
+            <div style={{ minWidth: 0 }}><div className="text-sm" style={{ fontWeight: 700 }}>{o.storeName || 'Comercio'}</div><div className="text-xs muted">a su cuenta de Mercado Pago</div></div>
+            <span className="amt" style={{ color: '#4ADE80' }}>{money(o.creditAccount ? 0 : o.part)}</span>
+          </div>
+          <div className="mp-split-row">
+            <span className="ic plat"><i className="fa-solid fa-gear"></i></span>
+            <div style={{ minWidth: 0 }}><div className="text-sm" style={{ fontWeight: 700 }}>RepuestosAlToque</div><div className="text-xs muted">comisión + flete + recargo (marketplace_fee)</div></div>
+            <span className="amt" style={{ color: 'var(--purple-light)' }}>{money(o.total - (o.creditAccount ? 0 : o.part))}</span>
+          </div>
+        </div>
+        <div className="text-xs muted mt-8"><i className="fa-solid fa-circle-info"></i> Si el comercio tiene Mercado Pago conectado, el cobro se divide así automáticamente. Si no, entra centralizado (cuenta de la plataforma).</div>
+        <div className="text-xs muted mt-8"><i className="fa-solid fa-circle-info"></i> Valores congelados al crearse el pedido. Cambiar la comisión/recargo en Ajustes solo afecta pedidos nuevos.</div>
       </div>
     </div>
   );

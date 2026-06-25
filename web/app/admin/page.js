@@ -14,6 +14,7 @@ import StoreCategories from '@/components/admin/StoreCategories';
 import OrdersSection from '@/components/admin/OrdersSection';
 import UsersSection, { AltaUsuario } from '@/components/admin/UsersSection';
 import HomeSection from '@/components/admin/HomeSection';
+import CobrosSection from '@/components/admin/CobrosSection';
 
 const NAV = [
   ['inicio', 'fa-house', 'Inicio'],
@@ -21,10 +22,11 @@ const NAV = [
   ['comercios', 'fa-store', 'Comercios'],
   ['pedidos', 'fa-receipt', 'Pedidos'],
   ['cuentas', 'fa-id-card-clip', 'Cuenta corriente'],
+  ['cobros', 'fa-money-bill-transfer', 'Cobros'],
   ['stats', 'fa-chart-line', 'Estadísticas'],
   ['ajustes', 'fa-sliders', 'Ajustes'],
 ];
-const SEC_TITLE = { inicio: 'Inicio', usuarios: 'Usuarios', comercios: 'Comercios', pedidos: 'Pedidos', cuentas: 'Cuenta corriente', stats: 'Estadísticas', ajustes: 'Ajustes' };
+const SEC_TITLE = { inicio: 'Inicio', usuarios: 'Usuarios', comercios: 'Comercios', pedidos: 'Pedidos', cuentas: 'Cuenta corriente', cobros: 'Cobros', stats: 'Estadísticas', ajustes: 'Ajustes' };
 
 export default function Admin() {
   const router = useRouter();
@@ -133,6 +135,8 @@ export default function Admin() {
         {tab === 'comercios' && <StoreCategories stores={d?.stores} categories={d?.categories} onSaved={load} />}
 
         {tab === 'cuentas' && <CreditSection rows={creds} onReload={load} />}
+
+        {tab === 'cobros' && <CobrosSection stores={d?.stores} />}
 
         {tab === 'pedidos' && <OrdersSection orders={d?.recent} loading={d === null} />}
 

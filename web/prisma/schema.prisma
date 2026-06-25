@@ -153,6 +153,9 @@ model StoreProfile {
   partCondition PartCondition @default(NUEVO) @map("part_condition")
   mpUserId      String?       @map("mp_user_id")
   mpLinked      Boolean       @default(false) @map("mp_linked")
+  mpAccessToken  String?      @map("mp_access_token") // OAuth: token del comercio para split de pagos
+  mpRefreshToken String?      @map("mp_refresh_token")
+  mpTokenExpires DateTime?    @map("mp_token_expires")
   cbu           String?
   mpAlias       String?       @map("mp_alias")
   invoiceType   String?       @map("invoice_type")

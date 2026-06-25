@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast, ping, tierFor, fmtDateTime } from '@/lib/ui';
 import { usePoll, keep } from '@/lib/usePoll';
 import { useTitleBell } from '@/lib/useTitleBell';
-import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled, dismissRequest } from '@/app/actions/data';
+import { getMe, getOpenRequestsForStore, getStoreSales, createQuote, getStoreCreditRequests, storeActOnCredit, storeConfirmPickup, getMyReputation, markCreditSettled, dismissRequest, getMpLinkStatus, getMpLinkUrl } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { usePhotoUpload } from '@/lib/usePhotoUpload';
 import { data } from '@/lib/data';
@@ -30,6 +30,8 @@ export default function Comercio() {
   const [zoom, setZoom] = useState(null);
   const [detalle, setDetalle] = useState(null); // pedido cuyo detalle se ve en el modal
   const [rep, setRep] = useState(null);
+  const [mpStatus, setMpStatus] = useState(null); // { configured, linked } — para el banner de conexión MP
+  const [mpBusy, setMpBusy] = useState(false);
   const [loaded, setLoaded] = useState(false); // primer fetch completado (evita parpadeo del empty state)
   // la insignia sale de los PUNTOS reales (ventas concretadas), no del mock
   const badge = tierFor('store', rep?.points ?? 0);
@@ -39,6 +41,7 @@ export default function Comercio() {
     // la reputación es un badge secundario: va FUERA del Promise.all crítico para que su
     // fallo (o presión del pool) no congele el refresco de solicitudes/ventas.
     getMyReputation().then((r) => r && setRep((p) => keep(p, r))).catch(() => {});
+    getMpLinkStatus().then((s) => s && setMpStatus(s)).catch(() => {});
     try {
       const [m, o, s] = await Promise.all([getMe(), getOpenRequestsForStore(), getStoreSales()]);
       setMe((p) => keep(p, m || null));
@@ -109,6 +112,11 @@ export default function Comercio() {
     load();
   }
   async function logout() { await logoutAction(); router.push('/login'); }
+  async function conectarMp() {
+    setMpBusy(true);
+    try { const r = await getMpLinkUrl(); if (r?.url) window.location.href = r.url; else toast({ title: r?.error || 'No disponible', icon: 'fa-triangle-exclamation', type: 'yellow' }); }
+    finally { setMpBusy(false); }
+  }
 
   return (
     <div className="app-shell">
@@ -125,6 +133,19 @@ export default function Comercio() {
       <div className="container">
         <div className="mb-16"><div className="eyebrow">{me?.name || 'Comercio'}</div><h1 className="h-lg">Solicitudes entrantes</h1><p className="text-sm muted">Respondé rápido = ganás la venta</p></div>
         <div className="mb-16"><PushButton /></div>
+
+        {mpStatus?.configured && !mpStatus.linked && (
+          <div className="card mb-16" style={{ borderColor: 'rgba(0,158,227,0.35)', background: 'linear-gradient(180deg,rgba(0,158,227,0.10),rgba(17,24,39,0.6))' }}>
+            <div className="flex gap-12" style={{ alignItems: 'flex-start' }}>
+              <div className="store-avatar" style={{ background: 'rgba(0,158,227,0.16)', color: '#5BC8F5', flexShrink: 0 }}><i className="fa-solid fa-handshake"></i></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800 }}>Conectá tu Mercado Pago</div>
+                <div className="text-xs subtle mt-4">Para que tus ventas se acrediten <b>directo en tu cuenta</b> — sin esperar la liquidación.</div>
+              </div>
+            </div>
+            <button className="btn btn-mp btn-block mt-12" disabled={mpBusy} onClick={conectarMp}>{mpBusy ? <span className="spinner" style={{ width: 16, height: 16 }}></span> : <><i className="fa-solid fa-handshake"></i> Conectar con Mercado Pago</>}</button>
+          </div>
+        )}
 
         <div className="card glow mb-16" style={{ background: 'linear-gradient(135deg,rgba(250,204,21,0.16),rgba(31,41,55,0.6))' }}>
           <div className="flex-between mb-12">

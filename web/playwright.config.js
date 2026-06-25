@@ -23,6 +23,10 @@ export default defineConfig({
     // token NO va seteado. DATABASE_URL/AUTH_SECRET se propagan si están en el entorno (DB local).
     env: {
       ...(process.env.MP_TEST_ACCESS_TOKEN ? { MP_TEST_ACCESS_TOKEN: process.env.MP_TEST_ACCESS_TOKEN } : {}),
+      // credenciales dummy de la app Marketplace: habilitan el flujo de vinculación (split) en los
+      // tests sin pegarle a MP. La autorización real con MP no se ejecuta en E2E.
+      ...(process.env.MP_CLIENT_ID ? { MP_CLIENT_ID: process.env.MP_CLIENT_ID } : {}),
+      ...(process.env.MP_CLIENT_SECRET ? { MP_CLIENT_SECRET: process.env.MP_CLIENT_SECRET } : {}),
       ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
       ...(process.env.AUTH_SECRET ? { AUTH_SECRET: process.env.AUTH_SECRET } : {}),
     },

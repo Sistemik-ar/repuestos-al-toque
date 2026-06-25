@@ -73,6 +73,18 @@ export async function ensureStore2(email = 'e2e-store2@rat.test') {
   return email;
 }
 
+// Marca el MP del comercio como vinculado (split) para los E2E de la UI de cobros.
+export async function linkStoreMp(email = 'vendedor@repuestosaltoque.com.ar') {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  if (u) await p.storeProfile.update({ where: { userId: u.id }, data: { mpLinked: true, mpAccessToken: 'E2E-seller-token', mpUserId: 'E2E-9' } });
+}
+export async function unlinkStoreMp(email = 'vendedor@repuestosaltoque.com.ar') {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  if (u) await p.storeProfile.update({ where: { userId: u.id }, data: { mpLinked: false, mpAccessToken: null, mpRefreshToken: null, mpTokenExpires: null } });
+}
+
 // Restaura la contraseña de las cuentas seed (tras probar el reseteo desde el admin).
 export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.com.ar']) {
   const p = db();
