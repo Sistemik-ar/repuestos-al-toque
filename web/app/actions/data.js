@@ -676,6 +676,42 @@ export async function getRecentQuotes() {
   }));
 }
 
+// Admin: todas las cotizaciones que recibió UN pedido (qué comercios cotizaron, precio, estado, cuál
+// ganó). Para ver el detalle de competencia de cada pedido desde el listado del admin.
+export async function getRequestQuotes(requestId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const [quotes, dismissals, reqRow, activeStores] = await Promise.all([
+    prisma.requestQuote.findMany({ where: { requestId }, orderBy: { price: 'asc' }, select: { id: true, storeId: true, price: true, status: true, partBrand: true, optionLabel: true, createdAt: true } }),
+    prisma.requestDismissal.findMany({ where: { requestId }, select: { storeId: true, createdAt: true } }), // comercios que marcaron "sin stock"
+    prisma.request.findUnique({ where: { id: requestId }, select: { categoryId: true } }),
+    prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { tradeName: true, categories: { select: { categoryId: true } } } } } }),
+  ]);
+  const storeIds = [...new Set([...quotes.map((q) => q.storeId), ...dismissals.map((d) => d.storeId)])];
+  const stores = await prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } });
+  const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
+  // "No respondieron": comercios elegibles (sin rubros = recibe de todo, o con el rubro del pedido)
+  // que no cotizaron ni marcaron sin stock.
+  const responded = new Set([...quotes.map((q) => q.storeId), ...dismissals.map((d) => d.storeId)]);
+  const noResponded = activeStores
+    .filter((u) => {
+      if (responded.has(u.id)) return false;
+      const cats = u.store?.categories || [];
+      return cats.length === 0 || (reqRow?.categoryId != null && cats.some((c) => c.categoryId === reqRow.categoryId));
+    })
+    .map((u) => ({ storeName: u.store?.tradeName || 'Comercio' }))
+    .sort((a, b) => a.storeName.localeCompare(b.storeName));
+  return {
+    quotes: quotes.map((q) => ({
+      id: q.id, storeName: sName[q.storeId] || 'Comercio', price: num(q.price), status: q.status,
+      partBrand: q.partBrand, optionLabel: q.optionLabel, createdAt: q.createdAt?.getTime() || 0,
+    })),
+    dismissals: dismissals
+      .map((d) => ({ storeName: sName[d.storeId] || 'Comercio', createdAt: d.createdAt?.getTime() || 0 }))
+      .sort((a, b) => b.createdAt - a.createdAt),
+    noResponded,
+  };
+}
+
 export async function getAdminData() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   const [usersCount, reqCount, paid, users, recent, categories, storeRows] = await Promise.all([
@@ -683,12 +719,15 @@ export async function getAdminData() {
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
-    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } } } }),
+    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } }, _count: { select: { quotes: true } } } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true, icon: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, mpLinked: true, categories: { select: { categoryId: true } } } }),
   ]);
   const commission = paid.reduce((a, o) => a + num(o.commissionAmount), 0);
   const storeNameById = Object.fromEntries(storeRows.map((st) => [st.userId, st.tradeName])); // para "Vendido por" en el pedido
+  // cuántos comercios marcaron "sin stock" en cada pedido reciente (RequestDismissal no tiene relación -> groupBy)
+  const dismissGroups = await prisma.requestDismissal.groupBy({ by: ['requestId'], where: { requestId: { in: recent.map((r) => r.id) } }, _count: { _all: true } });
+  const dismissBy = Object.fromEntries(dismissGroups.map((g) => [g.requestId, g._count._all]));
   return {
     kpis: { users: usersCount, requests: reqCount, paid: paid.length, commission },
     users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, status: u.status, createdAt: u.createdAt ? u.createdAt.getTime() : null })),
@@ -700,6 +739,8 @@ export async function getAdminData() {
       mechanicName: r.mechanic?.name || r.mechanic?.email || '—',
       mechanicEmail: r.mechanic?.email || '',
       storeName: r.order ? (storeNameById[r.order.storeId] || 'Comercio') : null, // comercio que vendió (Vendido por)
+      quoteCount: r._count?.quotes || 0, // cuántas cotizaciones recibió este pedido
+      dismissCount: dismissBy[r.id] || 0, // cuántos comercios marcaron "sin stock"
       label: r.description || r.category?.name || 'Repuesto',
       vehicle: `${r.brand || ''} ${r.model || ''}`.trim(),
       status: r.status,

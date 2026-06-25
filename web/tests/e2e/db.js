@@ -79,10 +79,18 @@ export async function linkStoreMp(email = 'vendedor@repuestosaltoque.com.ar') {
   const u = await p.user.findUnique({ where: { email } });
   if (u) await p.storeProfile.update({ where: { userId: u.id }, data: { mpLinked: true, mpAccessToken: 'E2E-seller-token', mpUserId: 'E2E-9' } });
 }
+
 export async function unlinkStoreMp(email = 'vendedor@repuestosaltoque.com.ar') {
   const p = db();
   const u = await p.user.findUnique({ where: { email } });
   if (u) await p.storeProfile.update({ where: { userId: u.id }, data: { mpLinked: false, mpAccessToken: null, mpRefreshToken: null, mpTokenExpires: null } });
+}
+
+// Siembra un "sin stock": el comercio marcó que no tiene la pieza de ese pedido (RequestDismissal).
+export async function seedDismissal(requestId, storeEmail = 'e2e-store2@rat.test') {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email: storeEmail } });
+  if (u) await p.requestDismissal.upsert({ where: { storeId_requestId: { storeId: u.id, requestId } }, update: {}, create: { storeId: u.id, requestId } });
 }
 
 // Restaura la contraseña de las cuentas seed (tras probar el reseteo desde el admin).

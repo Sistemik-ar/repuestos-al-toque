@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { money, fmtDateTime } from '@/lib/ui';
 import Loading from '@/components/Loading';
-import { getAdminTrip } from '@/app/actions/data';
+import { getAdminTrip, getRequestQuotes } from '@/app/actions/data';
 import { useTable, Search, SortBar, Thead, Pager } from './table';
 
 const ORDER_COLS = [
@@ -11,6 +11,7 @@ const ORDER_COLS = [
   { label: 'Vehículo', key: 'vehicle', type: 'str' },
   { label: 'Total', key: 'total', type: 'num' },
   { label: 'Estado', key: 'status', type: 'str' },
+  { label: 'Cotizaciones', key: 'quoteCount', type: 'num' },
   { label: 'Creado', key: 'created', type: 'num', date: true },
   { label: 'Concretada', key: 'concretada', type: 'num', date: true },
   { label: 'Reparto', key: 'tripRank', type: 'num' },
@@ -18,23 +19,53 @@ const ORDER_COLS = [
 
 const ORDER_SEARCH = ['code', 'mechanicName', 'mechanicEmail', 'label', 'vehicle', 'status', 'total'];
 
+// Estado del pedido legible + color (sobre el RequestStatus crudo).
+const STATUS_ST = {
+  OPEN: ['badge-gray', 'Abierto'],
+  QUOTED: ['badge-purple', 'Cotizado'],
+  CLOSED: ['badge-yellow', 'Elegido · sin pagar'],
+  PAID: ['badge-green', 'Pagado'],
+  SHIPPED: ['badge-yellow', 'En camino'],
+  DELIVERED: ['badge-green', 'Entregado'],
+  CANCELLED: ['badge-red', 'Cancelado'],
+  EXPIRED: ['badge-gray', 'Vencido'],
+};
+const StatusBadge = ({ status }) => { const [c, l] = STATUS_ST[status] || ['badge-gray', status]; return <span className={`badge ${c}`}>{l}</span>; };
+
+// Filtro por estado del listado.
+const ESTADO_TABS = [
+  ['todos', 'Todos', null],
+  ['activos', 'Activos', ['OPEN', 'QUOTED', 'CLOSED', 'EXPIRED']],
+  ['curso', 'En curso', ['PAID', 'SHIPPED']],
+  ['concretados', 'Concretados', ['DELIVERED']],
+  ['cancelados', 'Cancelados', ['CANCELLED']],
+];
+
 function OrdersSection({ orders, loading }) {
   const [tripId, setTripId] = useState(null);
   const [detail, setDetail] = useState(null); // pedido cuyo desglose (comisión/envío/MP) se muestra
-  const rows = useMemo(() => (orders || []).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' })), [orders]);
+  const [quotesReq, setQuotesReq] = useState(null); // pedido cuyas cotizaciones recibidas se muestran
+  const [estado, setEstado] = useState('todos');
+  const rows = useMemo(() => {
+    const g = ESTADO_TABS.find(([k]) => k === estado)?.[2];
+    return (orders || []).filter((o) => !g || g.includes(o.status)).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' }));
+  }, [orders, estado]);
   const t = useTable(rows, ORDER_COLS, ORDER_SEARCH, { key: 'created', dir: 'desc' });
 
   return (
     <div className="card">
       <div className="section-title"><h2>Últimos pedidos</h2><span className="text-xs muted">{t.total}</span></div>
+      <div className="pill-tabs mb-12" style={{ flexWrap: 'wrap' }}>
+        {ESTADO_TABS.map(([k, l]) => <button key={k} type="button" className={estado === k ? 'active' : ''} onClick={() => setEstado(k)}>{l}</button>)}
+      </div>
       <Search value={t.query} onChange={t.setQuery} placeholder="Buscar mecánico, repuesto, vehículo o total…" />
       <SortBar sortUI={t.sortUI} />
       <div style={{ overflowX: 'auto' }}>
         <table className="table rat-table">
           <Thead headers={t.headers} />
           <tbody>
-            {loading && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
-            {!loading && t.total === 0 && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
+            {loading && <tr><td colSpan={10} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
+            {!loading && t.total === 0 && <tr><td colSpan={10} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
             {t.visible.map((o) => (
               <tr key={o.id}>
                 <td data-label="#" className="text-xs">{o.code}</td>
@@ -42,7 +73,10 @@ function OrdersSection({ orders, loading }) {
                 <td data-label="Repuesto">{o.label}</td>
                 <td data-label="Vehículo">{o.vehicle}</td>
                 <td data-label="Total">{o.total ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setDetail(o)} title="Ver desglose">{o.totalStr} <i className="fa-solid fa-circle-info" style={{ fontSize: 11, opacity: 0.6 }}></i></button> : <span className="muted">—</span>}</td>
-                <td data-label="Estado"><span className="badge badge-gray">{o.status}</span></td>
+                <td data-label="Estado"><StatusBadge status={o.status} /></td>
+                <td data-label="Cotizaciones">{(o.quoteCount > 0 || o.dismissCount > 0)
+                  ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setQuotesReq(o)} title="Ver cotizaciones y respuestas"><i className="fa-solid fa-tags"></i> {o.quoteCount}{o.dismissCount > 0 && <span style={{ marginLeft: 7, color: '#FCA5A5' }} title={`${o.dismissCount} marcó sin stock`}><i className="fa-solid fa-ban" style={{ fontSize: 11 }}></i> {o.dismissCount}</span>}</button>
+                  : <span className="muted">0</span>}</td>
                 <td data-label="Creado" className="text-xs muted rat-th-date">{fmtDateTime(o.created)}</td>
                 <td data-label="Concretada" className="text-xs muted rat-th-date">{fmtDateTime(o.concretada)}</td>
                 <td data-label="Reparto">{o.hasTrip
@@ -56,6 +90,7 @@ function OrdersSection({ orders, loading }) {
       <Pager pager={t.pager} />
       {tripId && <TripModal orderId={tripId} onClose={() => setTripId(null)} />}
       {detail && <OrderBreakdownModal o={detail} onClose={() => setDetail(null)} />}
+      {quotesReq && <RequestQuotesModal req={quotesReq} onClose={() => setQuotesReq(null)} />}
     </div>
   );
 }
@@ -151,6 +186,69 @@ function TripModal({ orderId, onClose }) {
             <button className="btn btn-ghost btn-block mt-16" type="button" onClick={onClose}>Cerrar</button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Respuestas que recibió un pedido: las cotizaciones (comercio, precio, estado, cuándo) y los
+// comercios que marcaron "sin stock".
+function RequestQuotesModal({ req, onClose }) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    getRequestQuotes(req.id).then((r) => { if (alive) setData(r || { quotes: [], dismissals: [] }); }).catch(() => { if (alive) setData({ quotes: [], dismissals: [] }); });
+    return () => { alive = false; };
+  }, [req.id]);
+  const ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
+  const quotes = data?.quotes || [];
+  const dismissals = data?.dismissals || [];
+  const noResponded = data?.noResponded || [];
+  const comercios = new Set(quotes.map((r) => r.storeName)).size;
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ maxWidth: 560 }}>
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}><h2 className="h-md" style={{ minWidth: 0 }}>Cotizaciones recibidas</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar" style={{ flexShrink: 0 }}><i className="fa-solid fa-xmark"></i></button></div>
+        <p className="text-sm muted mb-16">{req.code} · {req.label}{req.vehicle ? ` · ${req.vehicle}` : ''}</p>
+        {data === null ? <Loading label="Cargando cotizaciones…" />
+          : (quotes.length === 0 && dismissals.length === 0) ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>Este pedido no recibió cotizaciones ni respuestas.</div>
+          : (<div style={{ maxHeight: '64vh', overflowY: 'auto' }}>
+            {quotes.length > 0 && (<>
+              <p className="text-sm muted mb-12">{quotes.length} cotización{quotes.length === 1 ? '' : 'es'} · {comercios} comercio{comercios === 1 ? '' : 's'}</p>
+              {quotes.map((q) => {
+                const [cls, txt] = ST[q.status] || ['badge-gray', q.status];
+                return (
+                  <div key={q.id} className="card mb-8" style={{ background: 'var(--bg-1)' }}>
+                    <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}>
+                      <div className="text-sm flex-center gap-8" style={{ fontWeight: 700, minWidth: 0 }}><i className="fa-solid fa-store muted" style={{ fontSize: 12 }}></i><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.storeName}</span></div>
+                      <span className="price" style={{ flexShrink: 0 }}>{money(q.price)}</span>
+                    </div>
+                    <div className="flex-between" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      <span className="text-xs muted">{q.optionLabel || 'Opción'}{q.partBrand ? ` · ${q.partBrand}` : ''} · {fmtDateTime(q.createdAt)}</span>
+                      <span className={`badge ${cls}`} style={{ flexShrink: 0 }}>{txt}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </>)}
+            {dismissals.length > 0 && (<>
+              <div className="section-title" style={{ marginTop: quotes.length ? 18 : 0 }}><h2 style={{ fontSize: 15 }}><i className="fa-solid fa-ban" style={{ color: '#FCA5A5', marginRight: 7 }}></i>Marcaron sin stock</h2><span className="text-xs muted">{dismissals.length}</span></div>
+              <div className="card" style={{ background: 'var(--bg-1)' }}>
+                {dismissals.map((d, i) => (
+                  <div key={i} className="flex-between" style={{ padding: '9px 0', borderTop: i ? '1px solid var(--border)' : 'none', gap: 10 }}>
+                    <span className="text-sm flex-center gap-8" style={{ minWidth: 0, fontWeight: 600 }}><i className="fa-solid fa-store muted" style={{ fontSize: 12 }}></i><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.storeName}</span></span>
+                    <span className="text-xs muted" style={{ flexShrink: 0 }}>{fmtDateTime(d.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            </>)}
+            {noResponded.length > 0 && (<>
+              <div className="section-title" style={{ marginTop: (quotes.length || dismissals.length) ? 18 : 0 }}><h2 style={{ fontSize: 15 }}><i className="fa-regular fa-clock muted" style={{ marginRight: 7 }}></i>No respondieron</h2><span className="text-xs muted">{noResponded.length}</span></div>
+              <p className="text-xs muted mb-8">Comercios que reciben este rubro pero todavía no cotizaron ni marcaron sin stock.</p>
+              <div className="flex" style={{ flexWrap: 'wrap', gap: 6 }}>{noResponded.map((d, i) => <span key={i} className="chip"><i className="fa-solid fa-store" style={{ fontSize: 10, opacity: 0.6 }}></i> {d.storeName}</span>)}</div>
+            </>)}
+          </div>)}
       </div>
     </div>
   );
