@@ -180,9 +180,9 @@ export default function Comercio() {
           <div className="empty-state"><div className="empty-icon"><i className="fa-solid fa-inbox"></i></div><div className="text-sm">Sin solicitudes pendientes</div><div className="text-xs">Cuando un mecánico pida un repuesto, aparece acá</div></div>
         ) : <div className="cards-grid">{pend.map((r) => (
           <div className="card mb-12" key={r.id}>
-            <div className="flex-between mb-12">
-              <div className="flex-center gap-12"><div className="store-avatar" style={r.urgency === 'Necesito ahora' ? { background: 'rgba(239,68,68,0.16)', color: '#FCA5A5' } : {}}><i className="fa-solid fa-bolt"></i></div><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div></div>
-              <span className="badge badge-gray">#{r.code}</span>
+            <div className="flex-between mb-12" style={{ gap: 10, alignItems: 'flex-start' }}>
+              <div className="flex-center gap-12" style={{ minWidth: 0 }}><div className="store-avatar" style={r.urgency === 'Necesito ahora' ? { background: 'rgba(239,68,68,0.16)', color: '#FCA5A5', flexShrink: 0 } : { flexShrink: 0 }}><i className="fa-solid fa-bolt"></i></div><div style={{ minWidth: 0 }}><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)} · {r.catLabel}</div></div></div>
+              <span className="badge badge-gray" style={{ flexShrink: 0 }}>#{r.code}</span>
             </div>
             <div className="flex-between mb-12">
               <div className="flex-center gap-8" style={{ flexWrap: 'wrap' }}>
@@ -228,7 +228,7 @@ export default function Comercio() {
                 const [bCls, bIcon, bTxt] = esZombie ? ['badge-gray', 'fa-moon', 'Sin respuesta'] : esPago ? ['badge-yellow', 'fa-stopwatch', venceEn(r.selectedAt)] : cotBadge(r);
                 return (
                   <div className="card mb-12" key={r.id} style={r.status === 'CANCELLED' || esZombie ? { opacity: 0.6 } : esPago ? { borderColor: 'rgba(250,204,21,0.35)' } : {}}>
-                    <div className="flex-between mb-8"><div><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)}{r.plate ? ` · ${r.plate}` : ''} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
+                    <div className="flex-between mb-8" style={{ gap: 10, alignItems: 'flex-start' }}><div style={{ minWidth: 0 }}><div className="text-sm" style={{ fontWeight: 700 }}>{label(r)}</div><div className="text-xs muted">{veh(r)}{r.plate ? ` · ${r.plate}` : ''} · {r.catLabel} · {r.myCount} {r.myCount === 1 ? 'opción' : 'opciones'}</div></div><span className={`badge ${bCls}`} style={{ flexShrink: 0, whiteSpace: 'nowrap', textAlign: 'center' }}><i className={`fa-solid ${bIcon}`}></i> {bTxt}</span></div>
                     {esPago ? (
                       <div className="flex-between text-sm mb-8"><span className="muted">Eligió tu precio</span><span className="text-yellow" style={{ fontWeight: 800 }}>{r.mySelectedPrice ? '$' + r.mySelectedPrice.toLocaleString('es-AR') : '—'}</span></div>
                     ) : (
@@ -276,7 +276,7 @@ function DetalleModal({ r, onClose }) {
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <div className="modal-handle"></div>
-        <div className="flex-between mb-4"><h2 className="h-md">{r.desc || r.catLabel || 'Repuesto'}</h2>{r.code && <span className="badge badge-gray">#{r.code}</span>}</div>
+        <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}><h2 className="h-md" style={{ minWidth: 0 }}>{r.desc || r.catLabel || 'Repuesto'}</h2>{r.code && <span className="badge badge-gray" style={{ flexShrink: 0 }}>#{r.code}</span>}</div>
         <p className="text-sm muted mb-16">{veh || 'Vehículo'}{r.plate ? ` · Patente ${r.plate}` : ''}{r.catLabel ? ` · ${r.catLabel}` : ''}</p>
 
         <div className="card mb-12" style={{ background: 'var(--bg-1)', paddingTop: 0 }}>
@@ -395,9 +395,9 @@ function EntregaCard({ r, label, veh, onChanged, onDetail }) {
   }
   return (
     <div className="card mb-12">
-      <div className="flex-between mb-8">
-        <div><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div>
-        <div className="flex-center gap-8" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div className="flex-between mb-8" style={{ gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}><div className="text-sm" style={{ fontWeight: 700 }}>{label}</div><div className="text-xs muted">{veh}</div></div>
+        <div className="flex-center gap-8" style={{ flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
           {r.creditAccount && <span className="badge badge-yellow"><i className="fa-solid fa-id-card-clip"></i> Cta. corriente{r.creditSettledAt ? ' · cobrada' : ''}</span>}
           <span className="badge badge-green"><i className="fa-solid fa-check"></i> Pagado</span>
         </div>
