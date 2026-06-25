@@ -695,7 +695,7 @@ export async function getAdminHome() {
   const [orders30, users, stores, ccPending, stuck, cats, storeCats, quoteCounts] = await Promise.all([
     prisma.order.findMany({ where: { status: { in: CONCRETADA }, createdAt: { gte: d30 } }, select: { storeId: true, partAmount: true, commissionAmount: true, total: true, createdAt: true } }),
     prisma.user.findMany({ select: { id: true, role: true, status: true, createdAt: true } }),
-    prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, mpUserId: true } }),
+    prisma.storeProfile.findMany({ select: { userId: true, tradeName: true } }),
     prisma.creditAccount.count({ where: { adminStatus: 'PENDING' } }),
     prisma.order.count({ where: { OR: [{ status: 'PAID', createdAt: { lt: new Date(now - 24 * 3600 * 1000) } }, { issue: { not: null }, status: { notIn: ['DELIVERED'] } }] } }),
     prisma.category.findMany({ select: { id: true, name: true } }),
@@ -715,9 +715,7 @@ export async function getAdminHome() {
   };
 
   // acciones pendientes
-  const statusOf = Object.fromEntries(users.map((u) => [u.id, u.status]));
   const altas = users.filter((u) => u.role === 'STORE' && u.status === 'PENDING').length;
-  const sinMp = stores.filter((st) => statusOf[st.userId] === 'ACTIVE' && !st.mpUserId).length;
   const covCount = Object.fromEntries(storeCats.map((g) => [g.categoryId, g._count.categoryId]));
   const thinRubros = cats.filter((c) => (covCount[c.id] || 0) <= 1).map((c) => c.name);
 
@@ -735,7 +733,7 @@ export async function getAdminHome() {
   const bars = new Array(8).fill(0);
   for (const o of today) { const i = Math.min(7, Math.max(0, Math.floor((arHour(o.createdAt) - 9) / 2))); bars[i] += num(o.total); }
 
-  return { kpis, pending: { cc: ccPending, stuck, altas, sinMp, thinRubros }, top, bars };
+  return { kpis, pending: { cc: ccPending, stuck, altas, thinRubros }, top, bars };
 }
 
 export async function getAdminStats({ from, to } = {}) {

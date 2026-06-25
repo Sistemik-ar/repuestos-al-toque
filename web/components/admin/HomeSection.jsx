@@ -36,7 +36,6 @@ export default function HomeSection({ onNav }) {
   if (P.cc) actions.push({ ic: 'yellow', i: 'fa-id-card-clip', t: 'Cuentas corrientes por aprobar', s: 'Vinculaciones mecánico ↔ comercio esperando tu OK', n: P.cc, go: 'cuentas' });
   if (P.stuck) actions.push({ ic: 'red', i: 'fa-triangle-exclamation', t: 'Pedidos trabados', s: 'Pagados sin avanzar o con incidencia', n: P.stuck, go: 'pedidos' });
   if (P.altas) actions.push({ ic: 'purple', i: 'fa-user-clock', t: 'Comercios pendientes de alta', s: 'Recién cargados, falta activarlos', n: P.altas, go: 'usuarios' });
-  if (P.sinMp) actions.push({ ic: 'yellow', i: 'fa-credit-card', t: 'Comercios sin Mercado Pago', s: 'Activos pero no pueden cobrar por la plataforma', n: P.sinMp, go: 'comercios' });
   if (P.thinRubros.length) actions.push({ ic: 'yellow', i: 'fa-layer-group', t: 'Rubros con poca cobertura', s: `${P.thinRubros.slice(0, 3).join(', ')}${P.thinRubros.length > 3 ? ` y ${P.thinRubros.length - 3} más` : ''} · 1 comercio o menos`, n: P.thinRubros.length, go: 'comercios' });
 
   const maxBar = Math.max(1, ...d.bars);
