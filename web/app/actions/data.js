@@ -643,13 +643,26 @@ export async function getRecentQuotes() {
 // ganó). Para ver el detalle de competencia de cada pedido desde el listado del admin.
 export async function getRequestQuotes(requestId) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
-  const [quotes, dismissals] = await Promise.all([
+  const [quotes, dismissals, reqRow, activeStores] = await Promise.all([
     prisma.requestQuote.findMany({ where: { requestId }, orderBy: { price: 'asc' }, select: { id: true, storeId: true, price: true, status: true, partBrand: true, optionLabel: true, createdAt: true } }),
     prisma.requestDismissal.findMany({ where: { requestId }, select: { storeId: true, createdAt: true } }), // comercios que marcaron "sin stock"
+    prisma.request.findUnique({ where: { id: requestId }, select: { categoryId: true } }),
+    prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { tradeName: true, categories: { select: { categoryId: true } } } } } }),
   ]);
   const storeIds = [...new Set([...quotes.map((q) => q.storeId), ...dismissals.map((d) => d.storeId)])];
   const stores = await prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } });
   const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
+  // "No respondieron": comercios elegibles (sin rubros = recibe de todo, o con el rubro del pedido)
+  // que no cotizaron ni marcaron sin stock.
+  const responded = new Set([...quotes.map((q) => q.storeId), ...dismissals.map((d) => d.storeId)]);
+  const noResponded = activeStores
+    .filter((u) => {
+      if (responded.has(u.id)) return false;
+      const cats = u.store?.categories || [];
+      return cats.length === 0 || (reqRow?.categoryId != null && cats.some((c) => c.categoryId === reqRow.categoryId));
+    })
+    .map((u) => ({ storeName: u.store?.tradeName || 'Comercio' }))
+    .sort((a, b) => a.storeName.localeCompare(b.storeName));
   return {
     quotes: quotes.map((q) => ({
       id: q.id, storeName: sName[q.storeId] || 'Comercio', price: num(q.price), status: q.status,
@@ -658,6 +671,7 @@ export async function getRequestQuotes(requestId) {
     dismissals: dismissals
       .map((d) => ({ storeName: sName[d.storeId] || 'Comercio', createdAt: d.createdAt?.getTime() || 0 }))
       .sort((a, b) => b.createdAt - a.createdAt),
+    noResponded,
   };
 }
 

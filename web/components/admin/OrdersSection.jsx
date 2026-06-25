@@ -19,16 +19,45 @@ const ORDER_COLS = [
 
 const ORDER_SEARCH = ['code', 'mechanicName', 'mechanicEmail', 'label', 'vehicle', 'status', 'total'];
 
+// Estado del pedido legible + color (sobre el RequestStatus crudo).
+const STATUS_ST = {
+  OPEN: ['badge-gray', 'Abierto'],
+  QUOTED: ['badge-purple', 'Cotizado'],
+  CLOSED: ['badge-yellow', 'Elegido · sin pagar'],
+  PAID: ['badge-green', 'Pagado'],
+  SHIPPED: ['badge-yellow', 'En camino'],
+  DELIVERED: ['badge-green', 'Entregado'],
+  CANCELLED: ['badge-red', 'Cancelado'],
+  EXPIRED: ['badge-gray', 'Vencido'],
+};
+const StatusBadge = ({ status }) => { const [c, l] = STATUS_ST[status] || ['badge-gray', status]; return <span className={`badge ${c}`}>{l}</span>; };
+
+// Filtro por estado del listado.
+const ESTADO_TABS = [
+  ['todos', 'Todos', null],
+  ['activos', 'Activos', ['OPEN', 'QUOTED', 'CLOSED', 'EXPIRED']],
+  ['curso', 'En curso', ['PAID', 'SHIPPED']],
+  ['concretados', 'Concretados', ['DELIVERED']],
+  ['cancelados', 'Cancelados', ['CANCELLED']],
+];
+
 function OrdersSection({ orders, loading }) {
   const [tripId, setTripId] = useState(null);
   const [detail, setDetail] = useState(null); // pedido cuyo desglose (comisión/envío/MP) se muestra
   const [quotesReq, setQuotesReq] = useState(null); // pedido cuyas cotizaciones recibidas se muestran
-  const rows = useMemo(() => (orders || []).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' })), [orders]);
+  const [estado, setEstado] = useState('todos');
+  const rows = useMemo(() => {
+    const g = ESTADO_TABS.find(([k]) => k === estado)?.[2];
+    return (orders || []).filter((o) => !g || g.includes(o.status)).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' }));
+  }, [orders, estado]);
   const t = useTable(rows, ORDER_COLS, ORDER_SEARCH, { key: 'created', dir: 'desc' });
 
   return (
     <div className="card">
       <div className="section-title"><h2>Últimos pedidos</h2><span className="text-xs muted">{t.total}</span></div>
+      <div className="pill-tabs mb-12" style={{ flexWrap: 'wrap' }}>
+        {ESTADO_TABS.map(([k, l]) => <button key={k} type="button" className={estado === k ? 'active' : ''} onClick={() => setEstado(k)}>{l}</button>)}
+      </div>
       <Search value={t.query} onChange={t.setQuery} placeholder="Buscar mecánico, repuesto, vehículo o total…" />
       <SortBar sortUI={t.sortUI} />
       <div style={{ overflowX: 'auto' }}>
@@ -44,7 +73,7 @@ function OrdersSection({ orders, loading }) {
                 <td data-label="Repuesto">{o.label}</td>
                 <td data-label="Vehículo">{o.vehicle}</td>
                 <td data-label="Total">{o.total ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setDetail(o)} title="Ver desglose">{o.totalStr} <i className="fa-solid fa-circle-info" style={{ fontSize: 11, opacity: 0.6 }}></i></button> : <span className="muted">—</span>}</td>
-                <td data-label="Estado"><span className="badge badge-gray">{o.status}</span></td>
+                <td data-label="Estado"><StatusBadge status={o.status} /></td>
                 <td data-label="Cotizaciones">{(o.quoteCount > 0 || o.dismissCount > 0)
                   ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setQuotesReq(o)} title="Ver cotizaciones y respuestas"><i className="fa-solid fa-tags"></i> {o.quoteCount}{o.dismissCount > 0 && <span style={{ marginLeft: 7, color: '#FCA5A5' }} title={`${o.dismissCount} marcó sin stock`}><i className="fa-solid fa-ban" style={{ fontSize: 11 }}></i> {o.dismissCount}</span>}</button>
                   : <span className="muted">0</span>}</td>
@@ -160,6 +189,7 @@ function RequestQuotesModal({ req, onClose }) {
   const ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
   const quotes = data?.quotes || [];
   const dismissals = data?.dismissals || [];
+  const noResponded = data?.noResponded || [];
   const comercios = new Set(quotes.map((r) => r.storeName)).size;
   return (
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -198,6 +228,11 @@ function RequestQuotesModal({ req, onClose }) {
                   </div>
                 ))}
               </div>
+            </>)}
+            {noResponded.length > 0 && (<>
+              <div className="section-title" style={{ marginTop: (quotes.length || dismissals.length) ? 18 : 0 }}><h2 style={{ fontSize: 15 }}><i className="fa-regular fa-clock muted" style={{ marginRight: 7 }}></i>No respondieron</h2><span className="text-xs muted">{noResponded.length}</span></div>
+              <p className="text-xs muted mb-8">Comercios que reciben este rubro pero todavía no cotizaron ni marcaron sin stock.</p>
+              <div className="flex" style={{ flexWrap: 'wrap', gap: 6 }}>{noResponded.map((d, i) => <span key={i} className="chip"><i className="fa-solid fa-store" style={{ fontSize: 10, opacity: 0.6 }}></i> {d.storeName}</span>)}</div>
             </>)}
           </div>)}
       </div>

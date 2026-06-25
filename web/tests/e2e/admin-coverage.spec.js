@@ -98,3 +98,29 @@ test('admin: ve las cotizaciones que recibió un pedido (+ quién marcó sin sto
   await expect(page.getByRole('heading', { name: /Marcaron sin stock/i })).toBeVisible(); // sección sin stock
   await expect(page.locator('.modal')).toContainText('Repuestos Dos'); // comercio que marcó sin stock
 });
+
+// Filtro por estado + estado legible/coloreado en el listado.
+test('admin/pedidos: filtro por estado muestra el pedido como "Entregado"', async ({ page }) => {
+  await seedSale({ desc: `FiltroEstado E2E ${Date.now()}`, part: 30000 }); // venta DELIVERED
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=pedidos');
+  await page.getByRole('button', { name: /^Concretados$/ }).click(); // filtro por estado
+  await page.getByPlaceholder(/Buscar mec/i).fill('FiltroEstado');
+  const row = page.locator('tr', { hasText: 'FiltroEstado' });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await expect(row.locator('td[data-label="Estado"]')).toContainText('Entregado'); // estado legible (no el crudo DELIVERED)
+});
+
+// El modal del pedido lista los comercios elegibles que NO respondieron.
+test('admin/pedidos: el modal muestra los comercios que no respondieron', async ({ page }) => {
+  const { desc } = await seedSale({ desc: `NoResp E2E ${Date.now()}`, part: 40000 }); // Repuestos Centro cotizó
+  await ensureStore2(); // Repuestos Dos: recibe de todos los rubros y no responde
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=pedidos');
+  await page.getByPlaceholder(/Buscar mec/i).fill(desc);
+  const row = page.locator('tr', { hasText: desc });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await row.locator('td[data-label="Cotizaciones"] button').click();
+  await expect(page.getByRole('heading', { name: /No respondieron/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.modal')).toContainText('Repuestos Dos'); // elegible que no respondió
+});
