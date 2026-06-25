@@ -76,3 +76,14 @@ test('admin/comercios: ver cotizaciones por fila (matriz) y "Todas las cotizacio
   await expect(page.locator('.modal')).toContainText(desc);
   await expect(page.locator('.modal')).toContainText('Repuestos Centro');
 });
+
+// Ficha consolidada del comercio (drawer): se abre desde la matriz y tiene tabs.
+test('admin/comercios: la ficha (drawer) del comercio abre con sus datos y métricas', async ({ page }) => {
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=comercios');
+  await expect(page.getByText('Poca cobertura')).toBeVisible({ timeout: 15000 });
+  await page.locator('.cm-row', { hasText: 'Repuestos Centro' }).locator('.cm-meta').click(); // click en el nombre
+  await expect(page.locator('.drawer .dr-name')).toContainText('Repuestos Centro', { timeout: 10000 });
+  await page.locator('.dr-tabs').getByRole('button', { name: /Métricas/i }).click();
+  await expect(page.locator('.drawer')).toContainText('Cotizó', { timeout: 10000 }); // métrica cargada
+});

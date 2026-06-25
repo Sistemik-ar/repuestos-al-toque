@@ -95,6 +95,7 @@ test('admin: ve las cotizaciones que recibió un pedido (+ quién marcó sin sto
   await expect(page.getByRole('heading', { name: /Cotizaciones recibidas/i })).toBeVisible({ timeout: 10000 });
   await expect(page.locator('.modal')).toContainText('Repuestos Centro'); // nombre del comercio que cotizó
   await expect(page.locator('.modal')).toContainText('Elegida'); // estado de la cotización (SELECTED)
+  await expect(page.locator('.modal')).toContainText('cotizó en'); // tiempo de respuesta
   await expect(page.getByRole('heading', { name: /Marcaron sin stock/i })).toBeVisible(); // sección sin stock
   await expect(page.locator('.modal')).toContainText('Repuestos Dos'); // comercio que marcó sin stock
 });
@@ -109,6 +110,20 @@ test('admin/pedidos: filtro por estado muestra el pedido como "Entregado"', asyn
   const row = page.locator('tr', { hasText: 'FiltroEstado' });
   await expect(row).toBeVisible({ timeout: 10000 });
   await expect(row.locator('td[data-label="Estado"]')).toContainText('Entregado'); // estado legible (no el crudo DELIVERED)
+});
+
+// Línea de tiempo completa del pedido (publicado → … → entregado).
+test('admin/pedidos: la línea de tiempo muestra el ciclo del pedido', async ({ page }) => {
+  const { desc } = await seedSale({ desc: `Timeline E2E ${Date.now()}`, part: 30000 }); // venta DELIVERED
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=pedidos');
+  await page.getByPlaceholder(/Buscar mec/i).fill(desc);
+  const row = page.locator('tr', { hasText: desc });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await row.locator('td[data-label="Línea de tiempo"] button').click();
+  await expect(page.getByRole('heading', { name: /Línea de tiempo/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.modal')).toContainText('Pedido publicado'); // inicio del ciclo
+  await expect(page.locator('.modal')).toContainText('Entregado'); // evento de reparto (concretado)
 });
 
 // El modal del pedido lista los comercios elegibles que NO respondieron.
