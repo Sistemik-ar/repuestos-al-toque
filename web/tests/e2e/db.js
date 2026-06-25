@@ -73,6 +73,13 @@ export async function ensureStore2(email = 'e2e-store2@rat.test') {
   return email;
 }
 
+// Siembra un "sin stock": el comercio marcó que no tiene la pieza de ese pedido (RequestDismissal).
+export async function seedDismissal(requestId, storeEmail = 'e2e-store2@rat.test') {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email: storeEmail } });
+  if (u) await p.requestDismissal.upsert({ where: { storeId_requestId: { storeId: u.id, requestId } }, update: {}, create: { storeId: u.id, requestId } });
+}
+
 // Restaura la contraseña de las cuentas seed (tras probar el reseteo desde el admin).
 export async function restoreSeedPassword(emails = ['vendedor@repuestosaltoque.com.ar']) {
   const p = db();

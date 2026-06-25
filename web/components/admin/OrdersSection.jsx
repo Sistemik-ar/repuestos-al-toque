@@ -45,8 +45,8 @@ function OrdersSection({ orders, loading }) {
                 <td data-label="Vehículo">{o.vehicle}</td>
                 <td data-label="Total">{o.total ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setDetail(o)} title="Ver desglose">{o.totalStr} <i className="fa-solid fa-circle-info" style={{ fontSize: 11, opacity: 0.6 }}></i></button> : <span className="muted">—</span>}</td>
                 <td data-label="Estado"><span className="badge badge-gray">{o.status}</span></td>
-                <td data-label="Cotizaciones">{o.quoteCount > 0
-                  ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setQuotesReq(o)} title="Ver cotizaciones recibidas"><i className="fa-solid fa-tags"></i> {o.quoteCount}</button>
+                <td data-label="Cotizaciones">{(o.quoteCount > 0 || o.dismissCount > 0)
+                  ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setQuotesReq(o)} title="Ver cotizaciones y respuestas"><i className="fa-solid fa-tags"></i> {o.quoteCount}{o.dismissCount > 0 && <span style={{ marginLeft: 7, color: '#FCA5A5' }} title={`${o.dismissCount} marcó sin stock`}><i className="fa-solid fa-ban" style={{ fontSize: 11 }}></i> {o.dismissCount}</span>}</button>
                   : <span className="muted">0</span>}</td>
                 <td data-label="Creado" className="text-xs muted rat-th-date">{fmtDateTime(o.created)}</td>
                 <td data-label="Concretada" className="text-xs muted rat-th-date">{fmtDateTime(o.concretada)}</td>
@@ -148,24 +148,31 @@ function TripModal({ orderId, onClose }) {
   );
 }
 
-// Todas las cotizaciones que recibió un pedido: comercio, precio, estado y cuándo cotizó.
+// Respuestas que recibió un pedido: las cotizaciones (comercio, precio, estado, cuándo) y los
+// comercios que marcaron "sin stock".
 function RequestQuotesModal({ req, onClose }) {
-  const [rows, setRows] = useState(null);
-  useEffect(() => { let alive = true; getRequestQuotes(req.id).then((r) => { if (alive) setRows(r || []); }).catch(() => { if (alive) setRows([]); }); return () => { alive = false; }; }, [req.id]);
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    getRequestQuotes(req.id).then((r) => { if (alive) setData(r || { quotes: [], dismissals: [] }); }).catch(() => { if (alive) setData({ quotes: [], dismissals: [] }); });
+    return () => { alive = false; };
+  }, [req.id]);
   const ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
-  const comercios = rows ? new Set(rows.map((r) => r.storeName)).size : 0;
+  const quotes = data?.quotes || [];
+  const dismissals = data?.dismissals || [];
+  const comercios = new Set(quotes.map((r) => r.storeName)).size;
   return (
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ maxWidth: 560 }}>
         <div className="modal-handle"></div>
         <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}><h2 className="h-md" style={{ minWidth: 0 }}>Cotizaciones recibidas</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar" style={{ flexShrink: 0 }}><i className="fa-solid fa-xmark"></i></button></div>
         <p className="text-sm muted mb-16">{req.code} · {req.label}{req.vehicle ? ` · ${req.vehicle}` : ''}</p>
-        {rows === null ? <Loading label="Cargando cotizaciones…" />
-          : rows.length === 0 ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>Este pedido no recibió cotizaciones.</div>
-          : (<>
-            <p className="text-sm muted mb-12">{rows.length} cotización{rows.length === 1 ? '' : 'es'} · {comercios} comercio{comercios === 1 ? '' : 's'}</p>
-            <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {rows.map((q) => {
+        {data === null ? <Loading label="Cargando cotizaciones…" />
+          : (quotes.length === 0 && dismissals.length === 0) ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>Este pedido no recibió cotizaciones ni respuestas.</div>
+          : (<div style={{ maxHeight: '64vh', overflowY: 'auto' }}>
+            {quotes.length > 0 && (<>
+              <p className="text-sm muted mb-12">{quotes.length} cotización{quotes.length === 1 ? '' : 'es'} · {comercios} comercio{comercios === 1 ? '' : 's'}</p>
+              {quotes.map((q) => {
                 const [cls, txt] = ST[q.status] || ['badge-gray', q.status];
                 return (
                   <div key={q.id} className="card mb-8" style={{ background: 'var(--bg-1)' }}>
@@ -180,8 +187,19 @@ function RequestQuotesModal({ req, onClose }) {
                   </div>
                 );
               })}
-            </div>
-          </>)}
+            </>)}
+            {dismissals.length > 0 && (<>
+              <div className="section-title" style={{ marginTop: quotes.length ? 18 : 0 }}><h2 style={{ fontSize: 15 }}><i className="fa-solid fa-ban" style={{ color: '#FCA5A5', marginRight: 7 }}></i>Marcaron sin stock</h2><span className="text-xs muted">{dismissals.length}</span></div>
+              <div className="card" style={{ background: 'var(--bg-1)' }}>
+                {dismissals.map((d, i) => (
+                  <div key={i} className="flex-between" style={{ padding: '9px 0', borderTop: i ? '1px solid var(--border)' : 'none', gap: 10 }}>
+                    <span className="text-sm flex-center gap-8" style={{ minWidth: 0, fontWeight: 600 }}><i className="fa-solid fa-store muted" style={{ fontSize: 12 }}></i><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.storeName}</span></span>
+                    <span className="text-xs muted" style={{ flexShrink: 0 }}>{fmtDateTime(d.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            </>)}
+          </div>)}
       </div>
     </div>
   );
