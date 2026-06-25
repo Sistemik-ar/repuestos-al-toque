@@ -79,3 +79,18 @@ test('admin: ve las cotizaciones de un comercio', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /Cotizaciones de Repuestos Centro/i })).toBeVisible({ timeout: 10000 });
   await expect(page.locator('.modal')).toContainText(desc); // el pedido cotizado aparece en el modal
 });
+
+// Desde el listado de pedidos, el admin ve TODAS las cotizaciones que recibió ese pedido
+// (comercio, precio, estado y cuándo cotizó).
+test('admin: ve las cotizaciones que recibió un pedido', async ({ page }) => {
+  const { desc } = await seedSale({ desc: `CotsPedido E2E ${Date.now()}`, part: 50000 }); // venta seed (1 cotización SELECTED)
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=pedidos');
+  await page.getByPlaceholder(/Buscar mec/i).fill(desc);
+  const row = page.locator('tr', { hasText: desc });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await row.locator('td[data-label="Cotizaciones"] button').click();
+  await expect(page.getByRole('heading', { name: /Cotizaciones recibidas/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.modal')).toContainText('Repuestos Centro'); // nombre del comercio que cotizó
+  await expect(page.locator('.modal')).toContainText('Elegida'); // estado de la cotización (SELECTED)
+});

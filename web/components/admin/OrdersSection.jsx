@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { money, fmtDateTime } from '@/lib/ui';
 import Loading from '@/components/Loading';
-import { getAdminTrip } from '@/app/actions/data';
+import { getAdminTrip, getRequestQuotes } from '@/app/actions/data';
 import { useTable, Search, SortBar, Thead, Pager } from './table';
 
 const ORDER_COLS = [
@@ -11,6 +11,7 @@ const ORDER_COLS = [
   { label: 'Vehículo', key: 'vehicle', type: 'str' },
   { label: 'Total', key: 'total', type: 'num' },
   { label: 'Estado', key: 'status', type: 'str' },
+  { label: 'Cotizaciones', key: 'quoteCount', type: 'num' },
   { label: 'Creado', key: 'created', type: 'num', date: true },
   { label: 'Concretada', key: 'concretada', type: 'num', date: true },
   { label: 'Reparto', key: 'tripRank', type: 'num' },
@@ -21,6 +22,7 @@ const ORDER_SEARCH = ['code', 'mechanicName', 'mechanicEmail', 'label', 'vehicle
 function OrdersSection({ orders, loading }) {
   const [tripId, setTripId] = useState(null);
   const [detail, setDetail] = useState(null); // pedido cuyo desglose (comisión/envío/MP) se muestra
+  const [quotesReq, setQuotesReq] = useState(null); // pedido cuyas cotizaciones recibidas se muestran
   const rows = useMemo(() => (orders || []).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' })), [orders]);
   const t = useTable(rows, ORDER_COLS, ORDER_SEARCH, { key: 'created', dir: 'desc' });
 
@@ -33,8 +35,8 @@ function OrdersSection({ orders, loading }) {
         <table className="table rat-table">
           <Thead headers={t.headers} />
           <tbody>
-            {loading && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
-            {!loading && t.total === 0 && <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
+            {loading && <tr><td colSpan={10} className="muted" style={{ textAlign: 'center', padding: 16 }}>Cargando…</td></tr>}
+            {!loading && t.total === 0 && <tr><td colSpan={10} className="muted" style={{ textAlign: 'center', padding: 16 }}>Sin resultados</td></tr>}
             {t.visible.map((o) => (
               <tr key={o.id}>
                 <td data-label="#" className="text-xs">{o.code}</td>
@@ -43,6 +45,9 @@ function OrdersSection({ orders, loading }) {
                 <td data-label="Vehículo">{o.vehicle}</td>
                 <td data-label="Total">{o.total ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setDetail(o)} title="Ver desglose">{o.totalStr} <i className="fa-solid fa-circle-info" style={{ fontSize: 11, opacity: 0.6 }}></i></button> : <span className="muted">—</span>}</td>
                 <td data-label="Estado"><span className="badge badge-gray">{o.status}</span></td>
+                <td data-label="Cotizaciones">{o.quoteCount > 0
+                  ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setQuotesReq(o)} title="Ver cotizaciones recibidas"><i className="fa-solid fa-tags"></i> {o.quoteCount}</button>
+                  : <span className="muted">0</span>}</td>
                 <td data-label="Creado" className="text-xs muted rat-th-date">{fmtDateTime(o.created)}</td>
                 <td data-label="Concretada" className="text-xs muted rat-th-date">{fmtDateTime(o.concretada)}</td>
                 <td data-label="Reparto">{o.hasTrip
@@ -56,6 +61,7 @@ function OrdersSection({ orders, loading }) {
       <Pager pager={t.pager} />
       {tripId && <TripModal orderId={tripId} onClose={() => setTripId(null)} />}
       {detail && <OrderBreakdownModal o={detail} onClose={() => setDetail(null)} />}
+      {quotesReq && <RequestQuotesModal req={quotesReq} onClose={() => setQuotesReq(null)} />}
     </div>
   );
 }
@@ -137,6 +143,45 @@ function TripModal({ orderId, onClose }) {
             <button className="btn btn-ghost btn-block mt-16" type="button" onClick={onClose}>Cerrar</button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Todas las cotizaciones que recibió un pedido: comercio, precio, estado y cuándo cotizó.
+function RequestQuotesModal({ req, onClose }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => { let alive = true; getRequestQuotes(req.id).then((r) => { if (alive) setRows(r || []); }).catch(() => { if (alive) setRows([]); }); return () => { alive = false; }; }, [req.id]);
+  const ST = { SENT: ['badge-purple', 'Enviada'], SELECTED: ['badge-green', 'Elegida'], REJECTED: ['badge-gray', 'No elegida'] };
+  const comercios = rows ? new Set(rows.map((r) => r.storeName)).size : 0;
+  return (
+    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ maxWidth: 560 }}>
+        <div className="modal-handle"></div>
+        <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}><h2 className="h-md" style={{ minWidth: 0 }}>Cotizaciones recibidas</h2><button className="icon-btn" type="button" onClick={onClose} title="Cerrar" style={{ flexShrink: 0 }}><i className="fa-solid fa-xmark"></i></button></div>
+        <p className="text-sm muted mb-16">{req.code} · {req.label}{req.vehicle ? ` · ${req.vehicle}` : ''}</p>
+        {rows === null ? <Loading label="Cargando cotizaciones…" />
+          : rows.length === 0 ? <div className="empty-state" style={{ padding: 28 }}><div className="empty-icon"><i className="fa-solid fa-tags"></i></div>Este pedido no recibió cotizaciones.</div>
+          : (<>
+            <p className="text-sm muted mb-12">{rows.length} cotización{rows.length === 1 ? '' : 'es'} · {comercios} comercio{comercios === 1 ? '' : 's'}</p>
+            <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {rows.map((q) => {
+                const [cls, txt] = ST[q.status] || ['badge-gray', q.status];
+                return (
+                  <div key={q.id} className="card mb-8" style={{ background: 'var(--bg-1)' }}>
+                    <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}>
+                      <div className="text-sm flex-center gap-8" style={{ fontWeight: 700, minWidth: 0 }}><i className="fa-solid fa-store muted" style={{ fontSize: 12 }}></i><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.storeName}</span></div>
+                      <span className="price" style={{ flexShrink: 0 }}>{money(q.price)}</span>
+                    </div>
+                    <div className="flex-between" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      <span className="text-xs muted">{q.optionLabel || 'Opción'}{q.partBrand ? ` · ${q.partBrand}` : ''} · {fmtDateTime(q.createdAt)}</span>
+                      <span className={`badge ${cls}`} style={{ flexShrink: 0 }}>{txt}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>)}
       </div>
     </div>
   );

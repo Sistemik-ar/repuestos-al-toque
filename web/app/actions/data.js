@@ -639,6 +639,24 @@ export async function getRecentQuotes() {
   }));
 }
 
+// Admin: todas las cotizaciones que recibió UN pedido (qué comercios cotizaron, precio, estado, cuál
+// ganó). Para ver el detalle de competencia de cada pedido desde el listado del admin.
+export async function getRequestQuotes(requestId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const quotes = await prisma.requestQuote.findMany({
+    where: { requestId },
+    orderBy: { price: 'asc' },
+    select: { id: true, storeId: true, price: true, status: true, partBrand: true, optionLabel: true, createdAt: true },
+  });
+  const storeIds = [...new Set(quotes.map((q) => q.storeId))];
+  const stores = await prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } });
+  const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
+  return quotes.map((q) => ({
+    id: q.id, storeName: sName[q.storeId] || 'Comercio', price: num(q.price), status: q.status,
+    partBrand: q.partBrand, optionLabel: q.optionLabel, createdAt: q.createdAt?.getTime() || 0,
+  }));
+}
+
 export async function getAdminData() {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   const [usersCount, reqCount, paid, users, recent, categories, storeRows] = await Promise.all([
@@ -646,7 +664,7 @@ export async function getAdminData() {
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
-    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } } } }),
+    prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } }, _count: { select: { quotes: true } } } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true, icon: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, categories: { select: { categoryId: true } } } }),
   ]);
@@ -663,6 +681,7 @@ export async function getAdminData() {
       mechanicName: r.mechanic?.name || r.mechanic?.email || '—',
       mechanicEmail: r.mechanic?.email || '',
       storeName: r.order ? (storeNameById[r.order.storeId] || 'Comercio') : null, // comercio que vendió (Vendido por)
+      quoteCount: r._count?.quotes || 0, // cuántas cotizaciones recibió este pedido
       label: r.description || r.category?.name || 'Repuesto',
       vehicle: `${r.brand || ''} ${r.model || ''}`.trim(),
       status: r.status,
