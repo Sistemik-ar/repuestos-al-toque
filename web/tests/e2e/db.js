@@ -73,6 +73,25 @@ export async function ensureStore2(email = 'e2e-store2@rat.test') {
   return email;
 }
 
+// Siembra un pedido (request) en el estado que se pida, opcionalmente con una cotización y con
+// desfasaje de tiempo (para el "tiempo de respuesta"). Flexible para los E2E de estados/filtro/timeline.
+export async function seedRequest({
+  mechEmail = 'mecanico@repuestosaltoque.com.ar', storeEmail = 'vendedor@repuestosaltoque.com.ar',
+  desc = 'Pedido E2E', status = 'QUOTED', jobStatus, withQuote = true, quotePrice = 10000,
+  quoteStatus = 'SENT', requestAgoMin = 0, quoteAgoMin = 0, selectedAt = false,
+} = {}) {
+  const p = db();
+  const mech = await p.user.findUnique({ where: { email: mechEmail } });
+  const store = await p.user.findUnique({ where: { email: storeEmail } });
+  const stamp = Date.now() + Math.floor(Math.random() * 1000);
+  const ago = (min) => new Date(Date.now() - min * 60000);
+  const jStatus = jobStatus || (status === 'CANCELLED' ? 'CANCELLED' : status === 'CLOSED' ? 'CLOSED' : 'DRAFT');
+  const job = await p.job.create({ data: { code: 'JRQ' + stamp, mechanicId: mech.id, plate: 'RQ' + (stamp % 100000), brand: 'Toyota', model: 'Corolla', status: jStatus } });
+  const req = await p.request.create({ data: { code: 'RRQ' + stamp, mechanicId: mech.id, jobId: job.id, description: desc, status, photoUrls: [], createdAt: ago(requestAgoMin), ...(selectedAt ? { selectedAt: ago(0) } : {}) } });
+  if (withQuote) await p.requestQuote.create({ data: { requestId: req.id, storeId: store.id, alias: 'Casa A', price: quotePrice, status: quoteStatus, photoUrls: [], createdAt: ago(quoteAgoMin) } });
+  return { requestId: req.id, jobId: job.id, desc };
+}
+
 // Siembra un "sin stock": el comercio marcó que no tiene la pieza de ese pedido (RequestDismissal).
 export async function seedDismissal(requestId, storeEmail = 'e2e-store2@rat.test') {
   const p = db();
