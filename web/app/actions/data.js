@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { getSession, invalidateStatusCache } from '@/lib/session';
 import { createPaymentLink, mpIsTest, mpOAuthUrl, mpOAuthConfigured, mpRefresh } from '@/lib/mercadopago';
-import { jobChargePlan } from '@/lib/orders';
+import { jobChargePlan, jobSplit } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, inBariloche, searchBariloche } from '@/lib/geo';
 import { creditStatus, creditActive } from '@/lib/credit';
@@ -1520,11 +1520,11 @@ export async function createJobCheckout(jobId) {
   // Split de pagos (Marketplace): solo si el trabajo es de UN comercio que vinculó su MP. El comercio
   // recibe el/los repuesto(s) en su cuenta y la plataforma retiene marketplace_fee (comisión + flete +
   // recargo). Multi-comercio o comercio sin vincular -> cobro centralizado (cuenta de Jorge).
-  let sellerToken = null, marketplaceFee = 0;
-  if (plan.stores === 1 && plan.items[0]?.storeId) {
-    sellerToken = await sellerMpToken(plan.items[0].storeId);
-    if (sellerToken) marketplaceFee = Math.max(0, plan.totals.total - plan.totals.parts);
-  }
+  // Solo consultamos el token del comercio cuando el trabajo es de uno solo; jobSplit decide si
+  // se cobra con split (comercio vinculado) o centralizado (cuenta de Jorge / fallback).
+  let storeToken = null;
+  if (plan.stores === 1 && plan.items[0]?.storeId) storeToken = await sellerMpToken(plan.items[0].storeId);
+  const { sellerToken, marketplaceFee } = jobSplit(plan, storeToken);
   try {
     const { link } = await createPaymentLink({
       orderRef: `job::${jobId}`,

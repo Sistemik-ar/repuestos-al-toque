@@ -90,6 +90,20 @@ export async function jobChargePlan(jobId) {
   return { job, settings, items, totals, stores: storeShip.size };
 }
 
+// Decide cómo se cobra un Trabajo: split (Marketplace) o centralizado. El split aplica SOLO si el
+// trabajo es de UN comercio y ese comercio vinculó su Mercado Pago (sellerToken presente). En
+// cualquier otro caso —varios comercios, o el comercio no conectó su cuenta— el cobro es
+// CENTRALIZADO (cuenta de la plataforma / Jorge) y sin marketplace_fee. Con split, la plataforma
+// retiene marketplace_fee = total − repuestos (comisión + flete + recargo); el repuesto va al comercio.
+export function jobSplit(plan, sellerToken) {
+  const single = plan?.stores === 1 && !!plan?.items?.[0]?.storeId;
+  const useSplit = single && !!sellerToken;
+  return {
+    sellerToken: useSplit ? sellerToken : null,
+    marketplaceFee: useSplit ? Math.max(0, plan.totals.total - plan.totals.parts) : 0,
+  };
+}
+
 // Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem elegido.
 async function confirmJobPaid(jobId, paidAmount) {
   const plan = await jobChargePlan(jobId);

@@ -13,7 +13,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { prisma } from '@/lib/db';
-import { confirmPaidByRef } from '@/lib/orders';
+import { confirmPaidByRef, jobSplit } from '@/lib/orders';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -76,5 +76,36 @@ describe('confirmPaidByRef — trabajo (job::)', () => {
     const ships = prisma.order.upsert.mock.calls.map((c) => c[0].create.freightAmount);
     expect(ships.filter((x) => x > 0)).toHaveLength(1); // mismo comercio -> 1 solo flete
     expect(prisma.job.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'PAID' } }));
+  });
+});
+
+describe('jobSplit — split de pagos vs cobro centralizado (cuenta de Jorge)', () => {
+  // total = repuestos + comisión + flete + recargo. La plataforma retiene total − repuestos.
+  const plan = (stores, { total = 100000, parts = 80000 } = {}) => ({
+    stores, items: stores > 0 ? [{ storeId: 'store-1' }] : [], totals: { total, parts },
+  });
+
+  it('un comercio que vinculó su MP → SPLIT: usa su token y retiene total − repuestos', () => {
+    const r = jobSplit(plan(1, { total: 100000, parts: 80000 }), 'SELLER-tok');
+    expect(r.sellerToken).toBe('SELLER-tok'); // cobra el comercio
+    expect(r.marketplaceFee).toBe(20000);     // comisión + flete + recargo se los queda la plataforma
+  });
+
+  it('un comercio SIN vincular → CENTRALIZADO (cuenta de Jorge): sin token de comercio ni fee', () => {
+    const r = jobSplit(plan(1), null); // sellerMpToken devolvió null (no conectó MP)
+    expect(r.sellerToken).toBeNull();   // null → createPaymentLink usa el token de la plataforma
+    expect(r.marketplaceFee).toBe(0);
+  });
+
+  it('varios comercios (aunque uno tenga token) → CENTRALIZADO: el split es solo para un comercio', () => {
+    const r = jobSplit(plan(2), 'SELLER-tok');
+    expect(r.sellerToken).toBeNull();
+    expect(r.marketplaceFee).toBe(0);
+  });
+
+  it('repuesto 100% a cuenta corriente (parts=0) → la plataforma retiene todo lo cobrado', () => {
+    const r = jobSplit(plan(1, { total: 25000, parts: 0 }), 'SELLER-tok');
+    expect(r.sellerToken).toBe('SELLER-tok');
+    expect(r.marketplaceFee).toBe(25000); // el repuesto lo liquida el comercio por CC; acá no va nada a su MP
   });
 });
