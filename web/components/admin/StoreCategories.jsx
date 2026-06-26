@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { money, toast, fmtDateTime } from '@/lib/ui';
 import Loading from '@/components/Loading';
-import { setStoreCategories, getStoreQuotes, getRecentQuotes } from '@/app/actions/data';
+import { setStoreCategories, getStoreQuotes, getRecentQuotes, getStoreDetail } from '@/app/actions/data';
 
 // "selección normalizada" de un comercio → string estable para comparar contra el baseline (dirty).
 const norm = (sel) => [...sel].sort((a, b) => a - b).join(',');
@@ -22,6 +22,7 @@ function StoreCategories({ stores, categories, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [quotesStore, setQuotesStore] = useState(null); // comercio cuyas cotizaciones se ven en el modal
   const [allQuotes, setAllQuotes] = useState(false); // modal "Todas las cotizaciones" (todos los comercios)
+  const [drawerStore, setDrawerStore] = useState(null); // comercio cuya ficha consolidada se ve en el drawer
 
   // (re)sincronizar con los datos: al montar y tras guardar (onSaved recarga stores).
   useEffect(() => {
@@ -119,7 +120,7 @@ function StoreCategories({ stores, categories, onSaved }) {
                     <td className="cm-name">
                       <div className="cm-name-inner">
                         <Avatar />
-                        <div className="cm-meta">
+                        <div className="cm-meta" onClick={() => setDrawerStore(c)} style={{ cursor: 'pointer' }} title={`Ver ficha de ${c.name}`}>
                           <div className="nm">{c.name}</div>
                           <div className="ct">{c.sel.length === 0 ? <span className="badge-all">Recibe de todos</span> : `${c.sel.length} de ${rubros.length} rubros`}</div>
                         </div>
@@ -184,6 +185,8 @@ function StoreCategories({ stores, categories, onSaved }) {
                     <span className="sep">·</span>
                     <button type="button" className="lnk" onClick={() => setRow(c.id, false)}>Limpiar</button>
                     <span className="spacer"></span>
+                    <button type="button" className="lnk" onClick={() => setDrawerStore(c)}><i className="fa-solid fa-id-card"></i> Ver ficha</button>
+                    <span className="sep">·</span>
                     <button type="button" className="lnk" onClick={() => setQuotesStore(c)}><i className="fa-solid fa-tags"></i> Ver cotizaciones</button>
                   </div>
                 </div>
@@ -257,6 +260,7 @@ function StoreCategories({ stores, categories, onSaved }) {
 
       {quotesStore && <StoreQuotesModal store={quotesStore} onClose={() => setQuotesStore(null)} />}
       {allQuotes && <AllQuotesModal onClose={() => setAllQuotes(false)} />}
+      {drawerStore && <StoreDrawer store={drawerStore} onClose={() => setDrawerStore(null)} />}
     </>
   );
 }
@@ -308,6 +312,73 @@ function StoreQuotesModal({ store, onClose }) {
 // Cotizaciones de TODOS los comercios.
 function AllQuotesModal({ onClose }) {
   return <QuotesModal title="Todas las cotizaciones" load={getRecentQuotes} deps={[]} empty="Todavía no hay cotizaciones." showStore onClose={onClose} />;
+}
+
+const IVA_LABEL = { RESPONSABLE_INSCRIPTO: 'Responsable Inscripto', MONOTRIBUTO: 'Monotributo', EXENTO: 'Exento', CONSUMIDOR_FINAL: 'Consumidor Final' };
+const STATUS_LABEL = { ACTIVE: 'Activo', PENDING: 'Pendiente de alta', SUSPENDED: 'Suspendido' };
+
+// Ficha consolidada de un comercio (drawer lateral): datos, rubros, cotizaciones, métricas y CC.
+function StoreDrawer({ store, onClose }) {
+  const [d, setD] = useState(null);
+  const [tab, setTab] = useState('datos');
+  const [quotes, setQuotes] = useState(null);
+  useEffect(() => { getStoreDetail(store.id).then((r) => setD(r)).catch(() => setD(null)); }, [store.id]);
+  useEffect(() => { if (tab === 'cotizaciones' && quotes === null) getStoreQuotes(store.id).then((r) => setQuotes(r || [])).catch(() => setQuotes([])); }, [tab, store.id, quotes]);
+  const TABS = [['datos', 'Datos'], ['rubros', 'Rubros'], ['cotizaciones', 'Cotizaciones'], ['metricas', 'Métricas'], ['cc', 'Cta corriente']];
+  const Row = ({ k, v }) => <div className="d-row"><span className="dk">{k}</span><span className="dv">{v}</span></div>;
+  return (
+    <>
+      <div className="drawer-back" onClick={onClose}></div>
+      <aside className="drawer">
+        <div className="dr-head">
+          <div className="dr-top">
+            <div className="dr-av"><i className="fa-solid fa-store"></i></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="dr-name">{store.name}</div>
+              <div className="dr-meta">{[d?.owner, d?.barrio].filter(Boolean).join(' · ') || 'Comercio'}</div>
+            </div>
+            <button className="dr-close" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button>
+          </div>
+          <div className="dr-tabs">{TABS.map(([k, l]) => <button key={k} type="button" className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{l}</button>)}</div>
+        </div>
+        <div className="dr-body">
+          {!d ? <Loading label="Cargando ficha…" /> : (<>
+            {tab === 'datos' && (<>
+              <Row k="Titular" v={d.owner || '—'} />
+              <Row k="Email" v={d.email || '—'} />
+              <Row k="Dirección" v={d.address ? `${d.address}${d.barrio ? ' · ' + d.barrio : ''}` : '—'} />
+              <Row k="CUIT" v={d.cuit || '—'} />
+              <Row k="Condición IVA" v={IVA_LABEL[d.iva] || d.iva || '—'} />
+              <Row k="Estado" v={STATUS_LABEL[d.status] || d.status || '—'} />
+              <Row k="Mercado Pago" v={d.mpLinked ? 'Conectado' : 'Sin conectar'} />
+              <Row k="Reputación" v={d.rating != null ? `★ ${d.rating} (${d.ratingsCount}) · ${d.points} pts` : `Sin reseñas · ${d.points} pts`} />
+              <Row k="Alta" v={d.createdAt ? fmtDateTime(d.createdAt) : '—'} />
+              <Row k="Último ingreso" v={d.lastLoginAt ? fmtDateTime(d.lastLoginAt) : 'Nunca'} />
+            </>)}
+            {tab === 'rubros' && (d.rubros.length === 0
+              ? <div className="empty-mini">Recibe pedidos de <b>todos los rubros</b>.</div>
+              : <div className="flex" style={{ flexWrap: 'wrap', gap: 8 }}>{d.rubros.map((r, i) => <span key={i} className="chip">{r}</span>)}</div>)}
+            {tab === 'metricas' && (<>
+              <div className="mini-kpi-row">
+                <div className="mini-kpi"><div className="v">{d.metrics.cotizo}</div><div className="l">Cotizó</div></div>
+                <div className="mini-kpi"><div className="v text-green">{d.metrics.concreto}</div><div className="l">Concretó</div></div>
+                <div className="mini-kpi"><div className="v">{Math.round(d.metrics.conv * 100)}%</div><div className="l">Conversión</div></div>
+              </div>
+              <Row k="Vendido (total)" v={<span className="text-green">{money(d.metrics.vendido)}</span>} />
+              <Row k="Comisión generada" v={<span className="text-yellow">{money(d.metrics.comision)}</span>} />
+              <Row k="Descartó (sin stock)" v={d.metrics.descarto} />
+            </>)}
+            {tab === 'cc' && (d.cc.length === 0
+              ? <div className="empty-mini">Sin relaciones de cuenta corriente.</div>
+              : d.cc.map((c, i) => <Row key={i} k={c.mechanic} v={c.active ? <span className="badge badge-green">Activa</span> : <span className="badge badge-gray">{c.adminStatus === 'PENDING' ? 'Pendiente' : 'Inactiva'}</span>} />))}
+            {tab === 'cotizaciones' && (quotes === null ? <Loading label="Cargando cotizaciones…" />
+              : quotes.length === 0 ? <div className="empty-mini">Todavía no cotizó nada.</div>
+              : (<><p className="text-sm muted mb-12">{quotes.length} cotización{quotes.length === 1 ? '' : 'es'} · {quotes.filter((q) => q.sold).length} concretada(s)</p>{quotes.map((q) => <QuoteRow key={q.id} q={q} />)}</>))}
+          </>)}
+        </div>
+      </aside>
+    </>
+  );
 }
 
 export default StoreCategories;

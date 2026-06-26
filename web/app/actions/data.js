@@ -683,9 +683,10 @@ export async function getRequestQuotes(requestId) {
   const [quotes, dismissals, reqRow, activeStores] = await Promise.all([
     prisma.requestQuote.findMany({ where: { requestId }, orderBy: { price: 'asc' }, select: { id: true, storeId: true, price: true, status: true, partBrand: true, optionLabel: true, createdAt: true } }),
     prisma.requestDismissal.findMany({ where: { requestId }, select: { storeId: true, createdAt: true } }), // comercios que marcaron "sin stock"
-    prisma.request.findUnique({ where: { id: requestId }, select: { categoryId: true } }),
+    prisma.request.findUnique({ where: { id: requestId }, select: { categoryId: true, createdAt: true } }),
     prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { tradeName: true, categories: { select: { categoryId: true } } } } } }),
   ]);
+  const reqMs = reqRow?.createdAt ? reqRow.createdAt.getTime() : null; // base para el "tiempo de respuesta"
   const storeIds = [...new Set([...quotes.map((q) => q.storeId), ...dismissals.map((d) => d.storeId)])];
   const stores = await prisma.storeProfile.findMany({ where: { userId: { in: storeIds } }, select: { userId: true, tradeName: true } });
   const sName = Object.fromEntries(stores.map((x) => [x.userId, x.tradeName]));
@@ -704,11 +705,42 @@ export async function getRequestQuotes(requestId) {
     quotes: quotes.map((q) => ({
       id: q.id, storeName: sName[q.storeId] || 'Comercio', price: num(q.price), status: q.status,
       partBrand: q.partBrand, optionLabel: q.optionLabel, createdAt: q.createdAt?.getTime() || 0,
+      // cuánto tardó el comercio en responder desde que se publicó el pedido
+      respondedInMin: (reqMs && q.createdAt) ? Math.max(0, Math.round((q.createdAt.getTime() - reqMs) / 60000)) : null,
     })),
     dismissals: dismissals
       .map((d) => ({ storeName: sName[d.storeId] || 'Comercio', createdAt: d.createdAt?.getTime() || 0 }))
       .sort((a, b) => b.createdAt - a.createdAt),
     noResponded,
+  };
+}
+
+// Admin: ficha consolidada de un comercio (datos, rubros, métricas y cuenta corriente) para el drawer.
+export async function getStoreDetail(storeId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const [user, prof, cotizo, orders, descarto, cats, cc] = await Promise.all([
+    prisma.user.findUnique({ where: { id: storeId }, select: { email: true, status: true, createdAt: true, lastLoginAt: true } }),
+    prisma.storeProfile.findUnique({ where: { userId: storeId }, select: { tradeName: true, ownerName: true, contactPerson: true, address: true, barrio: true, cuit: true, ivaCondition: true, mpLinked: true, ratingAvg: true, ratingsCount: true, points: true } }),
+    prisma.requestQuote.count({ where: { storeId } }),
+    prisma.order.findMany({ where: { storeId, status: { in: ['PAID', 'SHIPPED', 'DELIVERED'] } }, select: { partAmount: true, commissionAmount: true } }),
+    prisma.requestDismissal.count({ where: { storeId } }),
+    prisma.storeCategory.findMany({ where: { storeId }, select: { category: { select: { name: true } } } }),
+    prisma.creditAccount.findMany({ where: { storeId }, select: { mechanicId: true, active: true, adminStatus: true, storeStatus: true, createdAt: true } }),
+  ]);
+  if (!prof) return null;
+  const concreto = orders.length;
+  const mechIds = [...new Set(cc.map((c) => c.mechanicId))];
+  const mechs = mechIds.length ? await prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true } }) : [];
+  const mName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
+  return {
+    name: prof.tradeName, owner: prof.ownerName || prof.contactPerson || null, email: user?.email || null,
+    address: prof.address || null, barrio: prof.barrio || null, cuit: prof.cuit || null, iva: prof.ivaCondition || null,
+    status: user?.status || null, mpLinked: !!prof.mpLinked,
+    rating: prof.ratingsCount > 0 ? num(prof.ratingAvg) : null, ratingsCount: prof.ratingsCount, points: prof.points,
+    createdAt: user?.createdAt?.getTime() || null, lastLoginAt: user?.lastLoginAt?.getTime() || null,
+    rubros: cats.map((c) => c.category?.name).filter(Boolean).sort((a, b) => a.localeCompare(b, 'es')),
+    metrics: { cotizo, concreto, descarto, conv: cotizo ? concreto / cotizo : 0, vendido: orders.reduce((a, o) => a + num(o.partAmount), 0), comision: orders.reduce((a, o) => a + num(o.commissionAmount), 0) },
+    cc: cc.map((c) => ({ mechanic: mName[c.mechanicId] || 'Taller', active: c.active, adminStatus: c.adminStatus, storeStatus: c.storeStatus, createdAt: c.createdAt?.getTime() || 0 })),
   };
 }
 
@@ -895,6 +927,53 @@ export async function getAdminStats({ from, to } = {}) {
 }
 
 // Historial de reparto de un pedido (para el modal del admin). On-demand, con timestamps reales.
+// Línea de tiempo COMPLETA de un pedido (para el admin): publicado -> cotizado -> elegido -> pagado
+// -> ...reparto (cuando se concretó). Combina el ciclo temprano con los eventos de entrega.
+export async function getRequestTimeline(requestId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
+  const r = await prisma.request.findUnique({
+    where: { id: requestId },
+    select: {
+      code: true, description: true, brand: true, model: true, status: true, createdAt: true, selectedAt: true,
+      quotes: { select: { createdAt: true } },
+      order: { select: { createdAt: true, status: true, deliveryId: true, shipmentId: true, arrivedPickupAt: true, pickedAt: true, arrivedDropAt: true, deliveredAt: true, issue: true, issueAt: true } },
+    },
+  });
+  if (!r) return null;
+  const o = r.order;
+  let courier = null, plate = null, consolidated = false;
+  if (o?.deliveryId) {
+    const dp = await prisma.deliveryProfile.findUnique({ where: { userId: o.deliveryId }, select: { plate: true, user: { select: { name: true } } } });
+    courier = dp?.user?.name || 'Repartidor'; plate = dp?.plate || null;
+  }
+  if (o?.shipmentId) { const cnt = await prisma.order.count({ where: { shipmentId: o.shipmentId } }); consolidated = cnt > 1; }
+  const ms = (d) => (d ? d.getTime() : null);
+  const ev = [];
+  ev.push({ icon: 'fa-file-circle-plus', title: 'Pedido publicado', sub: 'El mecánico pidió el repuesto', time: ms(r.createdAt), state: 'done' });
+  const qts = (r.quotes || []).map((q) => q.createdAt?.getTime()).filter(Boolean).sort((a, b) => a - b);
+  if (qts.length) ev.push({ icon: 'fa-tags', title: 'Primera cotización', sub: `${qts.length} cotización${qts.length === 1 ? '' : 'es'} en total`, time: qts[0], state: 'done' });
+  if (r.selectedAt) ev.push({ icon: 'fa-hand-pointer', title: 'Eligió una cotización', sub: 'El mecánico eligió su oferta', time: ms(r.selectedAt), state: 'done' });
+  if (o) {
+    ev.push({ icon: 'fa-credit-card', title: 'Pedido pagado', sub: 'Mercado Pago', time: ms(o.createdAt), state: 'done' });
+    if (o.arrivedPickupAt) ev.push({ icon: 'fa-store', title: 'Llegó al comercio', sub: 'Retiro de la pieza', time: ms(o.arrivedPickupAt), state: 'done' });
+    if (o.pickedAt) ev.push({ icon: 'fa-box', title: 'Retiró la pieza', sub: 'PIN de retiro validado', time: ms(o.pickedAt), state: 'done' });
+    if (o.arrivedDropAt) ev.push({ icon: 'fa-location-dot', title: 'Llegó al taller', sub: 'Entrega al mecánico', time: ms(o.arrivedDropAt), state: 'done' });
+    if (o.deliveredAt) ev.push({ icon: 'fa-circle-check', title: 'Entregado', sub: 'PIN de entrega validado', time: ms(o.deliveredAt), state: 'done' });
+    else ev.push({ icon: 'fa-circle-check', title: 'Entrega pendiente', sub: o.deliveryId ? 'En reparto' : 'Esperando repartidor', time: null, state: 'current' });
+    if (o.issue) ev.push({ icon: 'fa-triangle-exclamation', title: 'Incidencia reportada', sub: o.issue, time: ms(o.issueAt), state: 'done' });
+  } else if (r.status === 'CANCELLED') {
+    ev.push({ icon: 'fa-ban', title: 'Cancelado', sub: 'No se concretó (no se pagó a tiempo)', time: null, state: 'done' });
+  } else if (r.status === 'EXPIRED') {
+    ev.push({ icon: 'fa-clock', title: 'Vencido', sub: 'La ventana cerró sin elección', time: null, state: 'done' });
+  } else {
+    ev.push({ icon: 'fa-hourglass-half', title: r.selectedAt ? 'Esperando pago' : 'Esperando decisión', sub: r.selectedAt ? 'El mecánico todavía no pagó' : 'El mecánico aún no eligió', time: null, state: 'current' });
+  }
+  return {
+    code: r.code || '', label: r.description || 'Repuesto', vehicle: `${r.brand || ''} ${r.model || ''}`.trim(),
+    courier, plate, consolidated, status: o?.status || r.status, events: ev,
+  };
+}
+
 export async function getAdminTrip(orderId) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return null;
   const o = await prisma.order.findUnique({ where: { id: orderId }, include: { request: { select: { code: true, description: true, brand: true, model: true } } } });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { money, fmtDateTime } from '@/lib/ui';
 import Loading from '@/components/Loading';
-import { getAdminTrip, getRequestQuotes } from '@/app/actions/data';
+import { getRequestQuotes, getRequestTimeline } from '@/app/actions/data';
 import { useTable, Search, SortBar, Thead, Pager } from './table';
 
 const ORDER_COLS = [
@@ -14,7 +14,7 @@ const ORDER_COLS = [
   { label: 'Cotizaciones', key: 'quoteCount', type: 'num' },
   { label: 'Creado', key: 'created', type: 'num', date: true },
   { label: 'Concretada', key: 'concretada', type: 'num', date: true },
-  { label: 'Reparto', key: 'tripRank', type: 'num' },
+  { label: 'Línea de tiempo', key: 'tripRank', type: 'num' },
 ];
 
 const ORDER_SEARCH = ['code', 'mechanicName', 'mechanicEmail', 'label', 'vehicle', 'status', 'total'];
@@ -31,6 +31,8 @@ const STATUS_ST = {
   EXPIRED: ['badge-gray', 'Vencido'],
 };
 const StatusBadge = ({ status }) => { const [c, l] = STATUS_ST[status] || ['badge-gray', status]; return <span className={`badge ${c}`}>{l}</span>; };
+// "tiempo de respuesta" legible (minutos -> min/h/días)
+const fmtDelta = (min) => (min == null ? '' : min < 1 ? 'al toque' : min < 60 ? `${min} min` : min < 1440 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} d`);
 
 // Filtro por estado del listado.
 const ESTADO_TABS = [
@@ -42,7 +44,7 @@ const ESTADO_TABS = [
 ];
 
 function OrdersSection({ orders, loading }) {
-  const [tripId, setTripId] = useState(null);
+  const [timelineReq, setTimelineReq] = useState(null);
   const [detail, setDetail] = useState(null); // pedido cuyo desglose (comisión/envío/MP) se muestra
   const [quotesReq, setQuotesReq] = useState(null); // pedido cuyas cotizaciones recibidas se muestran
   const [estado, setEstado] = useState('todos');
@@ -79,16 +81,14 @@ function OrdersSection({ orders, loading }) {
                   : <span className="muted">0</span>}</td>
                 <td data-label="Creado" className="text-xs muted rat-th-date">{fmtDateTime(o.created)}</td>
                 <td data-label="Concretada" className="text-xs muted rat-th-date">{fmtDateTime(o.concretada)}</td>
-                <td data-label="Reparto">{o.hasTrip
-                  ? <button className="btn btn-ghost btn-sm" onClick={() => setTripId(o.orderId)}><i className="fa-solid fa-truck-fast"></i> Ver reparto</button>
-                  : <span className="muted">—</span>}</td>
+                <td data-label="Línea de tiempo"><button className="btn btn-ghost btn-sm" onClick={() => setTimelineReq(o)} title="Ver la línea de tiempo del pedido"><i className="fa-solid fa-timeline"></i> Ver</button></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <Pager pager={t.pager} />
-      {tripId && <TripModal orderId={tripId} onClose={() => setTripId(null)} />}
+      {timelineReq && <TimelineModal req={timelineReq} onClose={() => setTimelineReq(null)} />}
       {detail && <OrderBreakdownModal o={detail} onClose={() => setDetail(null)} />}
       {quotesReq && <RequestQuotesModal req={quotesReq} onClose={() => setQuotesReq(null)} />}
     </div>
@@ -143,38 +143,42 @@ function OrderBreakdownModal({ o, onClose }) {
   );
 }
 
-function TripModal({ orderId, onClose }) {
-  const [trip, setTrip] = useState(null);
-  useEffect(() => { let alive = true; getAdminTrip(orderId).then((r) => { if (alive) setTrip(r || { events: [] }); }); return () => { alive = false; }; }, [orderId]);
-  const ST = { PAID: ['badge-yellow', 'Pagado'], SHIPPED: ['badge-yellow', 'En camino'], DELIVERED: ['badge-green', 'Entregado'], DONE: ['badge-green', 'Entregado'] };
-  const stBadge = trip ? (ST[trip.status] || ['badge-gray', trip.status]) : null;
+// Línea de tiempo completa del pedido: publicado -> cotizado -> elegido -> pagado -> ...reparto.
+function TimelineModal({ req, onClose }) {
+  const [tl, setTl] = useState(null);
+  useEffect(() => { let alive = true; getRequestTimeline(req.id).then((r) => { if (alive) setTl(r || { events: [] }); }); return () => { alive = false; }; }, [req.id]);
+  const ST = { PAID: ['badge-green', 'Pagado'], SHIPPED: ['badge-yellow', 'En camino'], DELIVERED: ['badge-green', 'Entregado'], DONE: ['badge-green', 'Entregado'], CANCELLED: ['badge-red', 'Cancelado'] };
+  const stBadge = tl ? (ST[tl.status] || ['badge-gray', tl.status]) : null;
   return (
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <div className="modal-handle"></div>
-        <div className="flex-between mb-4">
-          <h2 className="h-md">Historial de reparto</h2>
-          <button className="icon-btn" type="button" onClick={onClose} title="Cerrar"><i className="fa-solid fa-xmark"></i></button>
+        <div className="flex-between mb-4" style={{ gap: 10, alignItems: 'flex-start' }}>
+          <h2 className="h-md" style={{ minWidth: 0 }}>Línea de tiempo</h2>
+          <button className="icon-btn" type="button" onClick={onClose} title="Cerrar" style={{ flexShrink: 0 }}><i className="fa-solid fa-xmark"></i></button>
         </div>
-        {!trip ? <Loading label="Cargando reparto…" /> : (
+        {!tl ? <Loading label="Cargando línea de tiempo…" /> : (
           <>
-            <p className="text-sm muted mb-16">{trip.code} · {trip.label}{trip.vehicle ? ` · ${trip.vehicle}` : ''}</p>
-            <div className="map-mock mb-16"><div className="map-route"></div><div className="map-pin start"></div><div className="map-pin driver"></div><div className="map-pin end"></div></div>
-            <div className="card mb-16" style={{ background: 'var(--bg-1)' }}>
-              <div className="flex-center gap-12">
-                <div className="store-avatar"><i className="fa-solid fa-motorcycle"></i></div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="text-sm" style={{ fontWeight: 700 }}>{trip.courier || 'Sin repartidor asignado'}</div>
-                  {trip.plate && <div className="text-xs muted">Patente {trip.plate}</div>}
-                </div>
-                {stBadge && <span className={`badge ${stBadge[0]}`}>{stBadge[1]}</span>}
-              </div>
-              {trip.consolidated && (
-                <div className="float-notif mt-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-layer-group text-purple"></i><div className="text-xs subtle">Viaje <b>consolidado</b>: el repartidor retira piezas de más de un comercio en el mismo recorrido.</div></div>
-              )}
+            <div className="flex-between mb-16" style={{ gap: 10, alignItems: 'flex-start' }}>
+              <p className="text-sm muted" style={{ minWidth: 0 }}>{tl.code} · {tl.label}{tl.vehicle ? ` · ${tl.vehicle}` : ''}</p>
+              {stBadge && <span className={`badge ${stBadge[0]}`} style={{ flexShrink: 0 }}>{stBadge[1]}</span>}
             </div>
+            {tl.courier && (
+              <div className="card mb-16" style={{ background: 'var(--bg-1)' }}>
+                <div className="flex-center gap-12">
+                  <div className="store-avatar"><i className="fa-solid fa-motorcycle"></i></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="text-sm" style={{ fontWeight: 700 }}>{tl.courier}</div>
+                    {tl.plate && <div className="text-xs muted">Patente {tl.plate}</div>}
+                  </div>
+                </div>
+                {tl.consolidated && (
+                  <div className="float-notif mt-12" style={{ padding: '10px 12px' }}><i className="fa-solid fa-layer-group text-purple"></i><div className="text-xs subtle">Viaje <b>consolidado</b>: el repartidor retira piezas de más de un comercio en el mismo recorrido.</div></div>
+                )}
+              </div>
+            )}
             <div className="timeline">
-              {trip.events.map((e, i) => (
+              {tl.events.map((e, i) => (
                 <div key={i} className={`timeline-item ${e.state}`}>
                   <span className="dot"><i className={`fa-solid ${e.icon}`}></i></span>
                   <div className="t-title">{e.title}</div>
@@ -225,7 +229,7 @@ function RequestQuotesModal({ req, onClose }) {
                       <span className="price" style={{ flexShrink: 0 }}>{money(q.price)}</span>
                     </div>
                     <div className="flex-between" style={{ gap: 8, flexWrap: 'wrap' }}>
-                      <span className="text-xs muted">{q.optionLabel || 'Opción'}{q.partBrand ? ` · ${q.partBrand}` : ''} · {fmtDateTime(q.createdAt)}</span>
+                      <span className="text-xs muted">{q.optionLabel || 'Opción'}{q.partBrand ? ` · ${q.partBrand}` : ''} · {fmtDateTime(q.createdAt)}{q.respondedInMin != null ? ` · cotizó en ${fmtDelta(q.respondedInMin)}` : ''}</span>
                       <span className={`badge ${cls}`} style={{ flexShrink: 0 }}>{txt}</span>
                     </div>
                   </div>
