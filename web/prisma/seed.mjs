@@ -81,6 +81,13 @@ async function seedDemoPedidos() {
 }
 
 async function main() {
+  // Salvaguarda: el demo NUNCA se siembra en producción. Prod corre en Supabase; si la
+  // DATABASE_URL apunta ahí, abortamos antes de tocar la base. (Staging es Neon → pasa.)
+  if (process.env.SEED_DEMO && /supabase/i.test(process.env.DATABASE_URL || '')) {
+    console.error('✋ db:demo abortado: la DATABASE_URL parece de PRODUCCIÓN (Supabase). Los pedidos de demo no se siembran en prod.');
+    process.exit(1);
+  }
+
   const passwordHash = await bcrypt.hash(TEST_PASSWORD, 10);
 
   for (const a of accounts) {
