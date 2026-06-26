@@ -58,6 +58,34 @@ test('staging: línea de tiempo de un pedido entregado (ciclo completo + reparto
   await page.screenshot({ path: `${SHOT}/stg-timeline.png`, fullPage: true });
 });
 
+// Comprobantes del split con datos demo: el admin ve el desglose FULL + cómo se divide.
+test('staging: comprobante del admin (desglose full + cómo se divide el split)', async ({ page }) => {
+  await login(page, 'admin@repuestosaltoque.com.ar');
+  await page.goto('/admin?sec=pedidos');
+  await page.getByPlaceholder(/Buscar mec/i).fill('Disco de freno'); // pedido ENTREGADO del demo
+  const row = page.locator('tr', { hasText: 'Disco de freno' }).first();
+  await expect(row).toBeVisible();
+  await row.locator('td[data-label="Total"] button').click();
+  const modal = page.locator('.modal');
+  await expect(modal.getByRole('heading', { name: /Comprobante de pago/i })).toBeVisible();
+  await expect(modal.getByText(/Total cobrado/)).toBeVisible();
+  await expect(modal.getByRole('heading', { name: /Cómo se divide \(split MP\)/i })).toBeVisible();
+  await page.screenshot({ path: `${SHOT}/stg-comprobante-admin.png`, fullPage: true });
+});
+
+// Comprobante del lado del comercio (vendedor): venta concretada.
+test('staging: comprobante del comercio (venta concretada)', async ({ page }) => {
+  await login(page, 'vendedor@repuestosaltoque.com.ar');
+  await page.getByRole('button', { name: /Concretad/i }).click();
+  const card = page.locator('.card', { hasText: 'Disco de freno' }).first();
+  await expect(card).toBeVisible({ timeout: 15000 });
+  await card.getByRole('button', { name: /Ver detalle/i }).click();
+  const modal = page.locator('.modal');
+  await expect(modal.getByRole('heading', { name: /Comprobante de pago/i })).toBeVisible();
+  await expect(modal.getByText(/Monto del repuesto/i)).toBeVisible();
+  await page.screenshot({ path: `${SHOT}/stg-comprobante-comercio.png`, fullPage: true });
+});
+
 test('staging: el mecánico entra a su panel', async ({ page }) => {
   await login(page, 'mecanico@repuestosaltoque.com.ar');
   await expect(page).toHaveURL(/\/mecanico/);
