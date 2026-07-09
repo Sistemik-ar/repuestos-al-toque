@@ -162,7 +162,9 @@ export default function Trabajo() {
                     <div className="flex-between mb-8"><span className="text-sm muted">Repuestos ({link.breakdown.items})</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.parts)}</span></div>
                     {link.breakdown.creditParts > 0 && <div className="flex-between mb-8"><span className="text-sm muted"><i className="fa-solid fa-id-card-clip text-purple"></i> A cuenta corriente (no se cobra acá)</span><span className="text-sm" style={{ fontWeight: 700, textDecoration: 'line-through', opacity: 0.6 }}>{money(link.breakdown.creditParts)}</span></div>}
                     <div className="flex-between mb-8"><span className="text-sm muted">Comisión</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.commission)}</span></div>
-                    <div className="flex-between mb-8"><span className="text-sm muted">Envío ({link.breakdown.stores} comercio{link.breakdown.stores === 1 ? '' : 's'}, una sola visita)</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.ship)}</span></div>
+                    {link.breakdown.internalFreight
+                      ? <div className="flex-between mb-8"><span className="text-sm muted">Envío</span><span className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-handshake text-yellow"></i> Lo coordinamos con vos</span></div>
+                      : <div className="flex-between mb-8"><span className="text-sm muted">Envío ({link.breakdown.stores} comercio{link.breakdown.stores === 1 ? '' : 's'}, una sola visita)</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.ship)}</span></div>}
                     {link.breakdown.mpFee > 0 && <div className="flex-between mb-8"><span className="text-sm muted">Recargo MP</span><span className="text-sm" style={{ fontWeight: 700 }}>{money(link.breakdown.mpFee)}</span></div>}
                     <div className="divider"></div>
                     <div className="flex-between mt-8"><span className="h-md">Total</span><span className="h-md text-yellow">{money(link.breakdown.total)}</span></div>

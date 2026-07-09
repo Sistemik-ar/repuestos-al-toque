@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/db';
 import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
 import { drivingKm } from '@/lib/geo';
+import { mechanicZone } from '@/lib/zones';
 import { getSettings } from '@/lib/settings';
 import { mpIsTest } from '@/lib/mercadopago';
 import { notifyDeliveryNewTrip } from '@/lib/push';
@@ -17,6 +18,13 @@ export function paidCoversExpected(paidAmount, expectedTotal) {
 }
 
 const num = (d) => (d == null ? 0 : Number(d));
+
+// ¿La entrega de este mecánico se coordina internamente? (su zona no tiene delivery habilitado).
+// En ese caso no se cobra flete por la plataforma y el pedido no aparece a los repartidores.
+export async function isInternalFreight(mechanicId) {
+  const zone = await mechanicZone(mechanicId);
+  return !!zone && !zone.deliveryEnabled;
+}
 
 // Desglose de precios según la config (comisión % + recargo MP).
 // creditAccount: cuenta corriente -> el repuesto NO se cobra por la plataforma (se imputa a la CC),
@@ -62,6 +70,8 @@ export async function jobChargePlan(jobId) {
   const job = await prisma.job.findUnique({ where: { id: jobId }, include: { requests: { include: { quotes: true } } } });
   if (!job) return null;
   const settings = await getSettings();
+  // zona sin delivery (ej. El Bolsón): la entrega se coordina internamente -> no se cobra flete
+  const internalFreight = await isInternalFreight(job.mechanicId);
   // 1) ítems a cobrar (repuesto + comisión), y el flete de la pata de CADA comercio (comercio->taller)
   const base = [];
   const storeShip = new Map(); // storeId -> flete de su pata
@@ -70,7 +80,7 @@ export async function jobChargePlan(jobId) {
     if (!sel || ['PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'].includes(r.status)) continue;
     const part = num(sel.price);
     const commission = Math.round(part * (Number(settings.commissionPct) / 100));
-    if (!storeShip.has(sel.storeId)) storeShip.set(sel.storeId, await computeShip(r.id, sel.storeId));
+    if (!storeShip.has(sel.storeId)) storeShip.set(sel.storeId, internalFreight ? 0 : await computeShip(r.id, sel.storeId));
     base.push({ requestId: r.id, quoteId: sel.id, storeId: sel.storeId, useCredit: !!r.useCredit, part, commission });
   }
   // 2) FLETE ÚNICO por patente = la pata MÁS LARGA (comercio más lejano -> taller). El cliente del
@@ -87,7 +97,7 @@ export async function jobChargePlan(jobId) {
     if (b.useCredit) totals.creditParts += b.part; else totals.parts += b.part;
     totals.commission += b.commission; totals.ship += ship; totals.mpFee += mpFee; totals.total += cobrable + mpFee;
   });
-  return { job, settings, items, totals, stores: storeShip.size };
+  return { job, settings, items, totals, stores: storeShip.size, internalFreight };
 }
 
 // Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem elegido.
@@ -101,7 +111,7 @@ async function confirmJobPaid(jobId, paidAmount) {
       await prisma.order.upsert({
         where: { requestId: it.requestId },
         update: { status: 'PAID' },
-        create: { requestId: it.requestId, quoteId: it.quoteId, mechanicId: plan.job.mechanicId, storeId: it.storeId, partAmount: it.part, commissionPct: Number(plan.settings.commissionPct), commissionAmount: it.commission, freightAmount: it.ship, mpFeeAmount: it.mpFee, creditAccount: it.useCredit, total: it.cobrado, status: 'PAID' },
+        create: { requestId: it.requestId, quoteId: it.quoteId, mechanicId: plan.job.mechanicId, storeId: it.storeId, partAmount: it.part, commissionPct: Number(plan.settings.commissionPct), commissionAmount: it.commission, freightAmount: plan.internalFreight ? null : it.ship, mpFeeAmount: it.mpFee, internalFreight: plan.internalFreight, creditAccount: it.useCredit, total: it.cobrado, status: 'PAID' },
       });
     } catch (e) { if (e?.code !== 'P2002') throw e; }
     await prisma.request.update({ where: { id: it.requestId }, data: { status: 'PAID' } }).catch(() => {});
@@ -112,7 +122,8 @@ async function confirmJobPaid(jobId, paidAmount) {
     data: { status: 'CANCELLED' },
   }).catch(() => {});
   await prisma.job.update({ where: { id: jobId }, data: { status: 'PAID' } }).catch(() => {});
-  if (plan.items.some((it) => !it.useCredit)) await notifyDeliveryNewTrip(); // hay pieza física para fletar
+  // hay pieza física para fletar — salvo coordinación interna: ese viaje no es de la flota
+  if (!plan.internalFreight && plan.items.some((it) => !it.useCredit)) await notifyDeliveryNewTrip();
   return true;
 }
 
@@ -127,7 +138,8 @@ export async function confirmPaidByRef(ref, paidAmount) {
   if (!q || q.requestId !== requestId) return false;
 
   const part = num(q.price);
-  const ship = await computeShip(requestId, q.storeId);
+  const internalFreight = await isInternalFreight(q.request.mechanicId);
+  const ship = internalFreight ? 0 : await computeShip(requestId, q.storeId);
   const settings = await getSettings();
   const p = computePricing(part, ship, settings, creditAccount);
   // verificación de monto (defensa en profundidad): el pago real debe cubrir el total
@@ -137,7 +149,7 @@ export async function confirmPaidByRef(ref, paidAmount) {
     await prisma.order.upsert({
       where: { requestId },
       update: { status: 'PAID' },
-      create: { requestId, quoteId, mechanicId: q.request.mechanicId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: p.ship, mpFeeAmount: p.mpFeeAmount, creditAccount: p.creditAccount, total: p.total, status: 'PAID' },
+      create: { requestId, quoteId, mechanicId: q.request.mechanicId, storeId: q.storeId, partAmount: p.part, commissionPct: p.commissionPct, commissionAmount: p.commission, freightAmount: internalFreight ? null : p.ship, mpFeeAmount: p.mpFeeAmount, internalFreight, creditAccount: p.creditAccount, total: p.total, status: 'PAID' },
     });
   } catch (e) {
     // el webhook y la vuelta del navegador pueden confirmar a la vez -> la orden ya existe
@@ -145,6 +157,6 @@ export async function confirmPaidByRef(ref, paidAmount) {
   }
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }).catch(() => {});
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
-  if (!creditAccount) await notifyDeliveryNewTrip(); // pieza pagada por plataforma -> necesita flete
+  if (!creditAccount && !internalFreight) await notifyDeliveryNewTrip(); // pieza pagada por plataforma -> necesita flete
   return true;
 }

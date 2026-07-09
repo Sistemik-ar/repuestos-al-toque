@@ -28,6 +28,15 @@ const categories = [
 ];
 // "otros" se discontinuó: si quedó de un seed viejo y no tiene pedidos asociados, se elimina.
 
+// Zonas de cobertura iniciales. Solo el ÁREA se re-upserta; los interruptores (activa /
+// delivery / comercios) NO se pisan si la zona ya existe: se manejan desde el backoffice.
+const zones = [
+  // Bariloche: mismo box que estaba hardcodeado (centro, km de Bustillo, Dina Huapi)
+  { slug: 'bariloche', name: 'Bariloche', latMin: -41.30, latMax: -40.95, lngMin: -71.70, lngMax: -71.05, active: true, deliveryEnabled: true, storesEnabled: true },
+  // El Bolsón (+ Mallín Ahogado / Villa Turismo): solo mecánicos; la entrega se coordina internamente
+  { slug: 'el-bolson', name: 'El Bolsón', latMin: -42.05, latMax: -41.85, lngMin: -71.65, lngMax: -71.40, active: true, deliveryEnabled: false, storesEnabled: false },
+];
+
 // Pedidos de DEMO (opt-in: SEED_DEMO=1) para ver en el admin/staging ejemplos de cada estado/vista:
 // abierto, cotizado (con tiempos de respuesta, sin stock y "no respondieron"), elegido sin pagar,
 // pagado, en camino, entregado (con reparto + reseña) y cancelado. NO corre en E2E ni en prod.
@@ -104,6 +113,11 @@ async function main() {
 
   for (const [slug, name, icon] of categories) {
     await prisma.category.upsert({ where: { slug }, update: { name, icon }, create: { slug, name, icon } });
+  }
+
+  for (const z of zones) {
+    const { slug, name, latMin, latMax, lngMin, lngMax } = z;
+    await prisma.zone.upsert({ where: { slug }, update: { name, latMin, latMax, lngMin, lngMax }, create: z });
   }
   // baja de "otros" (discontinuada): solo si no quedó ningún pedido en esa categoría
   const otros = await prisma.category.findUnique({ where: { slug: 'otros' } });

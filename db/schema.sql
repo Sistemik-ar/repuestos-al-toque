@@ -35,7 +35,25 @@ create table profiles (
   created_at       timestamptz  default now(),
   created_by       uuid references profiles(id),
   notes            text,                       -- interno (solo admins)
-  terms_accepted_at timestamptz
+  terms_accepted_at timestamptz,
+  last_login_at    timestamptz,                -- último ingreso (stats del admin)
+  last_seen_at     timestamptz                 -- última actividad ("en línea" en el admin)
+);
+
+-- ---------- Zonas de cobertura ----------
+-- Ciudades/áreas (bounding box) donde se dan de alta usuarios, editables desde el backoffice.
+-- delivery_enabled=false => los pedidos de mecánicos de esa zona se entregan por coordinación
+-- interna (sin flete cobrado por la app, sin repartidores; el admin registra los movimientos).
+-- stores_enabled=false  => en esa zona solo se dan de alta mecánicos (ej: El Bolsón).
+create table zones (
+  id               serial primary key,
+  slug             text unique not null,          -- 'bariloche' | 'el-bolson' | ...
+  name             text not null,
+  lat_min double precision not null, lat_max double precision not null,
+  lng_min double precision not null, lng_max double precision not null,
+  active           boolean default true,
+  delivery_enabled boolean default true,
+  stores_enabled   boolean default false
 );
 
 -- ---------- Mecánico ----------
@@ -46,6 +64,7 @@ create table mechanics (
   barrio      text,
   address     text,
   lat double precision, lng double precision,
+  zone_id     int references zones(id),        -- zona de la dirección (derivada al alta)
   cuit        text
 );
 
@@ -60,6 +79,7 @@ create table stores (
   address        text,
   barrio         text,
   lat double precision, lng double precision,
+  zone_id        int references zones(id),      -- zona de la dirección (derivada al alta)
   hours          jsonb,                         -- días y horarios de atención
   contact_person text,                          -- quién opera la app
   part_condition part_condition default 'nuevo',
@@ -204,7 +224,8 @@ create table orders (
   part_amount       numeric(12,2),
   commission_pct    numeric(4,2) default 5.0,
   commission_amount numeric(12,2),
-  freight_amount    numeric(12,2),
+  freight_amount    numeric(12,2),                 -- null si la entrega es por coordinación interna
+  internal_freight  boolean default false,         -- zona sin delivery: entrega coordinada por la app (sin repartidor)
   total             numeric(12,2),
   payer             text default 'client',        -- 'client' (dueño del auto) | 'mechanic'
   status            order_status default 'paid',

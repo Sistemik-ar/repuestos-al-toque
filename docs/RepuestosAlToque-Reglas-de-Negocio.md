@@ -63,6 +63,12 @@ Cada frase describe una regla del producto. Sirve para chequear que el modelo de
 - El envío pasa por estados: preparando → retirado → en camino → entregado. ✅
 - El tamaño del paquete (moto/auto/utilitario) define el tipo de vehículo del flete. ✅
 
+## Zonas de cobertura
+- La plataforma opera por **zonas** (ciudades/áreas) editables desde el backoffice: hoy **Bariloche** y **El Bolsón**. ✅
+- Los usuarios solo se dan de alta con dirección dentro de una **zona activa**. ✅
+- **Comercios solo en zonas con comercios habilitados** (hoy: Bariloche). En El Bolsón, por ahora, solo mecánicos. ✅ *(decisión tomada — a futuro habrá comercios en otras ciudades)*
+- Si la zona del mecánico **no tiene delivery habilitado** (El Bolsón), la entrega se **coordina internamente** con la plataforma: no se cobra flete en el checkout, el pedido no aparece a los repartidores y el admin registra los movimientos (retirado/entregado) desde el backoffice. ✅ *(decisión tomada)*
+
 ## Reputación y calidad
 - Un vendedor suma puntos cuando concreta una venta. ✅
 - Un mecánico puede dejar reseña de uno o varios pedidos/ventas. ✅

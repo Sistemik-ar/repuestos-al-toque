@@ -6,6 +6,7 @@ vi.mock('@/lib/db', () => ({
     request: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn().mockResolvedValue({}) },
     storeProfile: { findUnique: vi.fn() },
     mechanicProfile: { findUnique: vi.fn() },
+    zone: { findMany: vi.fn().mockResolvedValue([]) },
     shippingTariff: { findMany: vi.fn() },
     setting: { findMany: vi.fn() },
     order: { upsert: vi.fn() },
@@ -48,6 +49,24 @@ describe('confirmPaidByRef', () => {
     expect(arg.create.freightAmount).toBe(5000); // mínimo, sin coordenadas
     expect(arg.create.total).toBe(39900 + 1995 + 5000);
     expect(prisma.request.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'PAID' } }));
+  });
+});
+
+describe('confirmPaidByRef — coordinación interna (zona sin delivery)', () => {
+  it('mecánico de El Bolsón: no cobra flete y marca la orden como internalFreight', async () => {
+    const BOLSON = { id: 2, slug: 'el-bolson', name: 'El Bolsón', latMin: -42.05, latMax: -41.85, lngMin: -71.65, lngMax: -71.40, active: true, deliveryEnabled: false, storesEnabled: false };
+    prisma.requestQuote.findUnique.mockResolvedValue({ id: 'q1', requestId: 'r1', storeId: 's1', price: 39900, request: { mechanicId: 'm1' } });
+    prisma.mechanicProfile.findUnique.mockResolvedValue({ zoneId: 2, lat: -41.96, lng: -71.53, zone: BOLSON });
+    prisma.setting.findMany.mockResolvedValue([]); // defaults: comisión 5%
+    prisma.order.upsert.mockResolvedValue({});
+    prisma.requestQuote.update.mockResolvedValue({});
+    prisma.request.update.mockResolvedValue({});
+
+    expect(await confirmPaidByRef('r1::q1')).toBe(true);
+    const arg = prisma.order.upsert.mock.calls[0][0];
+    expect(arg.create.internalFreight).toBe(true);
+    expect(arg.create.freightAmount).toBeNull(); // no es un envío gratis: no hay flete de la app
+    expect(arg.create.total).toBe(39900 + 1995); // repuesto + comisión, sin envío
   });
 });
 
