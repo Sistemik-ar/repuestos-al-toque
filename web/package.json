@@ -16,6 +16,8 @@
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.mjs",
     "db:demo": "SEED_DEMO=1 node prisma/seed.mjs",
+    "db:seed-zones": "node prisma/seed-zones.mjs",
+    "db:backfill-zones": "node scripts/backfill-zones.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",

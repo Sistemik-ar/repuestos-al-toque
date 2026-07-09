@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { money, fmtDateTime } from '@/lib/ui';
+import { money, fmtDateTime, toast } from '@/lib/ui';
 import Loading from '@/components/Loading';
-import { getRequestQuotes, getRequestTimeline } from '@/app/actions/data';
+import { getRequestQuotes, getRequestTimeline, adminAdvanceInternalOrder } from '@/app/actions/data';
 import { useTable, Search, SortBar, Thead, Pager } from './table';
 
 const ORDER_COLS = [
@@ -43,11 +43,24 @@ const ESTADO_TABS = [
   ['cancelados', 'Cancelados', ['CANCELLED']],
 ];
 
-function OrdersSection({ orders, loading }) {
+function OrdersSection({ orders, loading, onReload }) {
   const [timelineReq, setTimelineReq] = useState(null);
   const [detail, setDetail] = useState(null); // pedido cuyo desglose (comisión/envío/MP) se muestra
   const [quotesReq, setQuotesReq] = useState(null); // pedido cuyas cotizaciones recibidas se muestran
   const [estado, setEstado] = useState('todos');
+  const [advancing, setAdvancing] = useState(null); // orderId cuya coordinación interna se está avanzando
+
+  // Coordinación interna (zona sin delivery): el admin registra el movimiento (retirado/entregado).
+  async function avanzar(o) {
+    const next = o.orderStatus === 'PAID' ? '¿Registrar la pieza como RETIRADA del comercio?' : '¿Registrar la pieza como ENTREGADA al mecánico?';
+    if (!window.confirm(`${next}\nPedido #${o.code} · ${o.label}`)) return;
+    setAdvancing(o.orderId);
+    const res = await adminAdvanceInternalOrder(o.orderId);
+    setAdvancing(null);
+    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    toast({ title: res.status === 'SHIPPED' ? 'Retiro registrado' : 'Entrega registrada', sub: `#${o.code}`, icon: 'fa-truck-fast', type: 'green' });
+    onReload?.();
+  }
   const rows = useMemo(() => {
     const g = ESTADO_TABS.find(([k]) => k === estado)?.[2];
     return (orders || []).filter((o) => !g || g.includes(o.status)).map((o) => ({ ...o, tripRank: o.hasTrip ? 1 : 0, totalStr: o.total ? money(o.total) : '—' }));
@@ -75,7 +88,17 @@ function OrdersSection({ orders, loading }) {
                 <td data-label="Repuesto">{o.label}</td>
                 <td data-label="Vehículo">{o.vehicle}</td>
                 <td data-label="Total">{o.total ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setDetail(o)} title="Ver desglose">{o.totalStr} <i className="fa-solid fa-circle-info" style={{ fontSize: 11, opacity: 0.6 }}></i></button> : <span className="muted">—</span>}</td>
-                <td data-label="Estado"><StatusBadge status={o.status} /></td>
+                <td data-label="Estado">
+                  <StatusBadge status={o.status} />
+                  {o.internalFreight && <div className="mt-4"><span className="badge badge-yellow" title="Zona sin delivery: la entrega se coordina internamente"><i className="fa-solid fa-handshake"></i> Coordinación interna</span></div>}
+                  {o.internalFreight && ['PAID', 'SHIPPED'].includes(o.orderStatus) && (
+                    <div className="mt-4">
+                      <button className="btn btn-yellow btn-sm" disabled={advancing === o.orderId} onClick={() => avanzar(o)}>
+                        {advancing === o.orderId ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : o.orderStatus === 'PAID' ? <><i className="fa-solid fa-box"></i> Registrar retiro</> : <><i className="fa-solid fa-circle-check"></i> Registrar entrega</>}
+                      </button>
+                    </div>
+                  )}
+                </td>
                 <td data-label="Cotizaciones">{(o.quoteCount > 0 || o.dismissCount > 0)
                   ? <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px 10px' }} onClick={() => setQuotesReq(o)} title="Ver cotizaciones y respuestas"><i className="fa-solid fa-tags"></i> {o.quoteCount}{o.dismissCount > 0 && <span style={{ marginLeft: 7, color: '#FCA5A5' }} title={`${o.dismissCount} marcó sin stock`}><i className="fa-solid fa-ban" style={{ fontSize: 11 }}></i> {o.dismissCount}</span>}</button>
                   : <span className="muted">0</span>}</td>

@@ -265,7 +265,7 @@ function DetalleModal({ r, onClose }) {
   const [zoom, setZoom] = useState(null);
   const veh = `${r.brand || ''} ${r.model || ''} ${r.year || ''}`.trim();
   const isSale = !!r.orderId || !!r.orderStatus;
-  const ESTADO = { PAID: r.hasDelivery ? 'Pagado · repartidor en camino' : 'Pagado · esperando repartidor', SHIPPED: 'Retirado · en camino al taller', DELIVERED: 'Entregado al mecánico', READY: 'Listo', REFUNDED: 'Reembolsado' };
+  const ESTADO = { PAID: r.internalFreight ? 'Pagado · retiro coordinado por RepuestosAlToque' : r.hasDelivery ? 'Pagado · repartidor en camino' : 'Pagado · esperando repartidor', SHIPPED: 'Retirado · en camino al taller', DELIVERED: 'Entregado al mecánico', READY: 'Listo', REFUNDED: 'Reembolsado' };
   // estado de la cotización (cuando todavía no es venta concretada)
   const estadoCot = isSale ? null
     : r.status === 'CANCELLED' ? 'Cancelado — el mecánico no pagó'
@@ -406,8 +406,9 @@ function EntregaCard({ r, label, veh, onChanged, onDetail }) {
         <span className="text-sm muted">Venta <b className="text-green">{r.part ? '$' + r.part.toLocaleString('es-AR') : ''}</b></span>
         {r.orderStatus === 'SHIPPED' && <span className="badge badge-yellow"><i className="fa-solid fa-truck-fast"></i> Retirado · en camino al taller</span>}
         {r.orderStatus === 'DELIVERED' && <span className="badge badge-green"><i className="fa-solid fa-box-open"></i> Entregado al mecánico</span>}
-        {r.orderStatus === 'PAID' && !r.hasDelivery && <span className="badge badge-gray"><i className="fa-solid fa-clock"></i> Esperando repartidor</span>}
-        {r.orderStatus === 'PAID' && r.hasDelivery && <span className="badge badge-yellow"><i className="fa-solid fa-motorcycle"></i> Repartidor en camino a tu local</span>}
+        {r.orderStatus === 'PAID' && r.internalFreight && <span className="badge badge-yellow"><i className="fa-solid fa-handshake"></i> Retiro coordinado por RepuestosAlToque</span>}
+        {r.orderStatus === 'PAID' && !r.internalFreight && !r.hasDelivery && <span className="badge badge-gray"><i className="fa-solid fa-clock"></i> Esperando repartidor</span>}
+        {r.orderStatus === 'PAID' && !r.internalFreight && r.hasDelivery && <span className="badge badge-yellow"><i className="fa-solid fa-motorcycle"></i> Repartidor en camino a tu local</span>}
       </div>
       <div className="text-xs muted mb-12"><i className="fa-regular fa-clock"></i> {fmtDateTime(r.soldAt)}</div>
       {r.issue && <div className="float-notif mb-12" style={{ padding: '8px 12px', borderColor: 'rgba(239,68,68,0.4)' }}><i className="fa-solid fa-flag text-red"></i><span className="text-xs subtle"><b>Incidencia:</b> {r.issue}</span></div>}

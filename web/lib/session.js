@@ -44,6 +44,9 @@ export async function getSession() {
       const u = await prisma.user.findUnique({ where: { id: payload.id }, select: { status: true } });
       status = u?.status || 'MISSING';
       statusCache.set(payload.id, { status, at: Date.now() });
+      // Latido de presencia: esta rama corre a lo sumo 1 vez cada 30s por usuario (por instancia),
+      // así "en línea / última conexión" del admin no cuesta un write por request.
+      if (status === 'ACTIVE') await prisma.user.update({ where: { id: payload.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
     }
     if (status !== 'ACTIVE') return null;
     return payload;

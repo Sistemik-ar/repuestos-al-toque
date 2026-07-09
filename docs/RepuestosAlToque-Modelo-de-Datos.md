@@ -18,11 +18,14 @@ Una fila por usuario, ligada a la cuenta de acceso (auth). Roles: **admin, mecha
 - Gestión: estado (pendiente/activo/suspendido), fecha de alta, **quién lo dio de alta**, notas internas, aceptación de términos
 - Reputación (mecánico y vendedor): calificación promedio, cantidad de reseñas, puntos, operaciones completadas
 
+### 1b. zones (zonas de cobertura)
+Ciudades/áreas donde opera la plataforma, **editables desde el backoffice**: nombre, slug, bounding box (lat/lng min/max), activa, **delivery habilitado** (sin delivery ⇒ la entrega de los pedidos de esa zona se coordina internamente, sin flete cobrado) y **comercios habilitados** (sin comercios ⇒ solo se dan de alta mecánicos; hoy El Bolsón). Mecánicos y comercios guardan su `zone_id`, derivado de la dirección al alta.
+
 ### 2. mechanics (1‑a‑1 con profile, rol mechanic)
-Nombre del taller, tipo (taller/particular), barrio/zona, dirección, geo (lat/lng), CUIT (opcional).
+Nombre del taller, tipo (taller/particular), barrio/zona, dirección, geo (lat/lng), **zona** (`zone_id`), CUIT (opcional).
 
 ### 3. stores (vendedor — 1‑a‑1 con profile, rol seller)
-Nombre del local, **razón social**, **CUIT (único)**, **condición de IVA**, titular/responsable, dirección, **barrio**, geo, **horarios y días**, persona de contacto operativo, tipo de repuesto (nuevo), **datos de cobro** (cuenta MP vinculada, estado de vinculación, CBU/alias), facturación (tipo A/B/C, punto de venta), logo y foto del frente.
+Nombre del local, **razón social**, **CUIT (único)**, **condición de IVA**, titular/responsable, dirección, **barrio**, geo, **zona** (`zone_id`), **horarios y días**, persona de contacto operativo, tipo de repuesto (nuevo), **datos de cobro** (cuenta MP vinculada, estado de vinculación, CBU/alias), facturación (tipo A/B/C, punto de venta), logo y foto del frente.
 - **store_categories**: categorías de repuestos que maneja (N‑a‑N con `categories`).
 - **store_brands** *(opcional)*: marcas de vehículos que cubre.
 
@@ -45,7 +48,7 @@ Preguntas predefinidas + texto que un vendedor le hace al mecánico sobre un ped
 Por pedido y vendedor: **alias** (lo que ve el mecánico), marca de la pieza, **precio**, garantía, nota, **hasta 3 fotos** (validado en la base), calificación al momento (para ordenar), etiqueta de opción (A/B… porque el vendedor puede mandar varias), estado (enviada/elegida/rechazada).
 
 ### 9. orders (venta concretada)
-Pedido + cotización elegida + mecánico + vendedor, con el desglose del dinero: **monto del repuesto**, **% y monto de comisión**, **monto de flete**, total, quién paga, estado.
+Pedido + cotización elegida + mecánico + vendedor, con el desglose del dinero: **monto del repuesto**, **% y monto de comisión**, **monto de flete** (null si la entrega es coordinada), **coordinación interna** (`internal_freight`: zona sin delivery — no aparece a repartidores y el admin registra retiro/entrega), total, quién paga, estado.
 
 ### 10. payments (Mercado Pago)
 Pago asociado a la orden: id de MP, estado, monto, **split** (vendedor / comisión / flete) y el payload crudo del webhook.

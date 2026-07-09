@@ -12,6 +12,7 @@ import Pricing from '@/components/admin/PricingSection';
 import CreditSection from '@/components/admin/CreditSection';
 import StoreCategories from '@/components/admin/StoreCategories';
 import OrdersSection from '@/components/admin/OrdersSection';
+import ZonesSection from '@/components/admin/ZonesSection';
 import UsersSection, { AltaUsuario } from '@/components/admin/UsersSection';
 import HomeSection from '@/components/admin/HomeSection';
 import CobrosSection from '@/components/admin/CobrosSection';
@@ -138,12 +139,13 @@ export default function Admin() {
 
         {tab === 'cobros' && <CobrosSection stores={d?.stores} />}
 
-        {tab === 'pedidos' && <OrdersSection orders={d?.recent} loading={d === null} />}
+        {tab === 'pedidos' && <OrdersSection orders={d?.recent} loading={d === null} onReload={load} />}
 
         {tab === 'stats' && <StatsSection />}
 
         {tab === 'ajustes' && (<>
           <Pricing />
+          <ZonesSection />
           {/* Tarifas de envío */}
           <div className="card mb-16">
             <div className="section-title"><h2>Tarifas de envío (por km)</h2><span className="text-xs muted">respeta el envío mínimo configurado</span></div>

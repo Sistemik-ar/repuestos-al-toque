@@ -111,13 +111,14 @@ export default function Detalle() {
                 <div className="section-title"><h2>Pago</h2>{r.order.creditAccount && <span className="badge badge-purple"><i className="fa-solid fa-id-card-clip"></i> Cuenta Corriente</span>}</div>
                 <Row k={`Repuesto${r.order.creditAccount ? ' (a tu cuenta corriente)' : ''}`} v={money(r.order.part)} />
                 <Row k={`Comisión (${r.order.commissionPct}%)`} v={money(r.order.commission)} />
-                <Row k="Envío" v={money(r.order.ship)} />
+                <Row k="Envío" v={r.order.internalFreight ? 'Lo coordinamos con vos' : money(r.order.ship)} />
                 {r.order.mpFee > 0 && <Row k="Recargo Mercado Pago" v={money(r.order.mpFee)} />}
                 <div className="divider" style={{ margin: '10px 0' }}></div>
                 <div className="flex-between"><span className="h-md">Total{r.order.creditAccount ? ' pagado por la app' : ''}</span><span className="h-md text-yellow">{money(r.order.total)}</span></div>
-                {r.status === 'PAID' && !r.order.hasDelivery && <div className="text-xs muted mt-8"><i className="fa-solid fa-clock"></i> Esperando que un repartidor tome el pedido</div>}
-                {r.status === 'PAID' && r.order.hasDelivery && <div className="text-xs mt-8" style={{ color: 'var(--yellow)' }}><i className="fa-solid fa-motorcycle"></i> Repartidor asignado — yendo a retirar la pieza al comercio</div>}
-                {r.status === 'SHIPPED' && <div className="text-xs mt-8" style={{ color: 'var(--yellow)' }}><i className="fa-solid fa-truck-fast"></i> El repartidor retiró la pieza y está en camino a tu taller</div>}
+                {r.status === 'PAID' && r.order.internalFreight && <div className="text-xs mt-8" style={{ color: 'var(--yellow)' }}><i className="fa-solid fa-handshake"></i> La entrega la coordinamos con vos — te contactamos para acordar día y hora</div>}
+                {r.status === 'PAID' && !r.order.internalFreight && !r.order.hasDelivery && <div className="text-xs muted mt-8"><i className="fa-solid fa-clock"></i> Esperando que un repartidor tome el pedido</div>}
+                {r.status === 'PAID' && !r.order.internalFreight && r.order.hasDelivery && <div className="text-xs mt-8" style={{ color: 'var(--yellow)' }}><i className="fa-solid fa-motorcycle"></i> Repartidor asignado — yendo a retirar la pieza al comercio</div>}
+                {r.status === 'SHIPPED' && <div className="text-xs mt-8" style={{ color: 'var(--yellow)' }}><i className="fa-solid fa-truck-fast"></i> {r.order.internalFreight ? 'Retiramos la pieza — la entrega se coordina con vos' : 'El repartidor retiró la pieza y está en camino a tu taller'}</div>}
               </div>
             )}
 

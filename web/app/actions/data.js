@@ -6,7 +6,8 @@ import { getSession, invalidateStatusCache } from '@/lib/session';
 import { createPaymentLink, mpIsTest, mpOAuthUrl, mpOAuthConfigured, mpRefresh } from '@/lib/mercadopago';
 import { jobChargePlan, jobSplit } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
-import { geocode, inBariloche, searchBariloche } from '@/lib/geo';
+import { geocode, searchInZones, zoneOf } from '@/lib/geo';
+import { getActiveZones, zonesForRole } from '@/lib/zones';
 import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
 import { aliasLabel } from '@/lib/alias';
@@ -109,7 +110,7 @@ export async function getRequestDetail(id) {
     ...reqBase(r),
     quotesCount: r.quotes.length,
     selected: sel ? quotePublic(sel) : null,
-    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, hasDelivery: !!o.deliveryId, deliveryPin: ['PAID', 'SHIPPED'].includes(o.status) ? o.deliveryPin : null, arrivedDrop: !!o.arrivedDropAt } : null,
+    order: o ? { status: o.status, part: num(o.partAmount), commission: num(o.commissionAmount), commissionPct: num(o.commissionPct), ship: num(o.freightAmount), mpFee: num(o.mpFeeAmount), total: num(o.total), creditAccount: o.creditAccount, internalFreight: o.internalFreight, hasDelivery: !!o.deliveryId, deliveryPin: ['PAID', 'SHIPPED'].includes(o.status) ? o.deliveryPin : null, arrivedDrop: !!o.arrivedDropAt } : null,
   };
 }
 
@@ -268,7 +269,7 @@ export async function getStoreSales() {
   const mechs = await prisma.mechanicProfile.findMany({ where: { userId: { in: mechIds } }, select: { userId: true, workshopName: true } });
   const mechName = Object.fromEntries(mechs.map((m) => [m.userId, m.workshopName]));
   return orders.map((o) => ({
-    orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, creditAccount: o.creditAccount,
+    orderId: o.id, orderStatus: o.status, hasDelivery: !!o.deliveryId, internalFreight: o.internalFreight, creditAccount: o.creditAccount,
     creditSettledAt: o.creditSettledAt ? o.creditSettledAt.getTime() : null,
     soldAt: o.createdAt?.getTime() || 0, mechanicName: mechName[o.mechanicId] || 'Taller',
     arrivedPickup: !!o.arrivedPickupAt, issue: o.issue || null, total: num(o.total), part: num(o.partAmount), commission: num(o.commissionAmount), ...reqBase(o.request),
@@ -342,9 +343,10 @@ export async function createQuote(requestId, input) {
 // ---- Repartidor ----
 export async function getMyDeliveries() {
   const s = await getSession(); if (!s || s.role !== 'DELIVERY') return [];
-  // disponibles (sin repartidor asignado) + las mías en curso
+  // disponibles (sin repartidor asignado) + las mías en curso.
+  // Las de coordinación interna (zona sin delivery) NO son de la flota: no se muestran.
   const orders = await prisma.order.findMany({
-    where: { OR: [{ status: 'PAID', deliveryId: null }, { deliveryId: s.id, status: { in: ['PAID', 'SHIPPED'] } }] },
+    where: { internalFreight: false, OR: [{ status: 'PAID', deliveryId: null }, { deliveryId: s.id, status: { in: ['PAID', 'SHIPPED'] } }] },
     orderBy: { createdAt: 'desc' },
     include: { request: { include: { category: true, job: { select: { plate: true } } } } },
   });
@@ -750,7 +752,7 @@ export async function getAdminData() {
     prisma.user.count(),
     prisma.request.count(),
     prisma.order.findMany({ where: { status: 'PAID' }, select: { commissionAmount: true } }),
-    prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true } }),
+    prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 500, select: { id: true, email: true, name: true, role: true, status: true, createdAt: true, lastSeenAt: true, lastLoginAt: true } }),
     prisma.request.findMany({ orderBy: { createdAt: 'desc' }, take: 500, include: { category: true, order: true, mechanic: { select: { name: true, email: true } }, _count: { select: { quotes: true } } } }),
     prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, slug: true, name: true, icon: true } }),
     prisma.storeProfile.findMany({ select: { userId: true, tradeName: true, mpLinked: true, categories: { select: { categoryId: true } } } }),
@@ -762,7 +764,7 @@ export async function getAdminData() {
   const dismissBy = Object.fromEntries(dismissGroups.map((g) => [g.requestId, g._count._all]));
   return {
     kpis: { users: usersCount, requests: reqCount, paid: paid.length, commission },
-    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, status: u.status, createdAt: u.createdAt ? u.createdAt.getTime() : null })),
+    users: users.map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role, status: u.status, createdAt: u.createdAt ? u.createdAt.getTime() : null, lastSeenAt: u.lastSeenAt ? u.lastSeenAt.getTime() : (u.lastLoginAt ? u.lastLoginAt.getTime() : null) })),
     categories,
     // comercios con los rubros que tienen asignados (para el editor de categorías)
     stores: storeRows.map((st) => ({ id: st.userId, name: st.tradeName, mpLinked: !!st.mpLinked, categoryIds: st.categories.map((c) => c.categoryId) })),
@@ -780,6 +782,8 @@ export async function getAdminData() {
       created: r.createdAt ? r.createdAt.getTime() : null,
       concretada: r.order ? r.order.createdAt.getTime() : null,
       orderId: r.order ? r.order.id : null,
+      orderStatus: r.order ? r.order.status : null,
+      internalFreight: r.order ? r.order.internalFreight : false,
       hasTrip: !!(r.order && (r.order.deliveryId || ['SHIPPED', 'DELIVERED', 'DONE'].includes(r.order.status))),
       // desglose congelado del pedido (para el modal del admin)
       part: r.order ? num(r.order.partAmount) : null,
@@ -936,7 +940,7 @@ export async function getRequestTimeline(requestId) {
     select: {
       code: true, description: true, brand: true, model: true, status: true, createdAt: true, selectedAt: true,
       quotes: { select: { createdAt: true } },
-      order: { select: { createdAt: true, status: true, deliveryId: true, shipmentId: true, arrivedPickupAt: true, pickedAt: true, arrivedDropAt: true, deliveredAt: true, issue: true, issueAt: true } },
+      order: { select: { createdAt: true, status: true, deliveryId: true, internalFreight: true, shipmentId: true, arrivedPickupAt: true, pickedAt: true, arrivedDropAt: true, deliveredAt: true, issue: true, issueAt: true } },
     },
   });
   if (!r) return null;
@@ -956,10 +960,10 @@ export async function getRequestTimeline(requestId) {
   if (o) {
     ev.push({ icon: 'fa-credit-card', title: 'Pedido pagado', sub: 'Mercado Pago', time: ms(o.createdAt), state: 'done' });
     if (o.arrivedPickupAt) ev.push({ icon: 'fa-store', title: 'Llegó al comercio', sub: 'Retiro de la pieza', time: ms(o.arrivedPickupAt), state: 'done' });
-    if (o.pickedAt) ev.push({ icon: 'fa-box', title: 'Retiró la pieza', sub: 'PIN de retiro validado', time: ms(o.pickedAt), state: 'done' });
+    if (o.pickedAt) ev.push({ icon: 'fa-box', title: 'Retiró la pieza', sub: o.internalFreight ? 'Coordinación interna (registró el admin)' : 'PIN de retiro validado', time: ms(o.pickedAt), state: 'done' });
     if (o.arrivedDropAt) ev.push({ icon: 'fa-location-dot', title: 'Llegó al taller', sub: 'Entrega al mecánico', time: ms(o.arrivedDropAt), state: 'done' });
-    if (o.deliveredAt) ev.push({ icon: 'fa-circle-check', title: 'Entregado', sub: 'PIN de entrega validado', time: ms(o.deliveredAt), state: 'done' });
-    else ev.push({ icon: 'fa-circle-check', title: 'Entrega pendiente', sub: o.deliveryId ? 'En reparto' : 'Esperando repartidor', time: null, state: 'current' });
+    if (o.deliveredAt) ev.push({ icon: 'fa-circle-check', title: 'Entregado', sub: o.internalFreight ? 'Coordinación interna (registró el admin)' : 'PIN de entrega validado', time: ms(o.deliveredAt), state: 'done' });
+    else ev.push({ icon: 'fa-circle-check', title: 'Entrega pendiente', sub: o.internalFreight ? 'Coordinación interna (sin repartidor de la app)' : o.deliveryId ? 'En reparto' : 'Esperando repartidor', time: null, state: 'current' });
     if (o.issue) ev.push({ icon: 'fa-triangle-exclamation', title: 'Incidencia reportada', sub: o.issue, time: ms(o.issueAt), state: 'done' });
   } else if (r.status === 'CANCELLED') {
     ev.push({ icon: 'fa-ban', title: 'Cancelado', sub: 'No se concretó (no se pagó a tiempo)', time: null, state: 'done' });
@@ -1002,6 +1006,37 @@ export async function getAdminTrip(orderId) {
   };
 }
 
+// Órdenes de COORDINACIÓN INTERNA (zona sin delivery, ej. El Bolsón): no hay repartidor de la
+// app, así que el ADMIN registra los movimientos desde el backoffice: PAID -> retirada (SHIPPED)
+// -> entregada (DELIVERED). Cada avance queda en AuditLog (quién y cuándo).
+export async function adminAdvanceInternalOrder(orderId) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const o = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true, internalFreight: true, mechanicId: true, storeId: true, requestId: true, request: { select: { jobId: true } } } });
+  if (!o) return { error: 'Orden no encontrada' };
+  if (!o.internalFreight) return { error: 'Esta orden va con repartidor de la app: el estado lo mueven los PINs.' };
+  if (o.status === 'PAID') {
+    await prisma.order.update({ where: { id: orderId }, data: { status: 'SHIPPED', pickedAt: new Date() } });
+    await prisma.request.update({ where: { id: o.requestId }, data: { status: 'SHIPPED' } }).catch(() => {});
+    await prisma.auditLog.create({ data: { actorId: s.id, action: 'INTERNAL_FREIGHT_PICKED', entity: 'order', entityId: orderId } }).catch(() => {});
+    await sendPush(o.mechanicId, { title: 'Tu pedido está en camino 🚚', body: 'Retiramos la pieza del comercio. Coordinamos la entrega con vos.', url: '/mecanico', tag: 'interno-' + orderId }).catch(() => {});
+    return { ok: true, status: 'SHIPPED' };
+  }
+  if (o.status === 'SHIPPED') {
+    await prisma.order.update({ where: { id: orderId }, data: { status: 'DELIVERED', deliveredAt: new Date() } });
+    await prisma.request.update({ where: { id: o.requestId }, data: { status: 'DELIVERED' } }).catch(() => {});
+    // igual que la entrega con PIN: si no queda ningún ítem comprado sin entregar, el trabajo pasa a DONE
+    if (o.request?.jobId) {
+      const pendientes = await prisma.request.count({ where: { jobId: o.request.jobId, status: { in: ['PAID', 'SHIPPED'] } } });
+      if (pendientes === 0) await prisma.job.update({ where: { id: o.request.jobId }, data: { status: 'DONE' } }).catch(() => {});
+    }
+    await prisma.storeProfile.update({ where: { userId: o.storeId }, data: { points: { increment: 1 } } }).catch(() => {}); // venta concretada
+    await prisma.auditLog.create({ data: { actorId: s.id, action: 'INTERNAL_FREIGHT_DELIVERED', entity: 'order', entityId: orderId } }).catch(() => {});
+    await sendPush(o.mechanicId, { title: 'Pedido entregado ✅', body: 'Registramos la entrega de tu repuesto. ¡Gracias!', url: '/mecanico', tag: 'interno-' + orderId }).catch(() => {});
+    return { ok: true, status: 'DELIVERED' };
+  }
+  return { error: 'La orden no admite más avances (ya está entregada o reembolsada).' };
+}
+
 // El admin define qué rubros vende cada comercio. Solo le van a llegar pedidos de esas categorías.
 export async function setStoreCategories(storeId, categoryIds) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
@@ -1026,16 +1061,19 @@ export async function createUser(input) {
   const tempPassword = Math.random().toString(36).slice(2, 10);
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-  // Validación de dirección: tiene que existir (geocodificable) y estar en Bariloche.
+  // Validación de dirección: tiene que existir (geocodificable) y caer en una zona habilitada
+  // para el rol (mecánicos: cualquier zona activa; comercios: solo zonas con comercios habilitados).
   // Sin dirección válida no se puede calcular el costo de envío por distancia.
-  let coords = null;
+  let coords = null, zone = null;
   if (role === 'MECHANIC' || role === 'STORE') {
     if (!String(input.address || '').trim()) return { error: 'La dirección es obligatoria para mecánicos y comercios.' };
     // La dirección DEBE elegirse del autocompletado (trae coords exactas). No se geocodifica
-    // texto libre: garantiza que el envío se calcula sobre una dirección real de Bariloche.
+    // texto libre: garantiza que el envío se calcula sobre una dirección real de una zona habilitada.
     const picked = input.lat != null && input.lng != null ? { lat: Number(input.lat), lng: Number(input.lng), label: input.address } : null;
     if (!picked) return { error: 'Elegí la dirección del listado de sugerencias (no la escribas a mano).' };
-    if (!inBariloche(picked)) return { error: 'Esa dirección no está en Bariloche. Elegí una del listado.' };
+    const allowed = zonesForRole(await getActiveZones(), role);
+    zone = zoneOf(picked, allowed);
+    if (!zone) return { error: `Esa dirección no está en ${allowed.map((z) => z.name).join(' ni ')}. Elegí una del listado.` };
     coords = picked;
   }
 
@@ -1044,15 +1082,15 @@ export async function createUser(input) {
       data: { email, name: input.name || null, role, status: 'ACTIVE', passwordHash, phone: input.phone || null, whatsapp: input.whatsapp || null, createdById: s.id },
     });
     if (role === 'MECHANIC') {
-      await prisma.mechanicProfile.create({ data: { userId: user.id, workshopName: input.name || null, barrio: input.barrio || null, address: input.address || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null } });
+      await prisma.mechanicProfile.create({ data: { userId: user.id, workshopName: input.name || null, barrio: input.barrio || null, address: input.address || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null, zoneId: zone?.id ?? null } });
     } else if (role === 'STORE') {
-      await prisma.storeProfile.create({ data: { userId: user.id, tradeName: input.name || input.tradeName || 'Comercio', legalName: input.legalName || null, cuit: input.cuit || null, ivaCondition: input.ivaCondition || null, address: input.address || null, barrio: input.barrio || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null } });
+      await prisma.storeProfile.create({ data: { userId: user.id, tradeName: input.name || input.tradeName || 'Comercio', legalName: input.legalName || null, cuit: input.cuit || null, ivaCondition: input.ivaCondition || null, address: input.address || null, barrio: input.barrio || null, lat: coords?.lat ?? null, lng: coords?.lng ?? null, zoneId: zone?.id ?? null } });
     } else if (role === 'DELIVERY') {
       // Requisitos estilo Uber: DNI + licencia + seguro + patente. Sin docs completos no puede tomar pedidos.
       const docsOk = !!(input.dni?.trim() && input.licenseNumber?.trim() && input.insurance?.trim());
       await prisma.deliveryProfile.create({ data: { userId: user.id, vehicleType: input.vehicleType || null, plate: input.plate || null, dni: input.dni || null, licenseNumber: input.licenseNumber || null, insurance: input.insurance || null, docsOk } });
     }
-    return { ok: true, tempPassword, geocoded: !!coords, geocodedLabel: coords?.label || null };
+    return { ok: true, tempPassword, geocoded: !!coords, geocodedLabel: coords?.label || null, zoneName: zone?.name || null };
   } catch (e) {
     return { error: e?.code === 'P2002' ? 'Datos duplicados (CUIT o email ya existen).' : 'No se pudo crear el usuario.' };
   }
@@ -1155,11 +1193,13 @@ export async function updateUser(userId, input) {
   }
   const role = newRole || u.role;
 
-  // Si vino una dirección elegida del autocompletado, validar que esté en Bariloche.
-  let coords = null;
+  // Si vino una dirección elegida del autocompletado, validar que caiga en una zona habilitada para el rol.
+  let coords = null, zone = null;
   if ((role === 'MECHANIC' || role === 'STORE') && input.lat != null && input.lng != null) {
     const picked = { lat: Number(input.lat), lng: Number(input.lng), label: input.address };
-    if (!inBariloche(picked)) return { error: 'Esa dirección no está en Bariloche. Elegí una del listado.' };
+    const allowed = zonesForRole(await getActiveZones(), role);
+    zone = zoneOf(picked, allowed);
+    if (!zone) return { error: `Esa dirección no está en ${allowed.map((z) => z.name).join(' ni ')}. Elegí una del listado.` };
     coords = picked;
   }
 
@@ -1173,11 +1213,11 @@ export async function updateUser(userId, input) {
   try {
     await prisma.user.update({ where: { id: userId }, data });
     if (role === 'MECHANIC') {
-      const up = { workshopName: input.name ?? exMech?.workshopName ?? null, barrio: input.barrio ?? exMech?.barrio ?? null, ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
+      const up = { workshopName: input.name ?? exMech?.workshopName ?? null, barrio: input.barrio ?? exMech?.barrio ?? null, ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng, zoneId: zone?.id ?? null } : {}) };
       await prisma.mechanicProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
     } else if (role === 'STORE') {
       // cuit es @unique: vacío DEBE ir como null (si no, dos comercios sin CUIT chocan con '' duplicado).
-      const up = { tradeName: input.name || exStore?.tradeName || 'Comercio', cuit: input.cuit != null ? txt(input.cuit, 20) : (exStore?.cuit ?? null), ivaCondition: input.ivaCondition || exStore?.ivaCondition || null, barrio: input.barrio != null ? txt(input.barrio, 80) : (exStore?.barrio ?? null), ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng } : {}) };
+      const up = { tradeName: input.name || exStore?.tradeName || 'Comercio', cuit: input.cuit != null ? txt(input.cuit, 20) : (exStore?.cuit ?? null), ivaCondition: input.ivaCondition || exStore?.ivaCondition || null, barrio: input.barrio != null ? txt(input.barrio, 80) : (exStore?.barrio ?? null), ...(coords ? { address: coords.label, lat: coords.lat, lng: coords.lng, zoneId: zone?.id ?? null } : {}) };
       await prisma.storeProfile.upsert({ where: { userId }, update: up, create: { userId, ...up } });
     } else if (role === 'DELIVERY') {
       const dni = input.dni ?? exDel?.dni; const licenseNumber = input.licenseNumber ?? exDel?.licenseNumber; const insurance = input.insurance ?? exDel?.insurance;
@@ -1228,11 +1268,41 @@ export async function geocodeAddress(address) {
   return geocode(address);
 }
 
-// Autocompletado de direcciones de Bariloche para el alta (admin). Devuelve candidatos
-// [{ label, lat, lng }] dentro del bounding box; el admin elige uno.
-export async function searchAddresses(query) {
+// Autocompletado de direcciones para el alta (admin), acotado a las zonas habilitadas para el
+// rol (comercios: solo zonas con comercios; mecánicos: todas las activas). Devuelve candidatos
+// [{ label, lat, lng, zone }] dentro de los bounding boxes; el admin elige uno.
+export async function searchAddresses(query, role) {
   const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];
-  return searchBariloche(query);
+  return searchInZones(query, zonesForRole(await getActiveZones(), role));
+}
+
+// ---- Zonas de cobertura (backoffice) ----
+export async function getZones() {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return [];
+  const rows = await prisma.zone.findMany({ orderBy: { id: 'asc' } });
+  return rows.map((z) => ({ id: z.id, slug: z.slug, name: z.name, latMin: z.latMin, latMax: z.latMax, lngMin: z.lngMin, lngMax: z.lngMax, active: z.active, deliveryEnabled: z.deliveryEnabled, storesEnabled: z.storesEnabled }));
+}
+
+// Crea o edita una zona. No hay borrado: una zona con usuarios asignados se DESACTIVA (active=false),
+// así no rompe los perfiles que la referencian ni el historial.
+export async function saveZone(input) {
+  const s = await getSession(); if (!s || s.role !== 'ADMIN') return { error: 'No autorizado' };
+  const name = txt(input.name, 60);
+  if (!name) return { error: 'La zona necesita un nombre.' };
+  const nums = ['latMin', 'latMax', 'lngMin', 'lngMax'].map((k) => Number(input[k]));
+  if (nums.some((n) => !Number.isFinite(n))) return { error: 'Coordenadas del área inválidas.' };
+  const [latMin, latMax, lngMin, lngMax] = nums;
+  if (latMin >= latMax || lngMin >= lngMax) return { error: 'El área está invertida: min tiene que ser menor que max (ojo con los negativos).' };
+  const slug = String(input.slug || name).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const data = { slug, name, latMin, latMax, lngMin, lngMax, active: !!input.active, deliveryEnabled: !!input.deliveryEnabled, storesEnabled: !!input.storesEnabled };
+  try {
+    if (input.id) await prisma.zone.update({ where: { id: parseInt(input.id, 10) }, data });
+    else await prisma.zone.create({ data });
+    await prisma.auditLog.create({ data: { actorId: s.id, action: input.id ? 'ZONE_UPDATED' : 'ZONE_CREATED', entity: 'zone', entityId: slug, payload: data } }).catch(() => {});
+    return { ok: true };
+  } catch (e) {
+    return { error: e?.code === 'P2002' ? 'Ya existe una zona con ese nombre/slug.' : 'No se pudo guardar la zona.' };
+  }
 }
 
 // ================= Cuenta Corriente =================
@@ -1503,7 +1573,7 @@ export async function createJobCheckout(jobId) {
   if (plan.items.length === 0) return { error: 'Elegí al menos una cotización' };
 
   const { parts, creditParts, commission, ship, mpFee, total } = plan.totals;
-  const breakdown = { parts, creditParts, commission, ship, mpFee, total, stores: plan.stores, items: plan.items.length };
+  const breakdown = { parts, creditParts, commission, ship, mpFee, total, stores: plan.stores, items: plan.items.length, internalFreight: plan.internalFreight };
   // si el link ya fue generado, se REUTILIZA: dos links distintos = riesgo de cobro doble
   if (j.status === 'CLOSED' && j.paymentLink) return { link: j.paymentLink, breakdown };
 

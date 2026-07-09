@@ -15,9 +15,22 @@ const USER_COLS = [
   { label: 'Email', key: 'email', type: 'str' },
   { label: 'Rol', key: 'roleLabel', type: 'str' },
   { label: 'Estado', key: 'status', type: 'str' },
+  { label: 'Conexión', key: 'lastSeenAt', type: 'num', date: true },
   { label: 'Alta', key: 'createdAt', type: 'num', date: true },
   { label: '', key: null },
 ];
+
+// "En línea" = actividad en los últimos 2 minutos (el latido de presencia corre cada ~30s
+// mientras el usuario tiene un panel abierto). Después, "hace X" legible.
+const ONLINE_MS = 2 * 60 * 1000;
+function Conexion({ ms }) {
+  if (!ms) return <span className="text-xs muted">Nunca entró</span>;
+  const delta = Date.now() - ms;
+  if (delta < ONLINE_MS) return <span className="badge badge-green"><i className="fa-solid fa-circle" style={{ fontSize: 7 }}></i> En línea</span>;
+  const min = Math.round(delta / 60000);
+  const label = min < 60 ? `hace ${min} min` : min < 1440 ? `hace ${Math.round(min / 60)} h` : min < 43200 ? `hace ${Math.round(min / 1440)} d` : fmtDateTime(ms);
+  return <span className="text-xs muted" title={fmtDateTime(ms)}>{label}</span>;
+}
 
 const USER_SEARCH = ['name', 'email', 'roleLabel'];
 
@@ -63,13 +76,14 @@ function UsersSection({ users, onReload }) {
         <table className="table rat-table">
           <Thead headers={t.headers} />
           <tbody>
-            {t.total === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin resultados</td></tr>}
+            {t.total === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin resultados</td></tr>}
             {t.visible.map((u) => (
               <tr key={u.id}>
                 <td data-label="Nombre">{u.name || '—'}</td>
                 <td data-label="Email" className="text-xs">{u.email}</td>
                 <td data-label="Rol"><span className="badge badge-gray">{u.roleLabel}</span></td>
                 <td data-label="Estado"><span className={`badge ${ST_BADGE[u.status] || 'badge-gray'}`}>{u.status}</span></td>
+                <td data-label="Conexión"><Conexion ms={u.lastSeenAt} /></td>
                 <td data-label="Alta" className="text-xs muted rat-th-date">{fmtDateTime(u.createdAt)}</td>
                 <td className="rat-actions">{u.role !== 'ADMIN' && (
                   <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
@@ -103,7 +117,7 @@ function AltaUsuario({ onCreated }) {
     setLoading(true);
     const res = await createUser(f); setLoading(false);
     if (res?.error) { setError(res.error); return; }
-    setDone({ email: f.email.trim().toLowerCase(), tempPassword: res.tempPassword, geocoded: res.geocoded, geocodedLabel: res.geocodedLabel });
+    setDone({ email: f.email.trim().toLowerCase(), tempPassword: res.tempPassword, geocoded: res.geocoded, geocodedLabel: res.geocodedLabel, zoneName: res.zoneName });
     setF(EMPTY); onCreated?.();
   }
 
@@ -116,7 +130,7 @@ function AltaUsuario({ onCreated }) {
           <div className="text-sm subtle">
             <b>Usuario creado.</b> Pasale estas credenciales:
             <div className="text-xs mt-4">Email: <b>{done.email}</b> · Contraseña temporal: <b className="text-yellow">{done.tempPassword}</b></div>
-            <div className="text-xs muted mt-4">{done.geocoded ? `📍 Dirección validada en Bariloche${done.geocodedLabel ? ': ' + done.geocodedLabel.split(',').slice(0, 3).join(',') : ''}` : 'Sin dirección (repartidor/admin)'} · <button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${done.email} / ${done.tempPassword}`)}>copiar</button></div>
+            <div className="text-xs muted mt-4">{done.geocoded ? `📍 Dirección validada en ${done.zoneName || 'zona habilitada'}${done.geocodedLabel ? ': ' + done.geocodedLabel.split(',').slice(0, 3).join(',') : ''}` : 'Sin dirección (repartidor/admin)'} · <button className="text-purple" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700 }} onClick={() => navigator.clipboard?.writeText(`${done.email} / ${done.tempPassword}`)}>copiar</button></div>
           </div>
         </div>
       )}
@@ -143,7 +157,7 @@ function AltaUsuario({ onCreated }) {
           <div className="grid-2 mb-12">
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Dirección *</label>
-              <AddressAutocomplete value={f.address} picked={f.lat != null && f.lng != null}
+              <AddressAutocomplete value={f.address} role={f.role} picked={f.lat != null && f.lng != null}
                 onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
                 onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
             </div>
@@ -270,7 +284,7 @@ function EditUserModal({ userId, onClose, onSaved }) {
           <div className="grid-2 mb-12">
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Dirección *</label>
-              <AddressAutocomplete value={f.address} picked={f.lat != null && f.lng != null}
+              <AddressAutocomplete value={f.address} role={f.role} picked={f.lat != null && f.lng != null}
                 onType={(v) => setF((s) => ({ ...s, address: v, lat: null, lng: null }))}
                 onPick={(c) => setF((s) => ({ ...s, address: c.label, lat: c.lat, lng: c.lng }))} />
               <div className="text-xs muted mt-4">Si no la cambiás, se conserva la dirección actual.</div>
@@ -325,7 +339,7 @@ function EditUserModal({ userId, onClose, onSaved }) {
   );
 }
 
-function AddressAutocomplete({ value, picked, onType, onPick }) {
+function AddressAutocomplete({ value, picked, onType, onPick, role }) {
   const [sug, setSug] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -336,7 +350,8 @@ function AddressAutocomplete({ value, picked, onType, onPick }) {
     if (v.trim().length < 4) { setSug([]); setOpen(false); return; }
     setLoading(true); setOpen(true);
     tRef.current = setTimeout(async () => {
-      try { const res = await searchAddresses(v.trim()); setSug(res || []); } catch { setSug([]); }
+      // el rol acota las zonas donde se busca (comercios: solo zonas con comercios habilitados)
+      try { const res = await searchAddresses(v.trim(), role); setSug(res || []); } catch { setSug([]); }
       setLoading(false);
     }, 350);
   }
@@ -345,7 +360,7 @@ function AddressAutocomplete({ value, picked, onType, onPick }) {
       <input className="input" value={value} autoComplete="off" placeholder="Escribí la calle y número, y elegí del listado"
         onChange={(e) => handleType(e.target.value)} onFocus={() => { if (sug.length) setOpen(true); }} />
       {picked
-        ? <div className="text-xs text-green mt-4"><i className="fa-solid fa-circle-check"></i> Dirección validada en Bariloche</div>
+        ? <div className="text-xs text-green mt-4"><i className="fa-solid fa-circle-check"></i> Dirección validada (zona habilitada)</div>
         : value.trim().length >= 4 && <div className="text-xs muted mt-4">{loading ? 'Buscando…' : 'Elegí una opción del listado ↓'}</div>}
       {open && !picked && sug.length > 0 && (
         <div className="card address-suggest" style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflowY: 'auto', padding: 6 }}>
