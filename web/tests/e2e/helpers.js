@@ -19,7 +19,8 @@ export async function pickAddress(page, query = 'Mitre 100') {
   const opt = page.locator('.address-suggest button').first();
   await expect(opt).toBeVisible({ timeout: 25000 });
   await opt.click();
-  await expect(page.getByText(/Dirección validada en Bariloche/i)).toBeVisible({ timeout: 10000 });
+  // El texto exacto cambió con las zonas ("en Bariloche" → "(zona habilitada)"); alcanza el prefijo.
+  await expect(page.getByText(/Dirección validada/i)).toBeVisible({ timeout: 10000 });
 }
 
 // arma un trabajo con 1 ítem y deja la pantalla en "¿seguir comprando?"

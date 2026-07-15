@@ -308,8 +308,10 @@ create view quotes_public as
   from quotes;
 
 -- ============================================================
--- RLS (Row Level Security) — habilitar y definir políticas en Supabase.
--- Lineamientos (a implementar):
+-- RLS (Row Level Security) — habilitado en modo "denegar todo" vía
+-- db/rls.sql (la app no usa la Data API de Supabase; todo va por Prisma).
+-- Re-ejecutar db/rls.sql después de crear tablas nuevas.
+-- Lineamientos si algún día el browser consulta datos directo:
 --   profiles:   cada uno ve/edita su fila; admins ven todo.
 --   requests:   el mecánico ve los suyos; los vendedores ven los 'open'
 --               (sin datos de contacto del mecánico, solo barrio).

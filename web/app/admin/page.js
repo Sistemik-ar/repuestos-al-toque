@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import { usePoll, keep } from '@/lib/usePoll';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { money, toast } from '@/lib/ui';
@@ -59,13 +60,21 @@ export default function Admin() {
     try { History.prototype.replaceState.call(window.history, window.history.state, '', `/admin${search}`); } catch {}
   }, [tab, usuSub]);
 
-  // Carga al entrar + botón "Actualizar" + recarga después de cada acción (sin auto-poll: no pisa búsqueda/página).
-  const load = async () => {
-    setRefreshing(true);
-    try { const [a, c] = await Promise.all([getAdminData(), getCreditRequests()]); setD(a || null); setCreds(c || []); } catch {}
-    setRefreshing(false);
+  // Auto-poll con keep(): si los datos no cambiaron se mantiene la referencia anterior,
+  // así el refresco de fondo no re-renderiza ni pisa búsqueda/filtros de las secciones.
+  // El spinner solo gira en el refresh manual (el de fondo es silencioso).
+  const load = async (manual = false) => {
+    if (manual) setRefreshing(true);
+    try {
+      const [a, c] = await Promise.all([getAdminData(), getCreditRequests()]);
+      setD((p) => keep(p, a || null));
+      setCreds((p) => keep(p, c || []));
+    } catch {}
+    if (manual) setRefreshing(false);
   };
-  useEffect(() => { load(); getShippingTariffs().then(setTariffs); }, []);
+  usePoll(load, 8000);
+  // tarifas: se cargan una vez y se recargan tras guardar (no se pollean, para no pisar la edición)
+  useEffect(() => { getShippingTariffs().then(setTariffs); }, []);
 
   async function logout() { await logoutAction(); router.push('/login'); }
   // editor de tarifas (se carga una vez y se recarga tras guardar, para no pisar lo que estás editando)
@@ -85,7 +94,7 @@ export default function Admin() {
         <Link href="/admin" className="brand"><span className="logo-mark"><i className="fa-solid fa-gear"></i></span><span>Admin · RepuestosAlToque</span></Link>
         <div className="topbar-actions">
           <span className="badge badge-gray"><i className="fa-solid fa-location-dot"></i> Bariloche</span>
-          <button className="icon-btn" onClick={load} title="Actualizar" disabled={refreshing}><i className={`fa-solid fa-rotate ${refreshing ? 'fa-spin' : ''}`}></i></button>
+          <button className="icon-btn" onClick={() => load(true)} title="Actualizar" disabled={refreshing}><i className={`fa-solid fa-rotate ${refreshing ? 'fa-spin' : ''}`}></i></button>
           <FontScale />
           <button className="icon-btn" onClick={logout} title="Salir"><i className="fa-solid fa-right-from-bracket"></i></button>
         </div>
