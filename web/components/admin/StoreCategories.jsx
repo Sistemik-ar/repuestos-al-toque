@@ -24,11 +24,17 @@ function StoreCategories({ stores, categories, onSaved }) {
   const [allQuotes, setAllQuotes] = useState(false); // modal "Todas las cotizaciones" (todos los comercios)
   const [drawerStore, setDrawerStore] = useState(null); // comercio cuya ficha consolidada se ve en el drawer
 
-  // (re)sincronizar con los datos: al montar y tras guardar (onSaved recarga stores).
+  // (re)sincronizar con los datos: al montar, tras guardar y en cada refresh en vivo del admin.
+  // Las filas con cambios sin guardar (dirty) conservan su selección editada: el auto-refresh
+  // de fondo no pisa la edición en curso.
   useEffect(() => {
-    setWork((stores || []).map((s) => ({ id: s.id, name: s.name, sel: [...(s.categoryIds || [])] })));
+    setWork((prev) => (stores || []).map((s) => {
+      const old = prev.find((c) => c.id === s.id);
+      const keepEdit = old && baseline.get(old.id) !== norm(old.sel);
+      return { id: s.id, name: s.name, sel: keepEdit ? old.sel : [...(s.categoryIds || [])] };
+    }));
     setBaseline(new Map((stores || []).map((s) => [s.id, norm(s.categoryIds || [])])));
-  }, [stores]);
+  }, [stores]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // vista por defecto según ancho + preferencia guardada.
   useEffect(() => {
