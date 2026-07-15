@@ -4,7 +4,7 @@ import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
 import { drivingKm } from '@/lib/geo';
 import { mechanicZone } from '@/lib/zones';
 import { getSettings } from '@/lib/settings';
-import { mpIsTest } from '@/lib/mercadopago';
+import { mpIsTest, mpRefresh, getPayment } from '@/lib/mercadopago';
 import { notifyDeliveryNewTrip } from '@/lib/push';
 
 // ¿El pago real (transaction_amount de MP) cubre lo esperado?
@@ -112,6 +112,33 @@ export function jobSplit(plan, sellerToken) {
     sellerToken: useSplit ? sellerToken : null,
     marketplaceFee: useSplit ? Math.max(0, plan.totals.total - plan.totals.parts) : 0,
   };
+}
+
+// Devuelve el access_token vigente del comercio (refresca si está por vencer). null si no vinculó.
+export async function sellerMpToken(storeId) {
+  const sp = await prisma.storeProfile.findUnique({ where: { userId: storeId }, select: { mpAccessToken: true, mpRefreshToken: true, mpTokenExpires: true } });
+  if (!sp?.mpAccessToken) return null;
+  const soon = Date.now() + 5 * 60 * 1000;
+  if (sp.mpTokenExpires && sp.mpTokenExpires.getTime() < soon && sp.mpRefreshToken) {
+    try {
+      const tok = await mpRefresh(sp.mpRefreshToken);
+      await prisma.storeProfile.update({ where: { userId: storeId }, data: { mpAccessToken: tok.access_token, mpRefreshToken: tok.refresh_token || sp.mpRefreshToken, mpTokenExpires: tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000) : null } });
+      return tok.access_token;
+    } catch { return sp.mpAccessToken; } // si el refresh falla, probamos con el token actual
+  }
+  return sp.mpAccessToken;
+}
+
+// Consulta un pago que puede vivir en la cuenta del COMERCIO (split) o en la de la plataforma.
+// Con split, SOLO el token del comercio puede leer el pago (el de la plataforma da 404); por eso
+// el checkout agrega `?store=<id>` a la notification/back URL y acá usamos ese hint para elegir
+// el token. Si el token del comercio falla (desvinculó, revocó), probamos con el de la plataforma.
+export async function getPaymentForStore(paymentId, storeId) {
+  if (storeId) {
+    const tok = await sellerMpToken(storeId).catch(() => null);
+    if (tok) { try { return await getPayment(paymentId, tok); } catch {} }
+  }
+  return getPayment(paymentId);
 }
 
 // Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem elegido.

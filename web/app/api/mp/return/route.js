@@ -1,7 +1,7 @@
 // Retorno del navegador desde Mercado Pago. Verifica el pago y confirma la orden.
 // (Sirve en local y en prod; el webhook server-to-server es el respaldo en prod.)
-import { getPayment, mpIsTest } from '@/lib/mercadopago';
-import { confirmPaidByRef } from '@/lib/orders';
+import { mpIsTest } from '@/lib/mercadopago';
+import { confirmPaidByRef, getPaymentForStore } from '@/lib/orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,8 @@ export async function GET(req) {
     // SOLO se confirma verificando el pago REAL contra Mercado Pago (el external_reference
     // viene de MP, no del navegador). Los parámetros sueltos de la URL no alcanzan.
     if (paymentId) {
-      const pay = await getPayment(paymentId);
+      // con split, el pago está en la cuenta del comercio (hint ?store= puesto en la back_url)
+      const pay = await getPaymentForStore(paymentId, url.searchParams.get('store'));
       if (pay?.status === 'approved' && pay?.external_reference) {
         confirmed = await confirmPaidByRef(pay.external_reference, pay.transaction_amount);
       }

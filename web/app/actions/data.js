@@ -3,8 +3,8 @@ import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { getSession, invalidateStatusCache } from '@/lib/session';
-import { createPaymentLink, mpIsTest, mpOAuthUrl, mpOAuthConfigured, mpRefresh } from '@/lib/mercadopago';
-import { jobChargePlan, jobSplit } from '@/lib/orders';
+import { createPaymentLink, mpIsTest, mpOAuthUrl, mpOAuthConfigured } from '@/lib/mercadopago';
+import { jobChargePlan, jobSplit, sellerMpToken } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, searchInZones, zoneOf } from '@/lib/geo';
 import { getActiveZones, zonesForRole } from '@/lib/zones';
@@ -591,21 +591,6 @@ export async function getDeliveryHistory() {
 }
 
 // ---- Mercado Pago: vinculación del comercio (split de pagos) ----
-// Devuelve el access_token vigente del comercio (refresca si está por vencer). null si no vinculó.
-async function sellerMpToken(storeId) {
-  const sp = await prisma.storeProfile.findUnique({ where: { userId: storeId }, select: { mpAccessToken: true, mpRefreshToken: true, mpTokenExpires: true } });
-  if (!sp?.mpAccessToken) return null;
-  const soon = Date.now() + 5 * 60 * 1000;
-  if (sp.mpTokenExpires && sp.mpTokenExpires.getTime() < soon && sp.mpRefreshToken) {
-    try {
-      const tok = await mpRefresh(sp.mpRefreshToken);
-      await prisma.storeProfile.update({ where: { userId: storeId }, data: { mpAccessToken: tok.access_token, mpRefreshToken: tok.refresh_token || sp.mpRefreshToken, mpTokenExpires: tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000) : null } });
-      return tok.access_token;
-    } catch { return sp.mpAccessToken; } // si el refresh falla, probamos con el token actual
-  }
-  return sp.mpAccessToken;
-}
-
 // Link de autorización de MP para que el comercio logueado vincule su cuenta.
 export async function getMpLinkUrl() {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
@@ -1592,16 +1577,19 @@ export async function createJobCheckout(jobId) {
   // recargo). Multi-comercio o comercio sin vincular -> cobro centralizado (cuenta de Jorge).
   // Solo consultamos el token del comercio cuando el trabajo es de uno solo; jobSplit decide si
   // se cobra con split (comercio vinculado) o centralizado (cuenta de Jorge / fallback).
-  let storeToken = null;
-  if (plan.stores === 1 && plan.items[0]?.storeId) storeToken = await sellerMpToken(plan.items[0].storeId);
+  const soloStoreId = plan.stores === 1 ? plan.items[0]?.storeId : null;
+  const storeToken = soloStoreId ? await sellerMpToken(soloStoreId) : null;
   const { sellerToken, marketplaceFee } = jobSplit(plan, storeToken);
+  // Con split, el pago queda en la cuenta del COMERCIO y solo su token puede consultarlo. El hint
+  // `?store=` viaja en la notification/back URL para que webhook/return sepan con qué token leerlo.
+  const storeHint = sellerToken ? `?store=${encodeURIComponent(soloStoreId)}` : '';
   try {
     const { link } = await createPaymentLink({
       orderRef: `job::${jobId}`,
       title: `Repuestos · Trabajo #${j.code} · ${j.brand || ''} ${j.model || ''} ${j.plate || ''}`.trim(),
       amount,
-      backUrl: `${base}/api/mp/return`,
-      notificationUrl: `${base}/api/mp/webhook`,
+      backUrl: `${base}/api/mp/return${storeHint}`,
+      notificationUrl: `${base}/api/mp/webhook${storeHint}`,
       sellerToken: sellerToken || undefined,
       marketplaceFee,
     });

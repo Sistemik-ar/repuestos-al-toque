@@ -81,9 +81,11 @@ export async function createPaymentLink({ orderRef, title, amount, payerEmail, b
   return { preferenceId: data.id, link, sandboxLink: data.sandbox_init_point };
 }
 
-export async function getPayment(paymentId) {
+// `token` opcional: con split, el pago vive en la cuenta del COMERCIO y solo su token OAuth puede
+// consultarlo (el de la plataforma da 404). Sin token, usa el de la plataforma (cobro centralizado).
+export async function getPayment(paymentId, token) {
   const res = await fetch(`${MP_API}/v1/payments/${paymentId}`, {
-    headers: { Authorization: `Bearer ${mpToken()}` },
+    headers: { Authorization: `Bearer ${token || mpToken()}` },
   });
   if (!res.ok) throw new Error('No se pudo consultar el pago.');
   return res.json();

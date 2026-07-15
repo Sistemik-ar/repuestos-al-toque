@@ -16,6 +16,9 @@ export async function GET(req) {
   try {
     const s = await getSession();
     if (!s || s.role !== 'STORE' || !mpOAuthConfigured() || !code) return back(false);
+    // anti-CSRF: el `state` debe ser el que generamos para ESTE comercio (getMpLinkUrl usa s.id).
+    // Sin esto, un tercero podría hacer que el comercio termine vinculado a OTRA cuenta de MP.
+    if (url.searchParams.get('state') !== s.id) return back(false);
     const redirectUri = `${proto}://${host}/api/mp/oauth/callback`; // debe coincidir EXACTO con el de inicio
     const tok = await mpExchangeCode({ code, redirectUri });
     await prisma.storeProfile.update({

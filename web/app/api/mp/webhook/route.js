@@ -1,7 +1,8 @@
 // Webhook de Mercado Pago. MP avisa cuando hay un pago; consultamos el pago real
 // y, si está aprobado, marcamos la orden como pagada (cuando el flujo esté en la DB).
-import { getPayment } from '@/lib/mercadopago';
-import { confirmPaidByRef } from '@/lib/orders';
+// Con split, el pago vive en la cuenta del COMERCIO: el hint `?store=` (que pusimos en la
+// notification_url al crear la preferencia) dice con qué token consultarlo.
+import { confirmPaidByRef, getPaymentForStore } from '@/lib/orders';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,7 @@ export async function POST(req) {
     const type = body?.type || url.searchParams.get('type');
 
     if (type === 'payment' && paymentId) {
-      const pay = await getPayment(paymentId);
+      const pay = await getPaymentForStore(paymentId, url.searchParams.get('store'));
       if (pay?.status === 'approved' && pay?.external_reference) {
         await confirmPaidByRef(pay.external_reference, pay.transaction_amount);
       }

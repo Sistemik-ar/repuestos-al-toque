@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createPaymentLink, mpOAuthConfigured, mpOAuthUrl, mpExchangeCode, mpRefresh } from '@/lib/mercadopago';
+import { createPaymentLink, mpOAuthConfigured, mpOAuthUrl, mpExchangeCode, mpRefresh, getPayment } from '@/lib/mercadopago';
 
 beforeEach(() => {
   process.env.MP_ACCESS_TOKEN = 'TEST-token';
@@ -115,6 +115,18 @@ describe('Split de pagos (Marketplace / OAuth)', () => {
     const body = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(body.grant_type).toBe('refresh_token');
     expect(body.refresh_token).toBe('REF');
+  });
+
+  it('getPayment sin token: consulta con el token de la plataforma (cobro centralizado)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 1, status: 'approved' }) });
+    await getPayment('123');
+    expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer TEST-token');
+  });
+
+  it('getPayment con token del comercio: lo usa en vez del de la plataforma (pago con split)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 1, status: 'approved' }) });
+    await getPayment('123', 'SELLER-tok');
+    expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer SELLER-tok');
   });
 
   it('propaga el error de OAuth de Mercado Pago', async () => {

@@ -4,7 +4,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     requestQuote: { findUnique: vi.fn(), update: vi.fn() },
     request: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn().mockResolvedValue({}) },
-    storeProfile: { findUnique: vi.fn() },
+    storeProfile: { findUnique: vi.fn(), update: vi.fn().mockResolvedValue({}) },
     mechanicProfile: { findUnique: vi.fn() },
     zone: { findMany: vi.fn().mockResolvedValue([]) },
     shippingTariff: { findMany: vi.fn() },
@@ -14,7 +14,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { prisma } from '@/lib/db';
-import { confirmPaidByRef, jobSplit } from '@/lib/orders';
+import { confirmPaidByRef, jobSplit, sellerMpToken, getPaymentForStore } from '@/lib/orders';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -126,5 +126,67 @@ describe('jobSplit — split de pagos vs cobro centralizado (cuenta de Jorge)', 
     const r = jobSplit(plan(1, { total: 25000, parts: 0 }), 'SELLER-tok');
     expect(r.sellerToken).toBe('SELLER-tok');
     expect(r.marketplaceFee).toBe(25000); // el repuesto lo liquida el comercio por CC; acá no va nada a su MP
+  });
+});
+
+describe('sellerMpToken — token OAuth del comercio (split)', () => {
+  beforeEach(() => { process.env.MP_CLIENT_ID = 'APP'; process.env.MP_CLIENT_SECRET = 'SEC'; });
+
+  it('devuelve null si el comercio no vinculó su MP', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue({ mpAccessToken: null });
+    expect(await sellerMpToken('s1')).toBeNull();
+  });
+
+  it('token vigente: lo devuelve sin refrescar', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue({ mpAccessToken: 'TOK', mpRefreshToken: 'R', mpTokenExpires: new Date(Date.now() + 3600_000) });
+    expect(await sellerMpToken('s1')).toBe('TOK');
+    expect(prisma.storeProfile.update).not.toHaveBeenCalled();
+  });
+
+  it('token por vencer: lo refresca y guarda el nuevo', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue({ mpAccessToken: 'VIEJO', mpRefreshToken: 'R', mpTokenExpires: new Date(Date.now() + 60_000) });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ access_token: 'NUEVO', refresh_token: 'R2', expires_in: 100 }) });
+    expect(await sellerMpToken('s1')).toBe('NUEVO');
+    expect(prisma.storeProfile.update.mock.calls[0][0].data.mpAccessToken).toBe('NUEVO');
+  });
+
+  it('si el refresh falla, prueba con el token actual (no rompe el cobro)', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue({ mpAccessToken: 'VIEJO', mpRefreshToken: 'R', mpTokenExpires: new Date(Date.now() + 60_000) });
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'invalid_grant' }) });
+    expect(await sellerMpToken('s1')).toBe('VIEJO');
+  });
+});
+
+describe('getPaymentForStore — con qué token consulta el pago el webhook/return', () => {
+  beforeEach(() => { process.env.MP_ACCESS_TOKEN = 'PLAT-tok'; delete process.env.MP_TEST_ACCESS_TOKEN; });
+
+  it('sin hint de comercio → token de la plataforma (cobro centralizado, como siempre)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'approved' }) });
+    await getPaymentForStore('123', null);
+    expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer PLAT-tok');
+  });
+
+  it('con hint ?store= → token del comercio (el pago del split vive en SU cuenta)', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue({ mpAccessToken: 'SELLER-tok', mpRefreshToken: null, mpTokenExpires: null });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'approved' }) });
+    await getPaymentForStore('123', 's1');
+    expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer SELLER-tok');
+  });
+
+  it('si el token del comercio falla (revocado/desvinculado) → reintenta con el de la plataforma', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue({ mpAccessToken: 'REVOCADO', mpRefreshToken: null, mpTokenExpires: null });
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: false, json: async () => ({}) }) // MP: 404 con el token del comercio
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'approved' }) });
+    const pay = await getPaymentForStore('123', 's1');
+    expect(pay.status).toBe('approved');
+    expect(global.fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer PLAT-tok');
+  });
+
+  it('hint de un comercio sin token guardado → directo al de la plataforma', async () => {
+    prisma.storeProfile.findUnique.mockResolvedValue(null);
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'approved' }) });
+    await getPaymentForStore('123', 's1');
+    expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer PLAT-tok');
   });
 });
