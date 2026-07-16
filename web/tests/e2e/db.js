@@ -243,3 +243,37 @@ export async function avgFromRatings(email, kinds) {
   const avg = rows.reduce((a, r) => a + r.stars, 0) / rows.length;
   return { avg: Math.round(avg * 10) / 10, count: rows.length };
 }
+
+// ---- Avisos por WhatsApp ----
+// Código de verificación pendiente del usuario (el server lo generó al pedir "Verificar mi número").
+export async function waCodeFor(email) {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  const c = await p.waContact.findUnique({ where: { userId: u.id } });
+  return c?.code || null;
+}
+
+// Código pendiente de un número de guardia (por nombre).
+export async function waGuardCodeFor(name) {
+  const p = db();
+  const g = await p.waGuard.findFirst({ where: { name }, orderBy: { createdAt: 'desc' } });
+  return g?.code || null;
+}
+
+// Simula que el usuario respondió BAJA (lo que haría el webhook).
+export async function waOptOut(email) {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  await p.waContact.update({ where: { userId: u.id }, data: { enabled: false, optedOutAt: new Date() } });
+}
+
+// Limpia la configuración WA de un usuario / los números de guardia de prueba.
+export async function waReset(email) {
+  const p = db();
+  const u = await p.user.findUnique({ where: { email } });
+  if (u) await p.waContact.deleteMany({ where: { userId: u.id } });
+}
+export async function waDeleteGuards(namePrefix) {
+  const p = db();
+  await p.waGuard.deleteMany({ where: { name: { startsWith: namePrefix } } });
+}

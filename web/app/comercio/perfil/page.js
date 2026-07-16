@@ -6,6 +6,7 @@ import { getMyStoreProfile, getMpLinkStatus, getMpLinkUrl, unlinkMp, getStoreSal
 import { logoutAction } from '@/app/actions/auth';
 import { toast, money, fmtDateTime } from '@/lib/ui';
 import Loading from '@/components/Loading';
+import AvisosWhatsApp from '@/components/AvisosWhatsApp';
 
 const IVA = { RESPONSABLE_INSCRIPTO: 'Responsable Inscripto', MONOTRIBUTO: 'Monotributo', EXENTO: 'Exento', CONSUMIDOR_FINAL: 'Consumidor Final' };
 const COND = { NUEVO: 'Nuevo', USADO: 'Usado', REACONDICIONADO: 'Reacondicionado' };
@@ -126,6 +127,8 @@ export default function ComercioPerfil() {
                 </div>
               </>)}
             </>)}
+
+            <AvisosWhatsApp role="STORE" />
 
             <div className="section-title"><h2>Lo que vendo</h2><span className="text-xs muted">{p.categories.length} rubro{p.categories.length === 1 ? '' : 's'}</span></div>
             <div className="card">

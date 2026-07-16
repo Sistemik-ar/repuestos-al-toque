@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avisos WhatsApp — Comercio · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="demo/assets/styles.css" />
+  <style>
+    :root { --wa: #25D366; --wa-dark: #128C7E; }
+    a { color: var(--purple-light); } a:hover { color: #A78BFA; }
+
+    .wa-head { margin: 4px 0 18px; }
+    .wa-head h1 { font-size: 24px; font-weight: 800; }
+
+    /* demo state switcher */
+    .demo-seg { display: inline-flex; background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 2px; margin-bottom: 18px; }
+    .demo-seg button { padding: 8px 12px; border-radius: 9px; border: none; background: transparent; color: var(--text-2); font-weight: 700; font-size: 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .demo-seg button.active { background: var(--purple); color: #fff; }
+
+    .wa-hero { display: flex; align-items: flex-start; gap: 14px; }
+    .wa-ic { width: 46px; height: 46px; border-radius: 14px; background: rgba(37,211,102,0.15); color: var(--wa); display: grid; place-items: center; font-size: 22px; flex-shrink: 0; }
+    .wa-hero .ht { font-weight: 800; font-size: 16.5px; line-height: 1.3; }
+    .wa-hero .hs { font-size: 13px; color: var(--text-2); margin-top: 5px; line-height: 1.5; }
+
+    .benefits { display: flex; flex-direction: column; gap: 11px; margin: 16px 0 18px; }
+    .benefit { display: flex; align-items: center; gap: 11px; font-size: 13px; color: var(--text-1); }
+    .benefit i { width: 26px; height: 26px; border-radius: 8px; background: var(--bg-2); color: var(--wa); display: grid; place-items: center; font-size: 12px; flex-shrink: 0; }
+
+    /* phone field with fixed prefix */
+    .phone-wrap { display: flex; align-items: stretch; gap: 0; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2); overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
+    .phone-wrap:focus-within { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(109,40,217,0.18); }
+    .phone-wrap.invalid { border-color: rgba(239,68,68,0.55); }
+    .phone-wrap.invalid:focus-within { box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+    .phone-prefix { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 14px; background: var(--bg-3); font-weight: 800; font-size: 15px; color: var(--text-1); border-right: 1px solid var(--border); white-space: nowrap; }
+    .phone-prefix .flag { font-size: 15px; }
+    .phone-wrap input { flex: 1; min-width: 0; padding: 14px; background: transparent; border: none; color: #fff; font-size: 16px; font-weight: 700; font-family: inherit; letter-spacing: 0.02em; }
+    .phone-wrap input:focus { outline: none; }
+    .phone-wrap input::placeholder { color: var(--text-2); font-weight: 500; }
+    .field-hint { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); margin-top: 8px; }
+    .field-hint.err { color: #FCA5A5; }
+    .field-hint.ok { color: #4ADE80; }
+
+    .btn-wa { background: var(--wa); color: #06281A; box-shadow: 0 8px 22px rgba(37,211,102,0.3); }
+    .btn-wa:hover { filter: brightness(1.06); }
+
+    /* code inputs */
+    .code-row { display: flex; gap: 9px; justify-content: center; margin: 18px 0 6px; }
+    .code-box { width: 46px; height: 56px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--border); color: #fff; font-size: 24px; font-weight: 800; text-align: center; font-family: 'SF Mono', ui-monospace, Menlo, monospace; transition: border-color .15s ease; }
+    .code-box:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px rgba(109,40,217,0.18); }
+    .code-box.filled { border-color: rgba(139,92,246,0.5); }
+    .sent-to { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 11px 14px; border-radius: 12px; background: rgba(37,211,102,0.08); border: 1px solid rgba(37,211,102,0.2); font-size: 13px; color: var(--text-1); }
+    .sent-to i { color: var(--wa); }
+    .sent-to b { font-weight: 800; }
+    .code-actions { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; }
+    .link-btn { background: none; border: none; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--purple-light); cursor: pointer; padding: 4px; }
+    .link-btn:hover { color: #A78BFA; }
+    .link-btn:disabled { color: var(--text-2); cursor: default; }
+
+    /* verified state */
+    .num-card { display: flex; align-items: center; gap: 13px; }
+    .num-card .nm { flex: 1; min-width: 0; }
+    .num-card .nv { font-size: 17px; font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+    .num-card .nl { font-size: 11.5px; color: var(--text-2); margin-top: 3px; }
+
+    .setting-row { display: flex; align-items: center; gap: 13px; padding: 14px 0; border-top: 1px solid var(--border); }
+    .setting-row:first-child { border-top: none; padding-top: 2px; }
+    .setting-row .sm { flex: 1; min-width: 0; }
+    .setting-row .st { font-weight: 700; font-size: 14px; }
+    .setting-row .ss { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
+    .setting-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--bg-2); color: var(--text-1); display: grid; place-items: center; font-size: 14px; flex-shrink: 0; }
+
+    /* whatsapp message preview */
+    .wa-preview { background: #0B141A; border: 1px solid var(--border); border-radius: 16px; padding: 14px; background-image: radial-gradient(circle at 20% 30%, rgba(37,211,102,0.04), transparent 50%); }
+    .wa-preview .pv-label { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); margin-bottom: 11px; }
+    .wa-bubble { background: #1F2C34; border-radius: 4px 14px 14px 14px; padding: 11px 13px 8px; max-width: 100%; position: relative; }
+    .wa-bubble .from { font-size: 12px; font-weight: 800; color: var(--wa); margin-bottom: 5px; }
+    .wa-bubble .msg { font-size: 13.5px; line-height: 1.55; color: #E9EDEF; word-break: break-word; }
+    .wa-bubble .msg a { color: #53BDEB; text-decoration: underline; }
+    .wa-bubble .meta { display: flex; justify-content: flex-end; gap: 4px; font-size: 10.5px; color: #8696A0; margin-top: 4px; }
+    .consent-note { display: flex; gap: 9px; font-size: 11.5px; color: var(--text-2); line-height: 1.5; margin-top: 14px; }
+    .consent-note i { margin-top: 2px; flex-shrink: 0; }
+
+    .paused-note { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(250,204,21,0.08); border: 1px solid rgba(250,204,21,0.22); font-size: 12.5px; color: var(--yellow); margin-top: 12px; }
+
+    .state { display: none; }
+    .state.on { display: block; animation: pop-in .35s cubic-bezier(.2,.9,.3,1.2); }
+  </style>
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="app-shell">
+        <div class="topbar">
+          <a href="demo/comercio-perfil.html" class="brand"><span class="logo-mark"><i class="fa-solid fa-gear"></i></span><span>Panel Comercio</span></a>
+          <div class="topbar-actions">
+            <div class="avatar" style="background:linear-gradient(135deg,var(--yellow),var(--purple));">RC</div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="wa-head">
+            <div class="eyebrow"><i class="fa-solid fa-chevron-left" style="font-size:10px;margin-right:6px;"></i>Perfil · Repuestos Centro</div>
+            <h1>Avisos por WhatsApp</h1>
+          </div>
+
+          <div class="demo-seg" id="demoSeg" title="Demo: saltar entre estados">
+            <button data-state="setup" class="active">Sin configurar</button>
+            <button data-state="verify">Pendiente</button>
+            <button data-state="active">Verificado</button>
+            <button data-state="baja">Baja</button>
+          </div>
+
+          <!-- ═══════ ESTADO 1: SIN CONFIGURAR ═══════ -->
+          <section class="state" id="st-setup" data-screen-label="Estado 1 · Sin configurar">
+            <div class="card">
+              <div class="wa-hero">
+                <div class="wa-ic"><i class="fa-brands fa-whatsapp"></i></div>
+                <div>
+                  <div class="ht">Enterate al instante cuando un mecánico pide un repuesto de tu rubro</div>
+                  <div class="hs">Te mandamos un WhatsApp con el detalle del pedido y el link directo para cotizar. Los primeros en cotizar venden más.</div>
+                </div>
+              </div>
+
+              <div class="benefits">
+                <div class="benefit"><i class="fa-solid fa-bolt"></i>Aviso al segundo de publicada la solicitud</div>
+                <div class="benefit"><i class="fa-solid fa-filter"></i>Solo de tus rubros: Frenos, Suspensión, Motor</div>
+                <div class="benefit"><i class="fa-solid fa-hand"></i>Lo desactivás cuando quieras, sin vueltas</div>
+              </div>
+
+              <div class="field" style="margin-bottom:8px;">
+                <label for="phoneInput">Tu número de WhatsApp</label>
+                <div class="phone-wrap" id="phoneWrap">
+                  <span class="phone-prefix"><span class="flag">🇦🇷</span>+54 9</span>
+                  <input id="phoneInput" type="tel" inputmode="numeric" placeholder="294 412 3456" autocomplete="tel-national" />
+                </div>
+                <div class="field-hint" id="phoneHint"><i class="fa-solid fa-circle-info"></i>Código de área sin 0 y número sin 15. Ej: 294 412 3456</div>
+              </div>
+
+              <button class="btn btn-wa btn-block mt-8" id="btnVerify" disabled><i class="fa-brands fa-whatsapp"></i> Verificar mi número</button>
+            </div>
+          </section>
+
+          <!-- ═══════ ESTADO 2: PENDIENTE DE VERIFICACIÓN ═══════ -->
+          <section class="state" id="st-verify" data-screen-label="Estado 2 · Pendiente de verificación">
+            <div class="card">
+              <div class="text-center" style="padding-top:6px;">
+                <div class="wa-ic" style="margin:0 auto 12px;width:54px;height:54px;font-size:26px;"><i class="fa-solid fa-shield-halved"></i></div>
+                <div style="font-weight:800;font-size:17px;">Revisá tu WhatsApp</div>
+                <p class="text-sm muted mt-8" style="line-height:1.5;">Te mandamos un código de 6 dígitos para confirmar que el número es tuyo.</p>
+              </div>
+
+              <div class="sent-to mt-16"><i class="fa-brands fa-whatsapp"></i>Enviado a <b id="sentToNum">+54 9 294 415 2823</b></div>
+
+              <div class="code-row" id="codeRow">
+                <input class="code-box" type="tel" inputmode="numeric" maxlength="1" aria-label="Dígito 1" />
+                <input class="code-box" type="tel" inputmode="numeric" maxlength="1" aria-label="Dígito 2" />
+                <input class="code-box" type="tel" inputmode="numeric" maxlength="1" aria-label="Dígito 3" />
+                <input class="code-box" type="tel" inputmode="numeric" maxlength="1" aria-label="Dígito 4" />
+                <input class="code-box" type="tel" inputmode="numeric" maxlength="1" aria-label="Dígito 5" />
+                <input class="code-box" type="tel" inputmode="numeric" maxlength="1" aria-label="Dígito 6" />
+              </div>
+              <div class="field-hint err text-center" id="codeErr" style="display:none;justify-content:center;"><i class="fa-solid fa-circle-xmark"></i>Código incorrecto. Fijate en el último mensaje.</div>
+
+              <div class="code-actions">
+                <button class="link-btn" id="btnResend"><i class="fa-solid fa-rotate-right"></i> Reenviar código</button>
+                <button class="link-btn" id="btnChangeNum" style="color:var(--text-1);"><i class="fa-solid fa-pen"></i> Cambiar número</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ═══════ ESTADO 3: VERIFICADO Y ACTIVO ═══════ -->
+          <section class="state" id="st-active" data-screen-label="Estado 3 · Verificado y activo">
+            <div class="card card-flush">
+              <div style="padding:16px;">
+                <div class="num-card">
+                  <div class="wa-ic"><i class="fa-brands fa-whatsapp"></i></div>
+                  <div class="nm">
+                    <div class="nv" id="maskedNum">+54 9 294 •••• 823</div>
+                    <div class="nl">Verificado el 12 jul 2026</div>
+                  </div>
+                  <span class="badge badge-green"><i class="fa-solid fa-circle-check"></i> Verificado</span>
+                </div>
+              </div>
+              <div style="padding:2px 16px 14px;">
+                <div class="setting-row">
+                  <div class="setting-ic" style="background:rgba(37,211,102,0.12);color:var(--wa);"><i class="fa-solid fa-bell"></i></div>
+                  <div class="sm">
+                    <div class="st">Recibir avisos</div>
+                    <div class="ss" id="toggleSub">Nuevas solicitudes de Frenos, Suspensión y Motor</div>
+                  </div>
+                  <label class="switch"><input type="checkbox" id="notifToggle" checked /><span class="track"></span><span class="thumb"></span></label>
+                </div>
+                <div id="pausedNote" class="paused-note" style="display:none;"><i class="fa-solid fa-bell-slash"></i>Avisos pausados. No vas a recibir mensajes hasta que lo actives de nuevo.</div>
+              </div>
+            </div>
+
+            <div class="card mt-12" id="previewCard">
+              <div class="wa-preview">
+                <div class="pv-label"><i class="fa-solid fa-eye"></i>Así se ve el aviso que te llega</div>
+                <div class="wa-bubble">
+                  <div class="from">RepuestosAlToque</div>
+                  <div class="msg">🔧 <b>Nueva solicitud:</b> Amortiguadores · Ford Fiesta 2017 · Bariloche.<br />Entrá a cotizar → <a href="#" onclick="return false;">rat.ar/c/8F2K</a><br /><span style="color:#8696A0;">Respondé BAJA para dejar de recibir avisos.</span></div>
+                  <div class="meta">10:42 <i class="fa-solid fa-check-double" style="color:#53BDEB;"></i></div>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-block btn-sm mt-12" id="btnTest"><i class="fa-solid fa-paper-plane"></i> Enviarme un aviso de prueba</button>
+            </div>
+
+            <div class="card mt-12">
+              <div class="setting-row" style="padding-top:0;">
+                <div class="setting-ic"><i class="fa-solid fa-pen"></i></div>
+                <div class="sm">
+                  <div class="st">Cambiar número</div>
+                  <div class="ss">Vas a tener que verificar el número nuevo</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btnChangeFromActive">Cambiar</button>
+              </div>
+            </div>
+
+            <div class="consent-note"><i class="fa-solid fa-lock"></i><span>Solo usamos tu número para avisos de la plataforma. Podés desactivarlos cuando quieras desde acá o respondiendo <b>BAJA</b> al mensaje.</span></div>
+          </section>
+
+          <!-- ═══════ ESTADO 4: DADO DE BAJA ═══════ -->
+          <section class="state" id="st-baja" data-screen-label="Estado 4 · Dado de baja">
+            <div class="card">
+              <div class="text-center" style="padding-top:6px;">
+                <div class="wa-ic" style="margin:0 auto 12px;width:54px;height:54px;font-size:24px;background:rgba(250,204,21,0.12);color:var(--yellow);"><i class="fa-solid fa-bell-slash"></i></div>
+                <div style="font-weight:800;font-size:17px;">Desactivaste los avisos respondiendo BAJA</div>
+                <p class="text-sm muted mt-8" style="line-height:1.5;">El 13 jul respondiste <b>BAJA</b> al bot desde el <span style="font-variant-numeric:tabular-nums;">+54 9 294 •••• 823</span>. No te mandamos más mensajes desde entonces.</p>
+              </div>
+              <div class="paused-note" style="margin-top:16px;"><i class="fa-solid fa-circle-info"></i>Tu número sigue verificado. Si reactivás, volvés a recibir avisos al instante.</div>
+              <button class="btn btn-wa btn-block mt-16" id="btnReactivar"><i class="fa-solid fa-bell"></i> Reactivar avisos</button>
+              <div class="consent-note"><i class="fa-solid fa-lock"></i><span>Podés volver a darte de baja cuando quieras, desde acá o respondiendo <b>BAJA</b> al mensaje.</span></div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="demo/assets/app.js"></script>
+  <script src="avisos-wa-comercio.js"></script>
+</body>
+</html>

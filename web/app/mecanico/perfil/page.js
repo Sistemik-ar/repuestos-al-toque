@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getMe, getMyJobs } from '@/app/actions/data';
 import { logoutAction } from '@/app/actions/auth';
 import { tierFor } from '@/lib/ui';
+import AvisosWhatsApp from '@/components/AvisosWhatsApp';
 
 export default function Perfil() {
   const router = useRouter();
@@ -49,6 +50,8 @@ export default function Perfil() {
           <div className="card stat-card" style={{ padding: 16 }}><div className="stat-value text-green">{stats.entregados}</div><div className="stat-label">Repuestos recibidos</div></div>
           <div className="card stat-card" style={{ padding: 16 }}><div className="stat-value text-yellow">{stats.activos}</div><div className="stat-label">Trabajos activos</div></div>
         </div>
+
+        <AvisosWhatsApp role="MECHANIC" />
 
         <div className="section-title"><h2>Cuenta</h2></div>
         <Link href="/mecanico/cuentas" className="card mb-12 flex-between" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>

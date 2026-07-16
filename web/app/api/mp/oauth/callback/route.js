@@ -4,6 +4,7 @@
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/db';
 import { mpExchangeCode, mpOAuthConfigured } from '@/lib/mercadopago';
+import { waNotifyMpLinked } from '@/lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,9 @@ export async function GET(req) {
         mpLinked: true,
       },
     });
+    // aviso por WhatsApp a la guardia: un comercio ya puede cobrar con split
+    const sp = await prisma.storeProfile.findUnique({ where: { userId: s.id }, select: { tradeName: true } }).catch(() => null);
+    await waNotifyMpLinked({ comercio: sp?.tradeName || 'Un comercio' }).catch(() => {});
     return back(true);
   } catch {
     return back(false);

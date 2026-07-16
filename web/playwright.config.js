@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Puerto configurable: si el 3000 está ocupado por OTRA app (reuseExistingServer la reusaría
+// y los tests correrían contra la app equivocada), correr con E2E_PORT=3100.
+const PORT = process.env.E2E_PORT || 3000;
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 40000,
@@ -8,14 +12,14 @@ export default defineConfig({
   workers: 1,
   retries: 1,
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.E2E_BASE_URL || `http://localhost:${PORT}`,
     headless: true,
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run start',
-    url: 'http://localhost:3000',
+    command: `npx next start -H 0.0.0.0 -p ${PORT}`,
+    url: `http://localhost:${PORT}`,
     reuseExistingServer: true,
     timeout: 120000,
     // El modo prueba de pagos lo activa MP_TEST_ACCESS_TOKEN (token de sandbox, en el .env): con él
@@ -29,6 +33,8 @@ export default defineConfig({
       ...(process.env.MP_CLIENT_SECRET ? { MP_CLIENT_SECRET: process.env.MP_CLIENT_SECRET } : {}),
       ...(process.env.DATABASE_URL ? { DATABASE_URL: process.env.DATABASE_URL } : {}),
       ...(process.env.AUTH_SECRET ? { AUTH_SECRET: process.env.AUTH_SECRET } : {}),
+      // Avisos por WhatsApp en modo prueba: habilita la feature sin llamar a Meta (viene del .env.test)
+      ...(process.env.WA_TEST_MODE ? { WA_TEST_MODE: process.env.WA_TEST_MODE } : {}),
     },
   },
 });

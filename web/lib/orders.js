@@ -6,6 +6,9 @@ import { mechanicZone } from '@/lib/zones';
 import { getSettings } from '@/lib/settings';
 import { mpIsTest, mpRefresh, getPayment } from '@/lib/mercadopago';
 import { notifyDeliveryNewTrip } from '@/lib/push';
+import { waNotifyPaid } from '@/lib/whatsapp';
+
+const fmtMonto = (n) => '$' + Math.round(Number(n || 0)).toLocaleString('es-AR');
 
 // ¿El pago real (transaction_amount de MP) cubre lo esperado?
 // Tolerancia del 10%: el envío (OSRM) y el redondeo del recargo MP pueden variar unos pesos
@@ -165,6 +168,14 @@ async function confirmJobPaid(jobId, paidAmount) {
   await prisma.job.update({ where: { id: jobId }, data: { status: 'PAID' } }).catch(() => {});
   // hay pieza física para fletar — salvo coordinación interna: ese viaje no es de la flota
   if (!plan.internalFreight && plan.items.some((it) => !it.useCredit)) await notifyDeliveryNewTrip();
+  // WhatsApp a los comercios vendedores (+ guardia): se acreditó el pago, a preparar la pieza
+  const firstReq = plan.job.requests.find((r) => r.quotes.some((q) => q.status === 'SELECTED'));
+  await waNotifyPaid({
+    storeIds: [...new Set(plan.items.map((it) => it.storeId))],
+    monto: fmtMonto(plan.totals.total),
+    repuesto: plan.items.length > 1 ? `${plan.items.length} repuestos` : (firstReq?.description || 'Repuesto').slice(0, 60),
+    orden: '#' + (plan.job.code || jobId),
+  }).catch(() => {});
   return true;
 }
 
@@ -199,5 +210,11 @@ export async function confirmPaidByRef(ref, paidAmount) {
   await prisma.requestQuote.update({ where: { id: quoteId }, data: { status: 'SELECTED' } }).catch(() => {});
   await prisma.request.update({ where: { id: requestId }, data: { status: 'PAID' } });
   if (!creditAccount && !internalFreight) await notifyDeliveryNewTrip(); // pieza pagada por plataforma -> necesita flete
+  await waNotifyPaid({
+    storeIds: [q.storeId],
+    monto: fmtMonto(p.total),
+    repuesto: (q.request.description || 'Repuesto').slice(0, 60),
+    orden: q.request.code ? '#' + q.request.code : '',
+  }).catch(() => {});
   return true;
 }

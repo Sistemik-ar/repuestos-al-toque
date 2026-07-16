@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avisos WhatsApp — Admin · RepuestosAlToque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="demo/assets/styles.css" />
+  <style>
+    :root { --wa: #25D366; --wa-dark: #128C7E; }
+    a { color: var(--purple-light); } a:hover { color: #A78BFA; }
+
+    .adm-topbar { position: sticky; top: 0; z-index: 70; display: flex; align-items: center; justify-content: space-between; padding: 15px 22px; background: rgba(11,11,15,0.82); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+    .adm-brand { display: flex; align-items: center; gap: 13px; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+    .adm-brand .lm { width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(135deg, var(--purple), var(--purple-light)); display: grid; place-items: center; color: #fff; font-size: 17px; box-shadow: var(--shadow-glow); }
+    .adm-pill { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--text-1); }
+    .adm-top-actions { display: flex; align-items: center; gap: 11px; }
+    .adm-iconbtn { width: 42px; height: 42px; border-radius: 11px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-1); display: grid; place-items: center; cursor: pointer; transition: all .15s ease; }
+    .adm-iconbtn:hover { background: var(--bg-3); color: #fff; }
+
+    .adm-wrap { max-width: 1180px; margin: 0 auto; padding: 26px 32px 60px; }
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+    .page-head h1 { font-size: 26px; font-weight: 800; display: flex; align-items: center; gap: 12px; }
+    .page-head h1 .wa-mark { width: 40px; height: 40px; border-radius: 12px; background: rgba(37,211,102,0.15); color: var(--wa); display: grid; place-items: center; font-size: 20px; }
+    .page-head .ph-sub { font-size: 13.5px; color: var(--text-2); margin-top: 5px; }
+
+    /* KPI strip */
+    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+    @media (max-width: 900px) { .kpi-row { grid-template-columns: 1fr 1fr; } }
+    .kpi { background: linear-gradient(180deg, rgba(31,41,55,0.65), rgba(17,24,39,0.65)); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+    .kpi .kl { font-size: 12px; color: var(--text-2); font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+    .kpi .kv { font-size: 25px; font-weight: 800; margin-top: 8px; line-height: 1; display: flex; align-items: center; gap: 10px; }
+    .kpi .ks { font-size: 12px; color: var(--text-2); margin-top: 7px; }
+    .kpi.channel .kv { font-size: 17px; }
+    .kpi.channel.ok .kv { color: #4ADE80; }
+    .kpi.channel.err .kv { color: #FCA5A5; }
+    .kpi.green .kv { color: #4ADE80; } .kpi.red .kv { color: #FCA5A5; }
+    .kv .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(34,197,94,0.18); animation: pulse-soft 1.8s infinite; flex-shrink: 0; }
+    .split-kv { display: flex; align-items: baseline; gap: 8px; }
+    .split-kv .sep { color: var(--text-2); font-size: 15px; font-weight: 600; }
+    .split-kv .b { color: var(--text-2); font-size: 18px; }
+
+    /* layout */
+    .wa-grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 18px; align-items: start; }
+    @media (max-width: 980px) { .wa-grid { grid-template-columns: 1fr; } }
+    .panel { background: linear-gradient(180deg, rgba(31,41,55,0.5), rgba(17,24,39,0.5)); border: 1px solid var(--border); border-radius: 18px; padding: 18px; }
+    .panel-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .panel-h h2 { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 9px; }
+    .panel-h h2 .cnt { font-size: 11px; font-weight: 800; color: var(--text-1); background: var(--bg-3); padding: 2px 9px; border-radius: 999px; }
+    .panel-sub { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; line-height: 1.5; }
+
+    /* guard number rows */
+    .gd-row { border-top: 1px solid var(--border); padding: 15px 0 14px; }
+    .gd-row:first-child { border-top: none; }
+    .gd-row.off { opacity: 0.55; }
+    .gd-top { display: flex; align-items: center; gap: 13px; }
+    .gd-av { width: 40px; height: 40px; border-radius: 11px; background: rgba(37,211,102,0.12); color: var(--wa); display: grid; place-items: center; font-size: 16px; flex-shrink: 0; }
+    .gd-main { flex: 1; min-width: 0; }
+    .gd-name { font-weight: 800; font-size: 14.5px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .gd-num { font-size: 12.5px; color: var(--text-2); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .gd-last { font-size: 11.5px; color: var(--text-2); text-align: right; flex-shrink: 0; line-height: 1.4; }
+    .gd-last b { display: block; color: var(--text-1); font-weight: 700; font-size: 12px; }
+    .gd-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .icon-mini { width: 34px; height: 34px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-1); display: grid; place-items: center; cursor: pointer; transition: all .15s ease; }
+    .icon-mini:hover { background: var(--bg-3); color: #fff; }
+    .icon-mini.danger:hover { background: rgba(239,68,68,0.15); color: #FCA5A5; border-color: rgba(239,68,68,0.3); }
+
+    .gd-events { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 10px 0 0 53px; }
+    .ev-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-2); cursor: pointer; transition: all .15s ease; user-select: none; }
+    .ev-chip:hover { border-color: var(--border-strong); }
+    .ev-chip.on { background: rgba(109,40,217,0.16); border-color: rgba(109,40,217,0.45); color: var(--purple-light); }
+    .ev-chip.on i { color: var(--purple-light); }
+
+    /* verification inline */
+    .gd-verify { margin: 12px 0 2px 53px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 13px; border-radius: 12px; background: rgba(250,204,21,0.07); border: 1px solid rgba(250,204,21,0.22); }
+    .gd-verify .vt { font-size: 12.5px; color: var(--yellow); font-weight: 600; }
+    .gd-verify input { width: 110px; padding: 8px 11px; border-radius: 9px; background: var(--bg-2); border: 1px solid var(--border); color: #fff; font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-weight: 800; font-size: 14px; letter-spacing: 0.2em; text-align: center; }
+    .gd-verify input:focus { outline: none; border-color: var(--purple); }
+    .link-btn { background: none; border: none; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--purple-light); cursor: pointer; padding: 4px; }
+    .link-btn:hover { color: #A78BFA; }
+
+    /* empty state */
+    .empty-state .empty-icon { color: var(--wa); background: rgba(37,211,102,0.1); }
+
+    /* log */
+    .log-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .log-row:first-child { border-top: none; }
+    .log-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 13px; flex-shrink: 0; }
+    .log-ic.purple { background: rgba(139,92,246,0.16); color: var(--purple-light); }
+    .log-ic.yellow { background: rgba(250,204,21,0.14); color: var(--yellow); }
+    .log-ic.green { background: rgba(34,197,94,0.14); color: #4ADE80; }
+    .log-ic.blue { background: rgba(0,158,227,0.14); color: #5BC8F5; }
+    .log-main { flex: 1; min-width: 0; }
+    .log-t { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-s { font-size: 11.5px; color: var(--text-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+    .log-time { font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .btn-retry { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgba(239,68,68,0.12); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.28); cursor: pointer; font-family: inherit; transition: all .15s ease; }
+    .btn-retry:hover { background: rgba(239,68,68,0.2); }
+
+    /* tabs */
+    .tabs { display: inline-flex; background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 2px; margin-bottom: 20px; }
+    .tabs button { padding: 9px 16px; border-radius: 9px; border: none; background: transparent; color: var(--text-2); font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 8px; }
+    .tabs button.active { background: var(--purple); color: #fff; }
+    .tabs button .tb-cnt { font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(239,68,68,0.2); color: #FCA5A5; }
+    .tabs button.active .tb-cnt { background: rgba(255,255,255,0.2); color: #fff; }
+    .tab-pane { display: none; }
+    .tab-pane.on { display: block; }
+
+    /* alertas */
+    .alerts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+    .alert { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-radius: 14px; font-size: 13px; }
+    .alert .al-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 14px; flex-shrink: 0; }
+    .alert.warn { background: rgba(250,204,21,0.07); border: 1px solid rgba(250,204,21,0.25); }
+    .alert.warn .al-ic { background: rgba(250,204,21,0.14); color: var(--yellow); }
+    .alert.danger { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25); }
+    .alert.danger .al-ic { background: rgba(239,68,68,0.14); color: #FCA5A5; }
+    .alert .al-main { flex: 1; min-width: 0; }
+    .alert .al-t { font-weight: 800; }
+    .alert .al-s { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+
+    /* sub-segmento historial / plantillas */
+    .subseg { display: inline-flex; gap: 8px; }
+    .subseg button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-2); font-weight: 700; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+    .subseg button.active { background: rgba(109,40,217,0.16); border-color: rgba(109,40,217,0.45); color: var(--purple-light); }
+
+    /* filtros */
+    .filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+    .filters select, .filters input[type="date"] { padding: 9px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text-1); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .filters select:focus, .filters input:focus { outline: none; border-color: var(--purple); }
+    .filters .f-clear { margin-left: auto; }
+
+    /* tabla mensajes */
+    .msg-table { width: 100%; border-collapse: collapse; }
+    .msg-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-2); font-weight: 800; padding: 9px 10px; border-bottom: 1px solid var(--border-strong); }
+    .msg-table td { padding: 11px 10px; border-bottom: 1px solid var(--border); font-size: 12.5px; vertical-align: top; }
+    .msg-table tr.m-row { cursor: pointer; transition: background .12s ease; }
+    .msg-table tr.m-row:hover { background: rgba(139,92,246,0.05); }
+    .msg-table tr.m-row.expanded { background: rgba(139,92,246,0.07); }
+    .m-dest .dn { font-weight: 800; }
+    .m-dest .dnum { font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; margin-top: 1px; }
+    .m-when { font-variant-numeric: tabular-nums; color: var(--text-2); white-space: nowrap; font-size: 12px; }
+    .m-txt { color: var(--text-2); font-size: 11.5px; line-height: 1.45; max-width: 260px; }
+    .m-txt b { color: var(--text-1); }
+    .role-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; }
+    .role-comercio { background: rgba(0,158,227,0.13); color: #5BC8F5; }
+    .role-admin { background: rgba(139,92,246,0.15); color: var(--purple-light); }
+    .role-mecanico { background: rgba(250,204,21,0.12); color: var(--yellow); }
+
+    /* timeline de estado */
+    .tl { display: flex; align-items: center; gap: 0; }
+    .tl .tl-step { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+    .tl .tl-step i { font-size: 11px; }
+    .tl .tl-step.done { color: var(--text-1); }
+    .tl .tl-step.read { color: #53BDEB; }
+    .tl .tl-bar { width: 16px; height: 1.5px; background: var(--border-strong); margin: 0 5px; flex-shrink: 0; }
+    .tl .tl-bar.done { background: var(--green); }
+    .tl-fail { display: inline-flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+    .fail-reason { font-size: 10.5px; color: #FCA5A5; }
+
+    /* detalle expandible */
+    tr.m-detail td { background: rgba(11,11,15,0.45); padding: 14px 16px 16px; }
+    .det-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-2); margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
+    .det-grid { display: flex; flex-direction: column; gap: 7px; }
+    .det-row { display: flex; align-items: center; gap: 11px; font-size: 12px; padding: 8px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--border); }
+    .det-row .dr-name { font-weight: 700; flex: 1; }
+    .det-row .dr-num { color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 11px; }
+
+    /* plantillas */
+    .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    @media (max-width: 900px) { .tpl-grid { grid-template-columns: 1fr; } }
+    .tpl { border: 1px solid var(--border); background: var(--bg-2); border-radius: 14px; padding: 15px; }
+    .tpl.paused { border-color: rgba(250,204,21,0.35); }
+    .tpl-h { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .tpl-h .tn { font-weight: 800; font-size: 13.5px; flex: 1; }
+    .tpl-body { background: #0B141A; border-radius: 4px 12px 12px 12px; padding: 10px 12px; font-size: 12px; line-height: 1.55; color: #E9EDEF; }
+    .tpl-body a { color: #53BDEB; }
+    .tpl-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 11px; color: var(--text-2); }
+
+    .badge-blue { background: rgba(83,189,235,0.14); color: #53BDEB; }
+    .badge-red { background: rgba(239,68,68,0.13); color: #FCA5A5; }
+    .link-ev { color: var(--purple-light); font-weight: 700; text-decoration: none; }
+    .link-ev:hover { text-decoration: underline; }
+
+    /* modal (agregar / editar) */
+    .modal-backdrop { align-items: center; }
+    .modal { border-radius: 22px; max-width: 460px; }
+    .modal h3 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    .modal .m-sub { font-size: 13px; color: var(--text-2); margin-bottom: 16px; }
+    .phone-wrap { display: flex; align-items: stretch; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2); overflow: hidden; }
+    .phone-wrap:focus-within { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(109,40,217,0.18); }
+    .phone-prefix { display: flex; align-items: center; padding: 0 12px; background: var(--bg-3); font-weight: 800; font-size: 14px; color: var(--text-1); border-right: 1px solid var(--border); white-space: nowrap; }
+    .phone-wrap input { flex: 1; min-width: 0; padding: 13px; background: transparent; border: none; color: #fff; font-size: 15px; font-weight: 700; font-family: inherit; }
+    .phone-wrap input:focus { outline: none; }
+    .ev-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+    .m-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .m-actions .btn { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-main">
+      <div class="adm-topbar">
+        <div class="adm-brand"><span class="lm"><i class="fa-solid fa-gear"></i></span> Admin · RepuestosAlToque</div>
+        <div class="adm-top-actions">
+          <span class="adm-pill"><i class="fa-solid fa-location-dot"></i> Bariloche</span>
+          <button class="adm-iconbtn" id="refresh" title="Actualizar"><i class="fa-solid fa-rotate"></i></button>
+          <button class="adm-iconbtn" title="Salir" style="background:rgba(239,68,68,0.12);color:#FCA5A5;border-color:rgba(239,68,68,0.25);"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
+      </div>
+
+      <div class="adm-wrap" data-screen-label="Admin · Avisos WhatsApp">
+        <div class="page-head">
+          <div>
+            <h1><span class="wa-mark"><i class="fa-brands fa-whatsapp"></i></span> Avisos por WhatsApp</h1>
+            <div class="ph-sub">Números de guardia, eventos que reciben y salud del canal.</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-ghost" id="btnKill" style="border-color:rgba(239,68,68,0.35);color:#FCA5A5;"><i class="fa-solid fa-hand"></i> Pausar todos los avisos</button>
+            <button class="btn btn-primary" id="btnAdd"><i class="fa-solid fa-plus"></i> Agregar número</button>
+          </div>
+        </div>
+
+        <div class="alert danger" id="killBanner" style="display:none;margin-bottom:18px;">
+          <div class="al-ic"><i class="fa-solid fa-hand"></i></div>
+          <div class="al-main">
+            <div class="al-t">Todos los avisos están pausados</div>
+            <div class="al-s">Nadie recibe mensajes del bot — ni comercios, ni mecánicos, ni guardia. Los eventos se siguen registrando.</div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnResume"><i class="fa-solid fa-play"></i> Reanudar avisos</button>
+        </div>
+
+        <div class="tabs" id="mainTabs">
+          <button data-tab="guardia" class="active"><i class="fa-solid fa-tower-broadcast"></i> Guardia y canal</button>
+          <button data-tab="mensajes"><i class="fa-solid fa-comment-dots"></i> Mensajes <span class="tb-cnt" id="failCnt"></span></button>
+        </div>
+
+        <div class="tab-pane on" id="tab-guardia">
+        <div class="panel" id="setupChecklist" style="display:none;margin-bottom:18px;">
+          <div class="panel-h"><h2><i class="fa-solid fa-plug" style="color:var(--yellow);"></i> Canal sin configurar — setup pendiente</h2><span class="badge badge-yellow">1 de 3 listo</span></div>
+          <p class="panel-sub">Hasta completar estos pasos, el bot no puede enviar avisos.</p>
+          <div class="det-grid">
+            <div class="det-row"><i class="fa-solid fa-circle-check" style="color:#4ADE80;"></i><span class="dr-name">Conectar número de WhatsApp Business</span><span class="badge badge-green">Listo · +54 9 294 400 1100</span></div>
+            <div class="det-row"><i class="fa-solid fa-hourglass-half" style="color:var(--yellow);"></i><span class="dr-name">Verificación del negocio en Meta</span><span class="badge badge-yellow">En revisión · enviada 11 jul</span></div>
+            <div class="det-row"><i class="fa-regular fa-circle" style="color:var(--text-2);"></i><span class="dr-name">Plantillas enviadas a aprobación</span><span class="badge badge-gray">4 borradores · sin enviar</span></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="setupDemo" style="margin-top:12px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Demo: ver canal configurado</button>
+        </div>
+        <div id="channelReady">
+        <div class="kpi-row" id="kpis"></div>
+
+        <div class="wa-grid">
+          <div class="panel">
+            <div class="panel-h">
+              <h2><i class="fa-solid fa-tower-broadcast" style="color:var(--wa);"></i> Números de guardia <span class="cnt" id="gdCount">0</span></h2>
+            </div>
+            <p class="panel-sub">Reciben <b>todos</b> los avisos de la plataforma, sin importar el rubro del pedido. Tocá los chips para elegir qué eventos recibe cada número.</p>
+            <div id="gdList"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-h">
+              <h2><i class="fa-solid fa-clock-rotate-left" style="color:var(--purple-light);"></i> Últimos avisos</h2>
+              <span class="badge badge-gray" id="logToday"></span>
+            </div>
+            <div id="logList"></div>
+          </div>
+        </div>
+        </div>
+        <button class="link-btn" id="setupDemoBack" style="margin-top:14px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Demo: ver estado “canal sin configurar”</button>
+        </div>
+
+        <!-- ═══════ TAB MENSAJES ═══════ -->
+        <div class="tab-pane" id="tab-mensajes" data-screen-label="Admin · Mensajes del bot">
+          <div class="alerts" id="msgAlerts"></div>
+
+          <div class="panel">
+            <div class="panel-h">
+              <h2><i class="fa-solid fa-comment-dots" style="color:var(--wa);"></i> Mensajes enviados por el bot</h2>
+              <div class="subseg" id="subseg">
+                <button data-view="historial" class="active"><i class="fa-solid fa-list"></i> Historial</button>
+                <button data-view="respuestas"><i class="fa-solid fa-reply"></i> Respuestas</button>
+                <button data-view="plantillas"><i class="fa-solid fa-file-lines"></i> Plantillas</button>
+              </div>
+            </div>
+
+            <div id="view-historial">
+              <div class="filters" id="msgFilters">
+                <select id="fEstado">
+                  <option value="">Estado: todos</option>
+                  <option value="fail">Fallidos primero</option>
+                  <option value="read">Leídos</option>
+                  <option value="delivered">Entregados</option>
+                  <option value="sent">Enviados</option>
+                </select>
+                <select id="fDest"><option value="">Destinatario: todos</option></select>
+                <select id="fEvento"><option value="">Evento: todos</option></select>
+                <select id="fFecha">
+                  <option value="">Fecha: todas</option>
+                  <option value="Hoy">Hoy</option>
+                  <option value="Ayer">Ayer</option>
+                </select>
+                <button class="btn btn-ghost btn-sm f-clear" id="fClear" style="display:none;"><i class="fa-solid fa-xmark"></i> Limpiar filtros</button>
+              </div>
+              <table class="msg-table">
+                <thead><tr><th>Fecha / hora</th><th>Destinatario</th><th>Evento</th><th>Mensaje</th><th>Estado</th></tr></thead>
+                <tbody id="msgBody"></tbody>
+              </table>
+              <div id="msgEmpty" style="display:none;" class="empty-state">
+                <div class="empty-icon"><i class="fa-solid fa-filter"></i></div>
+                <div style="font-weight:800;font-size:15px;color:var(--text-1);">Nada con esos filtros</div>
+                <p class="text-sm" style="margin-top:6px;">Probá con otro estado, destinatario o fecha.</p>
+              </div>
+            </div>
+
+            <div id="view-respuestas" style="display:none;">
+              <p class="panel-sub" style="margin-top:10px;">Lo que la gente le contesta al bot y qué hizo el sistema con cada respuesta.</p>
+              <table class="msg-table">
+                <thead><tr><th>Fecha / hora</th><th>Remitente</th><th>Respuesta</th><th>Acción del sistema</th></tr></thead>
+                <tbody id="respBody"></tbody>
+              </table>
+            </div>
+
+            <div id="view-plantillas" style="display:none;">
+              <p class="panel-sub" style="margin-top:10px;">Plantillas aprobadas por Meta que usa el bot. Si Meta pausa una plantilla, ese evento deja de notificarse hasta reactivarla.</p>
+              <div class="tpl-grid" id="tplGrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal agregar / editar número -->
+  <div class="modal-backdrop" id="numModal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div id="numModalBody"></div>
+    </div>
+  </div>
+
+  <script src="demo/assets/app.js"></script>
+  <script src="avisos-wa-admin.js"></script>
+  <script src="avisos-wa-mensajes.js"></script>
+</body>
+</html>

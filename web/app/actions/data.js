@@ -7,11 +7,12 @@ import { createPaymentLink, mpIsTest, mpOAuthUrl, mpOAuthConfigured } from '@/li
 import { jobChargePlan, jobSplit, sellerMpToken } from '@/lib/orders';
 import { getSettings as readSettings } from '@/lib/settings';
 import { geocode, searchInZones, zoneOf } from '@/lib/geo';
-import { getActiveZones, zonesForRole } from '@/lib/zones';
+import { getActiveZones, zonesForRole, mechanicZone } from '@/lib/zones';
 import { creditStatus, creditActive } from '@/lib/credit';
 import { parsePrice } from '@/lib/money';
 import { aliasLabel } from '@/lib/alias';
 import { sendPush, sendPushMany } from '@/lib/push';
+import { waNotifyNewRequest, waNotifyNewQuote } from '@/lib/whatsapp';
 import { URGENCY, URGENCY_LABEL, txt, num, reqBase, quotePublic, newPin, tripWhere, TRIP_INCLUDE, PLATE_RE, normPlate, jobBase } from '@/lib/data-helpers';
 
 // Texto libre con tope: estos campos viajan en cada poll de cada panel; sin tope,
@@ -307,7 +308,7 @@ export async function markCreditSettled(orderId, settled = true) {
 
 export async function createQuote(requestId, input) {
   const s = await getSession(); if (!s || s.role !== 'STORE') return { error: 'No autorizado' };
-  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true, mechanicId: true } });
+  const req = await prisma.request.findUnique({ where: { id: requestId }, select: { status: true, windowEndsAt: true, jobId: true, mechanicId: true, code: true, description: true, category: { select: { name: true } } } });
   if (!req) return { error: 'Solicitud no encontrada' };
   if (!['OPEN', 'QUOTED'].includes(req.status)) return { error: 'La solicitud ya no admite cotizaciones' };
   // sin vencimiento: mientras el pedido esté abierto, el comercio puede cotizar (el contador es informativo)
@@ -337,6 +338,14 @@ export async function createQuote(requestId, input) {
   await prisma.request.update({ where: { id: requestId }, data: { status: 'QUOTED' } }).catch(() => {});
   // push al mecánico: llegó una cotización (tag por pedido -> coalesce si llegan varias)
   await sendPush(req.mechanicId, { title: 'Llegó una cotización 🏷️', body: 'Tenés una oferta nueva para tu pedido. Revisala.', url: '/mecanico', tag: 'cotiz-' + requestId }).catch(() => {});
+  // WhatsApp al mecánico (+ guardia). El comercio va por su ALIAS: el anonimato se mantiene también acá.
+  await waNotifyNewQuote({
+    mechanicId: req.mechanicId,
+    comercio: alias,
+    monto: '$' + Math.round(parsePrice(input.price)).toLocaleString('es-AR'),
+    repuesto: (req.description || req.category?.name || 'tu repuesto').slice(0, 60),
+    refCode: req.code ? '#' + req.code : null,
+  }).catch(() => {});
   return { ok: true };
 }
 
@@ -1458,6 +1467,15 @@ export async function publishJob(jobId) {
   const stores = await prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { categories: { select: { categoryId: true } } } } } });
   const targets = stores.filter((u) => { const cats = u.store?.categories || []; return cats.length === 0 || catIds.length === 0 || cats.some((c) => catIds.includes(c.categoryId)); }).map((u) => u.id);
   await sendPushMany(targets, { title: 'Nuevo pedido para cotizar 🔧', body: 'Un taller necesita un repuesto. Entrá y cotizá tu mejor precio.', url: '/comercio', tag: 'nuevo-pedido-' + jobId }).catch(() => {});
+  // WhatsApp a los mismos comercios (+ guardia). El detalle es genérico a propósito: el rubro y el
+  // vehículo alcanzan para decidir si entrar a cotizar, sin filtrar datos del pedido por WhatsApp.
+  try {
+    const cats = catIds.length ? await prisma.category.findMany({ where: { id: { in: catIds } }, select: { name: true } }) : [];
+    const repuesto = cats.length ? cats.map((c) => c.name).slice(0, 2).join(' + ') + (cats.length > 2 ? ' +' : '') : 'Repuestos';
+    const vehiculo = [job.brand, job.model, job.year].filter(Boolean).join(' ') || 'Vehículo';
+    const zone = await mechanicZone(s.id);
+    await waNotifyNewRequest({ storeIds: targets, repuesto, vehiculo, zona: zone?.name || 'Bariloche', refCode: '#' + (job.code || jobId) });
+  } catch {}
   return { ok: true };
 }
 
