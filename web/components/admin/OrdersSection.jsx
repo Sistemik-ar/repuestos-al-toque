@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { money, fmtDateTime, toast } from '@/lib/ui';
 import Loading from '@/components/Loading';
 import { getRequestQuotes, getRequestTimeline, adminAdvanceInternalOrder } from '@/app/actions/data';
+import { adminCancelUnpaidRequest } from '@/app/actions/admin-jobs';
 import { useTable, Search, SortBar, Thead, Pager } from './table';
 
 const ORDER_COLS = [
@@ -34,6 +35,9 @@ const StatusBadge = ({ status }) => { const [c, l] = STATUS_ST[status] || ['badg
 // "tiempo de respuesta" legible (minutos -> min/h/días)
 const fmtDelta = (min) => (min == null ? '' : min < 1 ? 'al toque' : min < 60 ? `${min} min` : min < 1440 ? `${Math.round(min / 60)} h` : `${Math.round(min / 1440)} d`);
 
+// Estados que el admin todavía puede dar de baja: nadie pagó, así que no hay plata que devolver.
+const CANCELABLE = ['OPEN', 'QUOTED', 'CLOSED', 'EXPIRED'];
+
 // Filtro por estado del listado.
 const ESTADO_TABS = [
   ['todos', 'Todos', null],
@@ -49,6 +53,25 @@ function OrdersSection({ orders, loading, onReload }) {
   const [quotesReq, setQuotesReq] = useState(null); // pedido cuyas cotizaciones recibidas se muestran
   const [estado, setEstado] = useState('todos');
   const [advancing, setAdvancing] = useState(null); // orderId cuya coordinación interna se está avanzando
+  const [cancelling, setCancelling] = useState(null); // pedido impago que se está dando de baja
+
+  // Baja de un pedido SIN pagar: cancela el trabajo completo y desactiva el link de Mercado Pago.
+  async function cancelar(o) {
+    const msg = `¿Cancelar el pedido #${o.code}?\n\n${o.label}${o.vehicle ? ` · ${o.vehicle}` : ''}\n\n`
+      + 'Se dan de baja todos los ítems del trabajo y el link de Mercado Pago deja de ser pagable. No se puede deshacer.';
+    if (!window.confirm(msg)) return;
+    setCancelling(o.id);
+    const res = await adminCancelUnpaidRequest(o.id);
+    setCancelling(null);
+    if (res?.error) { toast({ title: res.error, type: 'yellow', icon: 'fa-triangle-exclamation' }); return; }
+    // el link solo se puede desactivar si el trabajo tenía uno generado; si MP rechazó la baja,
+    // avisamos: el pago queda igualmente frenado del lado nuestro, pero conviene revisarlo.
+    const sub = !res.hadLink ? 'No tenía link de pago generado'
+      : res.linkDisabled ? 'El link de Mercado Pago quedó vencido'
+      : 'Ojo: no se pudo vencer el link en Mercado Pago';
+    toast({ title: `Pedido ${res.ref} cancelado`, sub, icon: 'fa-ban', type: res.hadLink && !res.linkDisabled ? 'yellow' : 'green' });
+    onReload?.();
+  }
 
   // Coordinación interna (zona sin delivery): el admin registra el movimiento (retirado/entregado).
   async function avanzar(o) {
@@ -95,6 +118,13 @@ function OrdersSection({ orders, loading, onReload }) {
                     <div className="mt-4">
                       <button className="btn btn-yellow btn-sm" disabled={advancing === o.orderId} onClick={() => avanzar(o)}>
                         {advancing === o.orderId ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : o.orderStatus === 'PAID' ? <><i className="fa-solid fa-box"></i> Registrar retiro</> : <><i className="fa-solid fa-circle-check"></i> Registrar entrega</>}
+                      </button>
+                    </div>
+                  )}
+                  {CANCELABLE.includes(o.status) && (
+                    <div className="mt-4">
+                      <button className="btn btn-danger btn-sm" disabled={cancelling === o.id} onClick={() => cancelar(o)} title="Cancelar el pedido y vencer el link de pago">
+                        {cancelling === o.id ? <span className="spinner" style={{ width: 14, height: 14 }}></span> : <><i className="fa-solid fa-ban"></i> Cancelar</>}
                       </button>
                     </div>
                   )}

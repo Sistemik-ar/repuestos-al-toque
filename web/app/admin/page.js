@@ -10,6 +10,7 @@ import Loading from '@/components/Loading';
 import FontScale from '@/components/FontScale';
 import StatsSection from '@/components/admin/StatsSection';
 import Pricing from '@/components/admin/PricingSection';
+import TelegramSection from '@/components/admin/TelegramSection';
 import CreditSection from '@/components/admin/CreditSection';
 import StoreCategories from '@/components/admin/StoreCategories';
 import OrdersSection from '@/components/admin/OrdersSection';
@@ -175,6 +176,7 @@ export default function Admin() {
               <button className="btn btn-yellow btn-sm" onClick={saveT}><i className="fa-solid fa-floppy-disk"></i> Guardar tarifas</button>
             </div>
           </div>
+          <TelegramSection />
         </>)}
 
         <p className="text-center text-xs muted mt-24 mb-24">RepuestosAlToque · Admin</p>

@@ -49,3 +49,39 @@ export async function getPayment(paymentId) {
   if (!res.ok) throw new Error('No se pudo consultar el pago.');
   return res.json();
 }
+
+// Id de la preferencia a partir del link ya guardado. El init_point de MP siempre es
+// .../checkout/v1/redirect?pref_id=<id>, así que lo derivamos del link en vez de guardar una
+// columna nueva: de paso, también podemos desactivar los links generados ANTES de esta función.
+export function preferenceIdFromLink(link) {
+  if (!link) return null;
+  try {
+    return new URL(String(link)).searchParams.get('pref_id') || null;
+  } catch {
+    return null;
+  }
+}
+
+// Mata un link de pago. MP no permite borrar una preferencia, pero sí ponerle una ventana de
+// vigencia ya vencida: el checkout pasa a mostrar "preferencia expirada" y no se puede pagar.
+// sellerToken: si la preferencia se creó con el token de otra cuenta (split), solo ESE token
+// puede modificarla; sin él, MP responde 404.
+// Best-effort: devuelve false en vez de lanzar — el llamador cancela igual en la base, y
+// lib/order-guards.js cubre el caso de que el link haya quedado vivo.
+const EXPIRED_FROM = '2020-01-01T00:00:00.000-03:00';
+const EXPIRED_TO = '2020-01-02T00:00:00.000-03:00';
+
+export async function deactivatePaymentLink(link, sellerToken) {
+  const id = preferenceIdFromLink(link);
+  if (!id) return false;
+  try {
+    const res = await fetch(`${MP_API}/checkout/preferences/${id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sellerToken || mpToken()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expires: true, expiration_date_from: EXPIRED_FROM, expiration_date_to: EXPIRED_TO }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

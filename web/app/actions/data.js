@@ -1431,6 +1431,24 @@ export async function publishJob(jobId) {
   const ends = quoteWindowMin > 0 ? new Date(Date.now() + quoteWindowMin * 60 * 1000) : null;
   await prisma.job.update({ where: { id: jobId }, data: { status: 'OPEN', windowEndsAt: ends } });
   await prisma.request.updateMany({ where: { jobId }, data: { windowEndsAt: ends, status: 'OPEN' } });
+  // Aviso a Telegram del admin: puente temporal hasta que esté el bot de WhatsApp — le llega el
+  // pedido con la patente y el vehículo, listo para copiar y reenviarlo por WhatsApp a mano.
+  // No comparte destinatarios con la push de abajo (esto va SOLO al admin), y el import es
+  // perezoso + try/catch porque es un aviso opcional: nunca puede impedir que se publique.
+  try {
+    const [{ tgNotifyNewJob }, { mechanicZone }] = await Promise.all([import('@/lib/telegram'), import('@/lib/zones')]);
+    const ids = [...new Set(job.requests.map((r) => r.categoryId).filter(Boolean))];
+    const [cats, mech, zone] = await Promise.all([
+      ids.length ? prisma.category.findMany({ where: { id: { in: ids } }, select: { name: true } }) : [],
+      prisma.user.findUnique({ where: { id: s.id }, select: { name: true, email: true } }),
+      mechanicZone(s.id),
+    ]);
+    await tgNotifyNewJob({
+      code: job.code, plate: job.plate, brand: job.brand, model: job.model, year: job.year,
+      repuesto: cats.map((c) => c.name).join(' + '),
+      mechanicName: mech?.name || mech?.email, zona: zone?.name,
+    });
+  } catch {}
   // push a los comercios que venden esos rubros (o que reciben de todo)
   const catIds = [...new Set(job.requests.map((r) => r.categoryId).filter(Boolean))];
   const stores = await prisma.user.findMany({ where: { role: 'STORE', status: 'ACTIVE' }, select: { id: true, store: { select: { categories: { select: { categoryId: true } } } } } });

@@ -1,5 +1,6 @@
 // Lógica de órdenes/envío (server-only). NO es server action.
 import { prisma } from '@/lib/db';
+import { jobIsChargeable, requestIsChargeable, reportOrphanPayment } from '@/lib/order-guards';
 import { shippingCostFromTariff, haversineKm, MIN_SHIP } from '@/lib/shipping';
 import { drivingKm } from '@/lib/geo';
 import { mechanicZone } from '@/lib/zones';
@@ -102,6 +103,13 @@ export async function jobChargePlan(jobId) {
 
 // Confirma el pago de un Trabajo completo (ref "job::<id>"): crea una orden por ítem elegido.
 async function confirmJobPaid(jobId, paidAmount) {
+  // Trabajo cancelado (por el admin o por vencimiento) cuyo link de MP igual se pagó: NO confirmar.
+  // Sin este corte el plan quedaría vacío, el total daría 0 y el trabajo se marcaría PAGADO sin
+  // ninguna orden. Se avisa al admin para que devuelva la plata. Ver lib/order-guards.js.
+  if (!(await jobIsChargeable(jobId))) {
+    await reportOrphanPayment({ ref: `job::${jobId}`, paidAmount });
+    return false;
+  }
   const plan = await jobChargePlan(jobId);
   if (!plan) return false;
   // verificación de monto: si el pago real no cubre lo esperado, NO confirmar (posible manipulación)
@@ -133,6 +141,11 @@ export async function confirmPaidByRef(ref, paidAmount) {
   if (!ref || !String(ref).includes('::')) return false;
   if (String(ref).startsWith('job::')) return confirmJobPaid(String(ref).slice(5), paidAmount);
   const [requestId, quoteId, mode] = String(ref).split('::');
+  // mismo corte que en los trabajos: un pedido cancelado no se confirma aunque llegue el pago
+  if (!(await requestIsChargeable(requestId))) {
+    await reportOrphanPayment({ ref, paidAmount });
+    return false;
+  }
   const creditAccount = mode === 'cc';
   const q = await prisma.requestQuote.findUnique({ where: { id: quoteId }, include: { request: true } });
   if (!q || q.requestId !== requestId) return false;
