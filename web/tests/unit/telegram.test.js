@@ -140,16 +140,31 @@ describe('tgNotifyNewJob', () => {
     expect(text).toContain('#T-134');
   });
 
-  it('deja el texto reenviable dentro de un <pre> y el contexto interno afuera', async () => {
+  it('el bloque a reenviar lleva SOLO rubro y link', async () => {
     activo();
     const f = okFetch();
     await tgNotifyNewJob(job);
     const copia = sent(f).text.match(/<pre>([\s\S]*?)<\/pre>/)[1];
-    expect(copia).toContain('AB123CD');
+
+    expect(copia).toContain('Frenos');
     expect(copia).toContain('https://repuestosaltoque.com.ar/comercio');
-    // el mecánico y la zona son para el admin: no se reenvían al comercio
-    expect(copia).not.toContain('Juan Pérez');
-    expect(copia).not.toContain('Bariloche');
+    // nada del pedido sale de la plataforma por WhatsApp: para verlo hay que entrar a cotizar
+    expect(copia).not.toContain('AB123CD'); // patente
+    expect(copia).not.toContain('Ranger'); // vehículo
+    expect(copia).not.toContain('Juan Pérez'); // mecánico
+    expect(copia).not.toContain('Bariloche'); // zona
+  });
+
+  it('el admin sí ve el detalle completo, fuera del bloque', async () => {
+    activo();
+    const f = okFetch();
+    await tgNotifyNewJob(job);
+    const { text } = sent(f);
+    const afuera = text.replace(/<pre>[\s\S]*?<\/pre>/, '');
+    expect(afuera).toContain('AB123CD');
+    expect(afuera).toContain('Ford Ranger 2018');
+    expect(afuera).toContain('Juan Pérez');
+    expect(afuera).toContain('Bariloche');
   });
 
   it('escapa el HTML de los datos que carga el mecánico', async () => {

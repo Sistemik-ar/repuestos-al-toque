@@ -79,9 +79,13 @@ describe('publishJob dispara el aviso de Telegram', () => {
     expect(text).toContain('Ford Ranger 2018');
     expect(text).toContain('Frenos');
     expect(text).toContain(`#${job.code}`);
-    // el contexto interno viaja fuera del bloque que Jorge reenvía
+    // el detalle es para el admin: el bloque que se reenvía por WhatsApp lleva solo rubro y link
     expect(text).toContain('Juan Pérez');
-    expect(text.match(/<pre>([\s\S]*?)<\/pre>/)[1]).not.toContain('Juan Pérez');
+    const copia = text.match(/<pre>([\s\S]*?)<\/pre>/)[1];
+    expect(copia).toContain('Frenos');
+    expect(copia).toContain('/comercio');
+    expect(copia).not.toContain('AB123CD');
+    expect(copia).not.toContain('Juan Pérez');
   });
 
   it('el trabajo se publica igual si el aviso está apagado', async () => {

@@ -71,26 +71,32 @@ function appUrl() {
   return (process.env.APP_URL || 'https://repuestosaltoque.com.ar').replace(/\/+$/, '');
 }
 
-// Aviso de trabajo publicado. El bloque <pre> es lo que Jorge copia y manda por WhatsApp a los
-// comercios; el resto (mecánico, zona) es contexto para él y NO va en el reenvío.
+// Aviso de trabajo publicado. Tiene dos partes con destinatarios distintos:
+//   - el detalle (patente, vehículo, mecánico, zona) es para el admin, para saber de qué se trata;
+//   - el bloque <pre> es lo que copia y reenvía por WhatsApp al comercio.
+// En el reenvío va SOLO el rubro y el link: alcanza para que el comercio decida si le compete,
+// y el resto del pedido no sale de la plataforma. Para verlo tiene que entrar a cotizar.
 export async function tgNotifyNewJob({ code, plate, brand, model, year, repuesto, mechanicName, zona }) {
   const cfg = await getTelegramConfig();
   if (!cfg.configured || !cfg.enabled || !cfg.chatId) return { ok: false, skipped: true };
   const vehiculo = [brand, model, year].filter(Boolean).join(' ') || 'Vehículo sin datos';
+  const rubro = repuesto || 'A confirmar';
   const ref = code ? `#${code}` : '';
   const copia = [
-    '¡Hola! Entró un pedido nuevo para cotizar 🔧',
+    '🔧 ¡Entró un pedido nuevo para cotizar!',
     '',
-    `Vehículo: ${vehiculo}`,
-    `Patente: ${plate || '—'}`,
-    `Repuesto: ${repuesto || 'A confirmar'}`,
+    `Rubro: ${rubro}`,
     '',
-    `Entrá a RepuestosAlToque y cargá tu precio: ${appUrl()}/comercio`,
+    'Cargá tu precio antes que los demás 👇',
+    `${appUrl()}/comercio`,
   ].join('\n');
   const text = [
     `🔧 <b>Pedido nuevo para cotizar</b> ${esc(ref)}`,
-    `<pre>${esc(copia)}</pre>`,
+    `<i>${esc(vehiculo)} · ${esc(plate || 's/patente')} · ${esc(rubro)}</i>`,
     `<i>Mecánico: ${esc(mechanicName || '—')} · Zona: ${esc(zona || '—')}</i>`,
+    '',
+    'Para reenviar por WhatsApp:',
+    `<pre>${esc(copia)}</pre>`,
   ].join('\n');
   return sendTelegram(text, { chatId: cfg.chatId });
 }
