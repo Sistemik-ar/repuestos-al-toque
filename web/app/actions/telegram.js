@@ -23,23 +23,39 @@ export async function saveTelegramSettings({ chatId, enabled }) {
   return { ok: true };
 }
 
-// Busca el chat_id de quien le haya escrito al bot recién (Jorge manda /start y tocamos Detectar).
+// Nombre legible de un chat: los grupos traen `title`, las personas `first_name`/`last_name`.
+function chatLabel(c) {
+  const persona = [c.first_name, c.last_name].filter(Boolean).join(' ');
+  const nombre = c.title || persona || c.username || 'Chat';
+  return c.type === 'group' || c.type === 'supergroup' ? `${nombre} (grupo)` : nombre;
+}
+
+// Busca el chat donde mandar los avisos entre lo último que vio el bot.
+// Sirven tanto el /start de una persona como el alta del bot en un grupo: ese evento llega
+// como `my_chat_member`, así que agregarlo al grupo alcanza —no hace falta escribir adentro—.
+// Importa porque en los grupos el modo privacidad viene activado: el bot no recibe los mensajes
+// comunes, solo los comandos, y sin `my_chat_member` un grupo recién creado quedaría invisible.
 // getUpdates solo funciona si el bot NO tiene webhook configurado, que es nuestro caso.
 export async function detectTelegramChat() {
   if (!(await requireAdmin())) return { error: 'No autorizado' };
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return { error: 'Falta TELEGRAM_BOT_TOKEN en el servidor.' };
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=20`, { cache: 'no-store' });
+    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`, { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.ok === false) return { error: data?.description || 'Telegram no respondió.' };
     const chats = new Map();
     for (const u of data.result || []) {
-      const c = u?.message?.chat || u?.channel_post?.chat;
-      if (c?.id != null) chats.set(String(c.id), [c.first_name, c.last_name].filter(Boolean).join(' ') || c.title || c.username || 'Chat');
+      // cualquier update trae el chat donde ocurrió; no nos importa de qué tipo sea
+      for (const ev of Object.values(u || {})) {
+        const c = ev?.chat;
+        if (c?.id != null) chats.set(String(c.id), chatLabel(c));
+      }
     }
     const found = [...chats].map(([id, name]) => ({ id, name })).reverse();
-    if (found.length === 0) return { error: 'Nadie le escribió al bot todavía. Abrí el bot en Telegram, mandá /start y probá de nuevo.' };
+    if (found.length === 0) {
+      return { error: 'El bot no vio ninguna conversación todavía. Mandale /start desde Telegram, o agregalo al grupo, y probá de nuevo.' };
+    }
     return { ok: true, chats: found };
   } catch (e) {
     return { error: e?.message || 'No se pudo contactar a Telegram.' };
