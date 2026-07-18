@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('@/lib/db', () => ({ prisma: { setting: { findMany: vi.fn(), upsert: vi.fn() } } }));
 
 import { prisma } from '@/lib/db';
-import { getTelegramConfig, sendTelegram, tgNotifyNewJob } from '@/lib/telegram';
+import { getTelegramConfig, setTelegramConfig, sendTelegram, tgNotifyNewJob, tgNotifyOrphanPayment } from '@/lib/telegram';
 
 // config activa por defecto en cada test
 const activo = () => prisma.setting.findMany.mockResolvedValue([
@@ -36,6 +36,55 @@ describe('getTelegramConfig', () => {
   it('si la base falla devuelve apagado en vez de romper', async () => {
     prisma.setting.findMany.mockRejectedValue(new Error('db caída'));
     expect(await getTelegramConfig()).toEqual({ configured: true, chatId: '', enabled: false });
+  });
+  it('sin TELEGRAM_BOT_TOKEN queda marcado como no configurado', async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    activo();
+    expect((await getTelegramConfig()).configured).toBe(false);
+  });
+});
+
+describe('setTelegramConfig', () => {
+  it('guarda chat y switch como settings', async () => {
+    await setTelegramConfig({ chatId: ' 123 ', enabled: true });
+    expect(prisma.setting.upsert).toHaveBeenCalledTimes(2);
+    const guardado = Object.fromEntries(prisma.setting.upsert.mock.calls.map(([a]) => [a.where.key, a.create.value]));
+    expect(guardado).toEqual({ tgChatId: '123', tgEnabled: 'true' });
+  });
+
+  it('el switch apagado se guarda como "false", no como vacío', async () => {
+    await setTelegramConfig({ chatId: '', enabled: false });
+    const guardado = Object.fromEntries(prisma.setting.upsert.mock.calls.map(([a]) => [a.where.key, a.create.value]));
+    expect(guardado).toEqual({ tgChatId: '', tgEnabled: 'false' });
+  });
+});
+
+describe('tgNotifyOrphanPayment', () => {
+  it('avisa con el código del pedido y el monto formateado', async () => {
+    activo();
+    const f = okFetch();
+    await tgNotifyOrphanPayment({ ref: 'job::j1', code: 'T-134', paidAmount: 120000 });
+    const { text } = sent(f);
+    expect(text).toContain('CANCELADO');
+    expect(text).toContain('#T-134');
+    expect(text).toContain('$120.000');
+    expect(text).toMatch(/Devolvé la plata/);
+  });
+
+  it('sin código legible cae al ref crudo, y sin monto lo dice', async () => {
+    activo();
+    const f = okFetch();
+    await tgNotifyOrphanPayment({ ref: 'job::j1', paidAmount: null });
+    const { text } = sent(f);
+    expect(text).toContain('job::j1');
+    expect(text).toContain('monto desconocido');
+  });
+
+  it('no manda nada si los avisos están apagados', async () => {
+    prisma.setting.findMany.mockResolvedValue([]);
+    const f = okFetch();
+    expect(await tgNotifyOrphanPayment({ ref: 'job::j1', paidAmount: 1 })).toEqual({ ok: false, skipped: true });
+    expect(f).not.toHaveBeenCalled();
   });
 });
 
