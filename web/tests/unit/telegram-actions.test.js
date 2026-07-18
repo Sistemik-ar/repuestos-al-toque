@@ -71,18 +71,36 @@ describe('saveTelegramSettings', () => {
 describe('detectTelegramChat', () => {
   it('devuelve los chats que le escribieron al bot, sin repetir', async () => {
     stubFetch({ ok: true, result: [
-      { message: { chat: { id: 111, first_name: 'Jorge', last_name: 'P' } } },
-      { message: { chat: { id: 111, first_name: 'Jorge', last_name: 'P' } } },
-      { message: { chat: { id: -222, title: 'Guardia finde' } } },
+      { message: { chat: { id: 111, type: 'private', first_name: 'Jorge', last_name: 'P' } } },
+      { message: { chat: { id: 111, type: 'private', first_name: 'Jorge', last_name: 'P' } } },
+      { message: { chat: { id: -222, type: 'group', title: 'Guardia finde' } } },
     ] });
     const r = await detectTelegramChat();
     expect(r.ok).toBe(true);
-    expect(r.chats).toEqual([{ id: '-222', name: 'Guardia finde' }, { id: '111', name: 'Jorge P' }]);
+    expect(r.chats).toEqual([{ id: '-222', name: 'Guardia finde (grupo)' }, { id: '111', name: 'Jorge P' }]);
   });
 
-  it('explica qué hacer si nadie le escribió todavía', async () => {
+  // Al agregar el bot a un grupo, Telegram manda `my_chat_member`, no un mensaje. Y como el modo
+  // privacidad viene activado, los mensajes comunes del grupo tampoco llegan: sin esto, un grupo
+  // recién creado quedaba invisible y había que adivinar que hacía falta escribir un comando.
+  it('encuentra un grupo recién creado aunque nadie haya escrito adentro', async () => {
+    stubFetch({ ok: true, result: [
+      { my_chat_member: { chat: { id: -5390176393, type: 'group', title: 'Repuestos Al Toque' } } },
+    ] });
+    const r = await detectTelegramChat();
+    expect(r.chats).toEqual([{ id: '-5390176393', name: 'Repuestos Al Toque (grupo)' }]);
+  });
+
+  it('no se cuelga con updates sin chat', async () => {
+    stubFetch({ ok: true, result: [{ poll: { id: 'p1' } }, { update_id: 9 }, {}] });
+    expect((await detectTelegramChat()).error).toBeTruthy();
+  });
+
+  it('explica qué hacer si el bot no vio nada todavía', async () => {
     stubFetch({ ok: true, result: [] });
-    expect((await detectTelegramChat()).error).toMatch(/\/start/);
+    const e = (await detectTelegramChat()).error;
+    expect(e).toMatch(/\/start/);
+    expect(e).toMatch(/grupo/);
   });
 
   it('avisa si falta el token del bot, sin llamar a Telegram', async () => {
