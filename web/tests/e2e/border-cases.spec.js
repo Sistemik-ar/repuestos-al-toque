@@ -15,7 +15,7 @@ test('desestimar un ítem lo saca del pago del trabajo', async ({ browser }) => 
   await m.locator('textarea').first().fill(`Borde2 E2E ${stamp}`);
   await m.getByRole('button', { name: /Continuar/i }).click();
   await m.getByRole('button', { name: /Continuar/i }).click();
-  await m.getByRole('button', { name: /Enviar pedido/i }).click();
+  await m.getByRole('button', { name: /Agregar repuesto/i }).click();
   await expect(m.getByText(/2 ítems en este trabajo/i)).toBeVisible({ timeout: 15000 });
   await publicarTrabajo(m);
 

@@ -52,7 +52,7 @@ export default function MecanicoDashboard() {
   const enEntrega = jobs.filter((jb) => jb.status === 'PAID'); // pagado, en tránsito
   const entregados = jobs.filter((jb) => jb.status === 'DONE'); // todos los ítems entregados
   const cancelados = jobs.filter((jb) => jb.status === 'CANCELLED');
-  const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-pen', 'En armado'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado'] };
+  const JOB_BADGE = { DRAFT: ['badge-yellow', 'fa-triangle-exclamation', 'Sin enviar'], OPEN: ['badge-purple', 'fa-tower-broadcast', 'Cotizando'], CLOSED: ['badge-yellow', 'fa-clock', 'Pendiente de pago'], PAID: ['badge-green', 'fa-check', 'Pagado'], DONE: ['badge-green', 'fa-box-open', 'Entregado'], CANCELLED: ['badge-red', 'fa-ban', 'Cancelado'] };
   const veh = (jb) => `${jb.brand || ''} ${jb.model || ''}`.trim() || 'Vehículo';
   const initials = (me?.name || 'TP').split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   // insignia por operaciones REALES (ítems entregados), no el número del mock
@@ -128,6 +128,13 @@ export default function MecanicoDashboard() {
 
         <div className="section">
           <div className="section-title"><h2>Trabajos activos</h2></div>
+          {/* borradores olvidados: el mecánico cree que ya pidió y espera cotizaciones que nunca llegan */}
+          {loaded && activos.some((jb) => jb.status === 'DRAFT') && (
+            <div className="float-notif mb-12" style={{ padding: '10px 12px', borderColor: 'rgba(250,204,21,0.55)', background: 'rgba(250,204,21,0.10)' }}>
+              <i className="fa-solid fa-triangle-exclamation text-yellow"></i>
+              <div className="text-sm subtle">Tenés pedidos <b>sin enviar</b>: los comercios no los ven. Entrá y tocá <b>Solicitar presupuesto</b>.</div>
+            </div>
+          )}
           {!loaded ? (
             <Loading label="Cargando tus trabajos…" />
           ) : activos.length === 0 ? (
@@ -145,7 +152,9 @@ export default function MecanicoDashboard() {
                 </div>
                 <div className="flex-between">
                   <span className="text-xs muted">{jb.items.map((i) => i.desc || i.catLabel).filter(Boolean).slice(0, 3).join(' · ')}</span>
-                  <span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span>
+                  {jb.status === 'DRAFT'
+                    ? <span className="text-xs text-yellow" style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Enviar →</span>
+                    : <span className="text-xs text-purple" style={{ fontWeight: 700 }}>Ver →</span>}
                 </div>
               </Link>
             );

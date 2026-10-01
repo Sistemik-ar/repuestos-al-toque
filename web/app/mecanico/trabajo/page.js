@@ -44,10 +44,17 @@ export default function Trabajo() {
   }
 
   async function desestimar(it) {
-    if (!window.confirm(`¿Desestimar "${it.desc || it.catLabel}"? No se va a comprar ni cobrar.`)) return;
+    const nombre = it.desc || it.catLabel;
+    // si es el último ítem vivo, el server cancela el trabajo entero: hay que decirlo con todas las letras
+    // (en prod hubo pedidos cancelados así sin querer, creyendo que solo se quitaba el repuesto)
+    const ultimo = items.filter((i) => i.status !== 'CANCELLED').length <= 1;
+    const msg = ultimo
+      ? `"${nombre}" es el único repuesto de este pedido.\n\nSi lo quitás, se CANCELA EL PEDIDO COMPLETO y los comercios dejan de verlo. ¿Cancelar el pedido?`
+      : `¿Quitar "${nombre}" del pedido? No se va a comprar ni cobrar.`;
+    if (!window.confirm(msg)) return;
     const res = await cancelItem(it.id);
     if (res?.error) { toast({ title: res.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); return; }
-    toast({ title: 'Repuesto desestimado', icon: 'fa-ban', type: 'purple' });
+    toast({ title: ultimo ? 'Pedido cancelado' : 'Repuesto quitado', icon: 'fa-ban', type: 'purple' });
     setJ(await getJob(id));
   }
 
@@ -103,11 +110,11 @@ export default function Trabajo() {
 
             {j.status === 'DRAFT' && (
               <div className="card mb-16" style={{ borderColor: 'rgba(250,204,21,0.4)' }}>
-                <div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-pen text-yellow"></i> Trabajo en armado</div>
-                <div className="text-xs muted mt-4 mb-12">Los comercios todavía no lo ven. Publicalo cuando esté completo.</div>
+                <div className="text-sm" style={{ fontWeight: 700 }}><i className="fa-solid fa-triangle-exclamation text-yellow"></i> Pedido sin enviar</div>
+                <div className="text-xs muted mt-4 mb-12">Los comercios <b>todavía no lo ven</b> y no te van a llegar cotizaciones hasta que toques <b>Solicitar presupuesto</b>.</div>
                 <div className="flex gap-12">
                   <Link href="/mecanico/pedido" className="btn btn-ghost btn-sm">Seguir agregando</Link>
-                  <BusyButton className="btn btn-yellow btn-block btn-sm" busyLabel="Publicando…" onClick={async () => { const r = await publishJob(id); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</BusyButton>
+                  <BusyButton className="btn btn-yellow btn-block btn-sm" busyLabel="Enviando…" onClick={async () => { const r = await publishJob(id); if (r?.error) toast({ title: r.error, icon: 'fa-triangle-exclamation', type: 'yellow' }); setJ(await getJob(id)); }}><i className="fa-solid fa-paper-plane"></i> Solicitar presupuesto</BusyButton>
                 </div>
               </div>
             )}
@@ -115,7 +122,9 @@ export default function Trabajo() {
             {/* Ítems */}
             <div className="section-title"><h2>Repuestos del trabajo</h2><span className="text-xs muted">{chosen.length}/{items.length} elegidos</span></div>
             {items.map((it) => {
-              const [cls, txt] = ITEM_BADGE[it.status] || ['badge-gray', it.status];
+              // en borrador el ítem está OPEN pero nadie lo ve: "Cotizando" le hacía creer al mecánico que ya estaba pedido
+              const borrador = j.status === 'DRAFT' && it.status !== 'CANCELLED';
+              const [cls, txt] = borrador ? ['badge-yellow', 'Sin enviar'] : (ITEM_BADGE[it.status] || ['badge-gray', it.status]);
               return (
                 <div className="card mb-12" key={it.id}>
                   <div className="flex-between mb-8">
@@ -132,7 +141,7 @@ export default function Trabajo() {
                         <Link href={`/mecanico/detalle?id=${it.id}`} className="btn btn-ghost btn-sm btn-block mt-12"><i className="fa-solid fa-truck-fast"></i> Ver detalle y seguimiento</Link>
                       )}
                     </div>
-                  ) : ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked ? (
+                  ) : borrador ? null : ['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked ? (
                     <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="btn btn-primary btn-sm btn-block"><i className="fa-solid fa-tags"></i> Ver cotizaciones {it.quotesCount > 0 ? `(${it.quotesCount})` : ''}</Link>
                   ) : <Link href={`/mecanico/detalle?id=${it.id}`} className="btn btn-ghost btn-sm btn-block">Ver detalle</Link>}
                   {/* cuenta corriente por ítem (solo antes de generar el link) */}
@@ -145,7 +154,7 @@ export default function Trabajo() {
                   {['OPEN', 'QUOTED', 'CLOSED'].includes(it.status) && !locked && (
                     <div className="flex-between mt-8">
                       {it.selected ? <Link href={`/mecanico/cotizaciones?id=${it.id}&job=${j.id}`} className="text-xs text-purple" style={{ fontWeight: 700 }}>Cambiar elección →</Link> : <span></span>}
-                      <button className="text-xs" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', fontWeight: 700 }} onClick={() => desestimar(it)}><i className="fa-solid fa-ban"></i> Desestimar</button>
+                      <button className="text-xs" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FCA5A5', fontWeight: 700 }} onClick={() => desestimar(it)}><i className="fa-solid fa-ban"></i> {j.status === 'DRAFT' ? 'Quitar' : 'Desestimar'}</button>
                     </div>
                   )}
                 </div>

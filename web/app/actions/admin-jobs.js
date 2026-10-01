@@ -46,6 +46,14 @@ export async function adminCancelUnpaidRequest(requestId) {
     await prisma.request.update({ where: { id: r.id }, data: { status: 'CANCELLED' } });
   }
 
+  // registro: quién canceló y por qué camino (sin esto, después no se distingue de una cancelación del mecánico)
+  await prisma.auditLog.create({
+    data: {
+      actorId: s.id, action: job ? 'JOB_CANCELLED' : 'REQUEST_CANCELLED', entity: job ? 'job' : 'request', entityId: job?.id || r.id,
+      payload: { by: 'admin', via: 'admin_cancelar_impago', requestId: r.id, from: job?.status || r.status, hadLink: !!job?.paymentLink, linkDisabled },
+    },
+  }).catch(() => {});
+
   // 3) Avisar al mecánico: el link que tiene abierto dejó de servir
   const ref = job?.code ? `#${job.code}` : `#${r.code}`;
   await sendPush(r.mechanicId, {
