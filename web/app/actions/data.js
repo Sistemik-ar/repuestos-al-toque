@@ -147,14 +147,32 @@ async function sweepExpirations() {
     // ítem elegido y sin pagar -> cancelado. NO toca ítems cuyo trabajo ya tiene link generado
     // (job CLOSED): ese reloj corre por el trabajo (abajo); si no, se descalzan los dos relojes
     // y queda un ítem cancelado con un link todavía pagable.
-    await prisma.request.updateMany({
-      where: { status: 'CLOSED', selectedAt: { lt: cutoff }, OR: [{ jobId: null }, { job: { status: { not: 'CLOSED' } } }] },
-      data: { status: 'CANCELLED' },
-    });
+    await expireAndLog(prisma.request, 'request', 'REQUEST_CANCELLED', 'vencido_sin_pagar_24h',
+      { status: 'CLOSED', selectedAt: { lt: cutoff }, OR: [{ jobId: null }, { job: { status: { not: 'CLOSED' } } }] });
     // borradores sin tocar por 24hs -> cancelados; con link generado y sin pagar 24hs -> cancelados
-    await prisma.job.updateMany({ where: { status: 'DRAFT', updatedAt: { lt: cutoff } }, data: { status: 'CANCELLED' } });
-    await prisma.job.updateMany({ where: { status: 'CLOSED', selectedAt: { lt: cutoff } }, data: { status: 'CANCELLED' } });
+    await expireAndLog(prisma.job, 'job', 'JOB_CANCELLED', 'borrador_abandonado_24h', { status: 'DRAFT', updatedAt: { lt: cutoff } });
+    await expireAndLog(prisma.job, 'job', 'JOB_CANCELLED', 'link_sin_pagar_24h', { status: 'CLOSED', selectedAt: { lt: cutoff } });
   } catch {}
+  // borradores sin enviar hace 30 min: aviso al mecánico y al admin (import perezoso, best-effort)
+  try { await (await import('@/lib/draft-alerts')).alertStaleDrafts(); } catch {}
+}
+
+// Cancela lo que venció y lo deja en audit_logs (by: 'system'), para poder distinguir después una
+// cancelación automática de una manual. Se buscan los ids primero porque updateMany no los devuelve;
+// el update repite el where para no pisar algo que cambió de estado en el medio.
+async function expireAndLog(model, entity, action, via, where) {
+  const rows = await model.findMany({ where, select: { id: true } });
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id);
+  await model.updateMany({ where: { ...where, id: { in: ids } }, data: { status: 'CANCELLED' } });
+  await prisma.auditLog.createMany({ data: ids.map((id) => ({ action, entity, entityId: id, payload: { by: 'system', via } })) }).catch(() => {});
+}
+
+// Registro de cancelaciones manuales: quién (actorId) y por qué camino (via). Best-effort.
+function logCancel(actorId, entity, entityId, payload) {
+  return prisma.auditLog.create({
+    data: { actorId, action: entity === 'job' ? 'JOB_CANCELLED' : 'REQUEST_CANCELLED', entity, entityId, payload },
+  }).catch(() => {});
 }
 
 // El mecánico vuelve a publicar un pedido (cancelado, entregado o el que sea) con los mismos datos.
@@ -1465,6 +1483,7 @@ export async function cancelJob(jobId) {
   if (!['DRAFT', 'OPEN'].includes(job.status)) return { error: 'Este trabajo ya no se puede cancelar' };
   await prisma.request.updateMany({ where: { jobId, status: { in: ['OPEN', 'QUOTED', 'CLOSED'] } }, data: { status: 'CANCELLED' } });
   await prisma.job.update({ where: { id: jobId }, data: { status: 'CANCELLED' } });
+  await logCancel(s.id, 'job', jobId, { by: 'mechanic', via: 'cancelar_pedido', from: job.status });
   return { ok: true };
 }
 
@@ -1616,10 +1635,14 @@ export async function cancelItem(itemId) {
   if (['PAID', 'SHIPPED', 'DELIVERED'].includes(r.status)) return { error: 'Este ítem ya fue pagado' };
   if (r.job && ['CLOSED', 'PAID'].includes(r.job.status)) return { error: 'El link de pago ya fue generado; cancelá el trabajo completo' };
   await prisma.request.update({ where: { id: itemId }, data: { status: 'CANCELLED' } });
+  await logCancel(s.id, 'request', itemId, { by: 'mechanic', via: 'desestimar', jobId: r.jobId, from: r.status });
   // si no queda NINGÚN ítem vivo en el trabajo, el trabajo entero pasa a CANCELADO (no queda zombie activo)
   if (r.jobId) {
     const vivos = await prisma.request.count({ where: { jobId: r.jobId, status: { not: 'CANCELLED' } } });
-    if (vivos === 0) await prisma.job.update({ where: { id: r.jobId }, data: { status: 'CANCELLED' } }).catch(() => {});
+    if (vivos === 0) {
+      await prisma.job.update({ where: { id: r.jobId }, data: { status: 'CANCELLED' } }).catch(() => {});
+      await logCancel(s.id, 'job', r.jobId, { by: 'mechanic', via: 'ultimo_item_desestimado', from: r.job?.status });
+    }
   }
   return { ok: true };
 }

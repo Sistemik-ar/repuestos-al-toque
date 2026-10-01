@@ -101,6 +101,24 @@ export async function tgNotifyNewJob({ code, plate, brand, model, year, repuesto
   return sendTelegram(text, { chatId: cfg.chatId });
 }
 
+// Alerta: un mecánico cargó repuestos y nunca tocó "Solicitar presupuesto". Los comercios no lo ven,
+// así que conviene llamarlo. Va con el teléfono para no tener que buscarlo. Ver lib/draft-alerts.js.
+export async function tgNotifyStaleDraft({ code, plate, brand, model, year, items = [], mechanicName, phone, minutes }) {
+  const cfg = await getTelegramConfig();
+  if (!cfg.configured || !cfg.enabled || !cfg.chatId) return { ok: false, skipped: true };
+  const vehiculo = [brand, model, year].filter(Boolean).join(' ') || 'Vehículo sin datos';
+  const text = [
+    `⏳ <b>Pedido SIN ENVIAR</b> ${esc(code ? '#' + code : '')}`,
+    `<i>${esc(vehiculo)} · ${esc(plate || 's/patente')}</i>`,
+    `Repuestos: ${esc(items.length ? items.join(' · ') : '—')}`,
+    `Mecánico: ${esc(mechanicName || '—')}${phone ? ' · Tel: ' + esc(phone) : ''}`,
+    '',
+    `Lo armó hace ${esc(minutes)} min y no tocó "Solicitar presupuesto": los comercios no lo ven.`,
+    'Conviene llamarlo para que lo envíe.',
+  ].join('\n');
+  return sendTelegram(text, { chatId: cfg.chatId });
+}
+
 // Alerta: entró un pago de un trabajo que ya estaba cancelado. No se generó ninguna orden y la
 // plata quedó en Mercado Pago -> hay que devolverla a mano. Ver lib/order-guards.js.
 export async function tgNotifyOrphanPayment({ ref, code, paidAmount }) {

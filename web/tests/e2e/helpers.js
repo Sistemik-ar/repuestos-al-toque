@@ -42,7 +42,7 @@ export async function crearItem(m, desc, plate) {
   await m.locator('textarea').first().fill(desc);
   await m.getByRole('button', { name: /Continuar/i }).click(); // urgencia
   await m.getByRole('button', { name: /Continuar/i }).click(); // confirmar
-  await m.getByRole('button', { name: /Enviar pedido/i }).click();
+  await m.getByRole('button', { name: /Agregar repuesto/i }).click();
   await expect(m.getByText(/Repuesto agregado/i)).toBeVisible({ timeout: 30000 });
 }
 

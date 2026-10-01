@@ -272,7 +272,7 @@ export default function Pedido() {
         {step === 5 && (
           <div>
             <div className="eyebrow mb-8">Paso 5</div>
-            <h2 className="h-lg mb-16">Revisá y enviá</h2>
+            <h2 className="h-lg mb-16">Revisá el repuesto</h2>
             <div className="card mb-12">
               <Row icon="fa-car" label="Vehículo" value={`${st.brand || 'Toyota'} ${(needsOther ? st.modelOther : st.model) || 'Hilux'} ${st.year || '2019'}`} />
               <Row icon="fa-layer-group" label="Categoría" value={st.catLabel || 'Frenos'} />
@@ -282,7 +282,7 @@ export default function Pedido() {
             </div>
             <div className="float-notif">
               <i className="fa-solid fa-circle-info text-purple"></i>
-              <div className="text-sm subtle">Notificamos a las casas de <b>{st.catLabel || 'Frenos'}</b> en Bariloche. Vas a ir recibiendo las ofertas <b className="text-yellow">a medida que coticen</b>.</div>
+              <div className="text-sm subtle">Al <b>solicitar el presupuesto</b> avisamos a las casas de <b>{st.catLabel || 'Frenos'}</b> en Bariloche. Vas a ir recibiendo las ofertas <b className="text-yellow">a medida que coticen</b>.</div>
             </div>
           </div>
         )}
@@ -293,7 +293,7 @@ export default function Pedido() {
         <div className="flex gap-12">
           {step > 1 && <button className="btn btn-ghost" style={{ flex: '0 0 auto' }} onClick={() => { setTried(false); setStep(step - 1); }}><i className="fa-solid fa-arrow-left"></i></button>}
           <button className={`btn btn-block ${step === 5 ? 'btn-yellow' : 'btn-primary'}`} disabled={searching} onClick={next}>
-            {step === 5 ? <><i className="fa-solid fa-paper-plane"></i> Enviar pedido</> : <>Continuar <i className="fa-solid fa-arrow-right"></i></>}
+            {step === 5 ? <><i className="fa-solid fa-plus"></i> Agregar repuesto</> : <>Continuar <i className="fa-solid fa-arrow-right"></i></>}
           </button>
         </div>
       </div>
@@ -304,7 +304,8 @@ export default function Pedido() {
         </div>
       )}
 
-      {/* ¿Seguir comprando? (los 3 botones) */}
+      {/* ¿Seguir comprando? (los 3 botones). "Solicitar presupuesto" va primero y destacado: en prod
+          varios mecánicos se iban de acá creyendo que el pedido ya estaba enviado y quedaba en borrador. */}
       {added && (
         <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-0)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div className="form-narrow" style={{ width: '100%', maxWidth: 480 }}>
@@ -312,11 +313,15 @@ export default function Pedido() {
               <div className="store-avatar" style={{ margin: '0 auto 10px', background: 'rgba(34,197,94,0.16)', color: '#4ADE80' }}><i className="fa-solid fa-check"></i></div>
               <div className="h-md">Repuesto agregado</div>
               <div className="text-sm muted mt-4">{st.brand} {needsOther ? st.modelOther : st.model} · {st.plate || st.vin} · <b>{itemCount} ítem{itemCount === 1 ? '' : 's'}</b> en este trabajo</div>
-              <div className="text-xs muted mt-8"><i className="fa-solid fa-circle-info"></i> Los comercios recién lo ven cuando publiques. Todo lo de este auto viaja en un solo envío por comercio.</div>
             </div>
-            <button className="btn btn-primary btn-block btn-lg mb-12" onClick={otroRepuesto}><i className="fa-solid fa-plus"></i> Agregar otro repuesto a este auto</button>
-            <BusyButton className="btn btn-ghost btn-block mb-12" busyLabel="Publicando…" onClick={otroAuto}><i className="fa-solid fa-car"></i> Publicar y comprar para otro auto</BusyButton>
-            <BusyButton className="btn btn-yellow btn-block btn-lg" busyLabel="Publicando…" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · solicitar presupuesto</BusyButton>
+            <div className="float-notif mb-16" style={{ padding: '10px 12px', borderColor: 'rgba(250,204,21,0.55)', background: 'rgba(250,204,21,0.10)' }}>
+              <i className="fa-solid fa-triangle-exclamation text-yellow"></i>
+              <div className="text-sm subtle"><b>Todavía no se envió.</b> Los comercios lo ven recién cuando toques <b>Solicitar presupuesto</b>.</div>
+            </div>
+            <BusyButton className="btn btn-yellow btn-block btn-lg mb-12" busyLabel="Enviando…" onClick={esoEsTodo}><i className="fa-solid fa-paper-plane"></i> Eso es todo · solicitar presupuesto</BusyButton>
+            <button className="btn btn-ghost btn-block mb-12" onClick={otroRepuesto}><i className="fa-solid fa-plus"></i> Agregar otro repuesto a este auto</button>
+            <BusyButton className="btn btn-ghost btn-block" busyLabel="Enviando…" onClick={otroAuto}><i className="fa-solid fa-car"></i> Solicitar y pedir para otro auto</BusyButton>
+            <div className="text-xs muted mt-12" style={{ textAlign: 'center' }}>Todo lo de este auto viaja en un solo envío por comercio.</div>
           </div>
         </div>
       )}

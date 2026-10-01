@@ -22,7 +22,7 @@ test('un trabajo puede tener varios repuestos (seguir comprando)', async ({ brow
   await m.locator('textarea').first().fill(`Multi2 E2E ${stamp}`);
   await m.getByRole('button', { name: /Continuar/i }).click();
   await m.getByRole('button', { name: /Continuar/i }).click();
-  await m.getByRole('button', { name: /Enviar pedido/i }).click();
+  await m.getByRole('button', { name: /Agregar repuesto/i }).click();
   await expect(m.getByText(/2 ítems en este trabajo/i)).toBeVisible({ timeout: 15000 });
   await publicarTrabajo(m);
   await expect(m.getByText(/Multi1 E2E/)).toBeVisible();
