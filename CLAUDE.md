@@ -174,8 +174,11 @@ Configuración de este repo que leen las skills (las de `mattpocock-skills` y la
 ### Issue tracker
 
 GitHub Issues de `Sistemik-ar/repuestos-al-toque`, con `gh`. Ver `docs/agents/issue-tracker.md`.
-Las etiquetas de triage todavía no están creadas en este repo (`/setup-matt-pocock-skills`
-las crea).
+
+### Triage labels
+
+Las cinco etiquetas canónicas (`needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`), creadas en el repo el 01/11/2026. Ver `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
