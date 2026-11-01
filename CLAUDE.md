@@ -21,7 +21,7 @@ las manos sucias), **casas de repuestos** (cotizan contra reloj), **repartidores
 2. `docs/RepuestosAlToque-Reglas-de-Negocio.md` y `docs/RepuestosAlToque-Modelo-de-Datos.md`
    — la intención original. `docs/ARQUITECTURA.md` — el diseño técnico (dice Neon y
    split de MP: hoy es Supabase y cobro centralizado).
-3. `/Users/feliarana/Projects/sistemik/sistemik-skills` — lo compartido de Sistemik:
+3. `~/Projects/sistemik/sistemik-skills` — lo compartido de Sistemik:
    `docs/proyectos.md` (este proyecto entre los demás), `docs/estado-sistemik.md`
    (cuentas, dominio, categorización FortiGuard).
 4. El código: `web/` es la app real; `demo/` es una maqueta estática con datos
